@@ -1,5 +1,4 @@
-import apiClient from "./services.js"; 
-
+import apiClient from "./services.js";
 export default {
   loginUser(user) {
     return apiClient.post("auth/login", user);

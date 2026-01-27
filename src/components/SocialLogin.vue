@@ -39,27 +39,17 @@ const handleCredentialResponse = async (response) => {
       fName.value = user.value.fName;
       lName.value = user.value.lName;
       
-      // Redirect based on user role
-      console.log('User logged in:', user.value);
+      // Login successful - for now just log the user info
+      console.log('User logged in successfully!');
+      console.log('User data:', user.value);
       console.log('User role:', user.value.role);
       
-      switch(user.value.role) {
-        case 'admin':
-          router.push({ name: 'adminDashboard' });
-          break;
-        case 'coach':
-          router.push({ name: 'coachDashboard' });
-          break;
-        case 'athlete':
-          router.push({ name: 'athleteDashboard' });
-          break;
-        default:
-          console.warn('Unknown role:', user.value.role);
-          router.push({ name: 'login' });
-      }
+      // TODO: Add dashboard routes later
+      alert(`Welcome ${user.value.fName} ${user.value.lName}! Role: ${user.value.role}`);
     })
     .catch((error) => {
-      console.log("error", error);
+      console.log("Login error:", error);
+      alert("Login failed. Please try again.");
     });
 };
 
