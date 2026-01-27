@@ -8,13 +8,13 @@ var baseurl = import.meta.env.VITE_APP_API_URL;
 // Fallback logic
 if (!baseurl) {
   if (import.meta.env.DEV) {
-    baseurl = "http://localhost:3121/tracker-t1/api/";
+    baseurl = "http://localhost:3121/workerscheduling/api/";
   } else {
-    baseurl = "https://project3.eaglesoftwareteam.com/tracker-t1/api/";
+    baseurl = "https://workerscheduling.eaglesoftwareteam.com/workerscheduling/api/";
   }
 }
 
-console.log("API Base URL:", baseurl); // DEBUG: Remove this later
+console.log("API Base URL:", baseurl);
 
 const apiClient = axios.create({
   baseURL: baseurl,

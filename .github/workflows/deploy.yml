@@ -1,0 +1,46 @@
+name: Deploy Frontend to AWS
+
+on:
+  push:
+    branches:
+      - dev
+  pull_request:
+    types: [closed]
+    branches:
+      - dev
+
+jobs:
+  aws-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: dev
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      
+      - name: Create production environment file
+        run: |
+          touch .env
+          echo VITE_APP_CLIENT_ID="${{ secrets.VITE_APP_CLIENT_ID }}" >> .env
+          echo VITE_APP_CLIENT_URL="${{ secrets.VITE_APP_CLIENT_URL }}" >> .env
+          echo VITE_APP_API_URL="${{ secrets.VITE_APP_API_URL }}" >> .env
+          echo VITE_APP_GOOGLE_API_URL="${{ secrets.VITE_APP_GOOGLE_API_URL }}" >> .env
+          echo "=== .env file contents ==="
+          cat .env
+          echo "=========================="
+
+      - run: npm install
+      - run: npm run build
+      - run: npm run bundle
+
+      - name: Deploy to Server
+        uses: easingthemes/ssh-deploy@v2.1.1
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          ARGS: "-rltgoDzvO --delete"
+          SOURCE: "dist/"
+          REMOTE_HOST: workerscheduling.eaglesoftwareteam.com
+          REMOTE_USER: ubuntu
+          TARGET: "/var/www/html/sev2026/t1"

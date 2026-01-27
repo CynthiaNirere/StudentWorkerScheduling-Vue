@@ -6,7 +6,7 @@ import * as components from "vuetify/components";
 import * as directives from "vuetify/directives";
 
 // Import VDataTable from labs (included in vuetify package)
-import { VDataTable } from "vuetify/labs/components";
+// import { VDataTable } from "vuetify/labs/components"; // COMMENTED OUT - not needed for login
 
 // Misc
 import { loadFonts } from "./webfontloader";
@@ -34,7 +34,7 @@ const myCustomLightTheme = {
 const vuetify = createVuetify({
   components: {
     ...components,
-    VDataTable, // Add VDataTable component
+    // VDataTable, // COMMENTED OUT - not needed for login
   },
   directives,
   theme: {
