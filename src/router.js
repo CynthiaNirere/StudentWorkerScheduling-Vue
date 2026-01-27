@@ -7,23 +7,11 @@ import Login from "./views/Login.vue";
 // Admin Views
 import AdminDashboard from "./views/AdminDashboard.vue";
 import AdminUsers from "./views/AdminUsers.vue";
-import AdminExercises from "./views/AdminExercises.vue";
-import AdminExercisePlans from "./views/AdminExercisePlans.vue";
-
-// Athlete Views
-import AthleteDashboard from "./views/AthleteDashboard.vue";
-import AthleteProfile from "./views/AthleteProfile.vue";
-import RecordExercise from "./views/RecordExercise.vue";
-import AthleteGoals from "./views/AthleteGoals.vue";
-import ViewExerciseResults from "./views/ViewExerciseResults.vue";
-import ViewProgress from "./views/ViewProgress.vue";
-import AthleteAssignedPlans from "./views/AthleteAssignedPlans.vue";
 
 // Coach Views
 import CoachDashboard from "./views/CoachDashboard.vue";
 import CoachExercises from "./views/CoachExercises.vue";
-import CoachPlans from "./views/CoachPlans.vue";
-import AthleteDetail from "./views/AthleteDetails.vue";
+
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
