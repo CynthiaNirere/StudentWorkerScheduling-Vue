@@ -1,5 +1,4 @@
 <script setup>
-import ocLogo from "/oc-logo-white.png";
 import { ref, onMounted } from "vue";
 import Utils from "../config/utils";
 import AuthServices from "../services/authServices";
@@ -7,10 +6,9 @@ import { useRouter } from "vue-router";
 
 const router = useRouter();
 const user = ref(null);
-const title = ref("Exercise Tracker");
+const title = ref("Work Schedule JL");
 const initials = ref("");
 const name = ref("");
-const logoURL = ref("");
 
 const resetMenu = () => {
   user.value = Utils.getStore("user");
@@ -32,119 +30,26 @@ const logout = async () => {
   }
 };
 
-// Get dashboard route based on user role
-const getDashboardRoute = () => {
-  if (!user.value) return { name: "login" };
-  switch (user.value.role) {
-    case "admin":
-      return { name: "adminDashboard" };
-    case "coach":
-      return { name: "coachDashboard" };
-    case "athlete":
-      return { name: "athleteDashboard" };
-    default:
-      return { name: "login" };
-  }
-};
-
 onMounted(() => {
-  logoURL.value = ocLogo;
   resetMenu();
 });
 </script>
 
 <template>
-  <v-app-bar color="primary" elevation="2">
-    <!-- Logo -->
-    <router-link :to="getDashboardRoute()" style="text-decoration: none">
-      <v-img
-        class="mx-3"
-        :src="logoURL"
-        height="45"
-        width="45"
-        cover
-      ></v-img>
-    </router-link>
-    
+  <!-- Only show app bar if user is logged in -->
+  <v-app-bar v-if="user" color="primary" elevation="2">
     <!-- App Title -->
-    <v-toolbar-title>{{ title }}</v-toolbar-title>
+    <v-toolbar-title class="mx-4">{{ title }}</v-toolbar-title>
     
     <v-spacer></v-spacer>
     
-    <!-- ========================================
-         ADMIN MENU
-         ======================================== -->
-    <template v-if="user && user.role === 'admin'">
-      <v-btn class="mx-2" :to="{ name: 'adminDashboard' }" variant="text">
-        
-        Dashboard
-      </v-btn>
-      <v-btn class="mx-2" :to="{ name: 'userManagement' }" variant="text">
-        
-        Users
-      </v-btn>
-      <v-btn class="mx-2" :to="{ name: 'exerciseManagement' }" variant="text">
-        
-        Exercises
-      </v-btn>
-      <v-btn class="mx-2" :to="{ name: 'exercisePlansManagement' }" variant="text">
-       
-        Plans
-      </v-btn>
-    </template>
+    <!-- User info chip -->
+    <v-chip color="secondary" class="mx-2">
+      {{ user.role }}
+    </v-chip>
     
-    <!-- ========================================
-         COACH MENU (ADDED!)
-         ======================================== -->
-    <template v-else-if="user && user.role === 'coach'">
-      <v-btn class="mx-2" :to="{ name: 'coachDashboard' }" variant="text">
-        
-        Dashboard
-      </v-btn>
-      <v-btn class="mx-2" :to="{ name: 'coach-exercises' }" variant="text">
-        
-        Exercises
-      </v-btn>
-      <v-btn class="mx-2" :to="{ name: 'coach-plans' }" variant="text">
-        
-        Plans
-      </v-btn>
-    </template>
-    
-    <!-- ========================================
-         ATHLETE MENU
-         ======================================== -->
-    <template v-else-if="user && user.role === 'athlete'">
-      <v-btn class="mx-2" :to="{ name: 'athleteDashboard' }" variant="text">
-        
-        Dashboard
-      </v-btn>
-      <v-btn class="mx-2" :to="{ name: 'athleteProfile' }" variant="text">
-        
-        Profile
-      </v-btn>
-      <v-btn class="mx-2" :to="{ name: 'recordExercise' }" variant="text">
-        
-        Record
-      </v-btn>
-      <v-btn class="mx-2" :to="{ name: 'athleteGoals' }" variant="text">
-        
-        Goals
-      </v-btn>
-      <v-btn class="mx-2" :to="{ name: 'viewExerciseResults' }" variant="text">
-        
-        Results
-      </v-btn>
-      <v-btn class="mx-2" :to="{ name: 'athleteAssignedPlans' }" variant="text">
-        
-        Plans
-      </v-btn>
-    </template>
-    
-    <!-- ========================================
-         USER PROFILE MENU
-         ======================================== -->
-    <v-menu v-if="user" location="bottom">
+    <!-- User Profile Menu -->
+    <v-menu location="bottom">
       <template v-slot:activator="{ props }">
         <v-btn v-bind="props" icon>
           <v-avatar color="secondary">
