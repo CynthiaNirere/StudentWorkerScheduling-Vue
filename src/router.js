@@ -7,9 +7,7 @@ import Login from "./views/Login.vue";
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    // ========================================
-    // Public Routes
-    // ========================================
+    
     {
       path: "/",
       redirect: "/login",
