@@ -9,4 +9,7 @@ export default {
   logoutUser(token) {
     return apiClient.post("auth/logout", token);
   },
+  signUp(userData) {
+  return apiClient.post("auth/signup", userData);
+}
 };
