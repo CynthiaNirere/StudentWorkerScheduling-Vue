@@ -10,7 +10,13 @@ const router = createRouter({
   routes: [
     {
       path: "/",
-      redirect: "/login",
+      redirect: "/signup",
+    },
+    {
+      path: "/signup",
+      name: "signup",
+      component: SignUp,
+      meta: { requiresAuth: false },
     },
     {
       path: "/login",
@@ -26,7 +32,7 @@ const router = createRouter({
     },
     {
       path: "/:pathMatch(.*)*",
-      redirect: "/login",
+      redirect: "/signup",
     },
   ],
 });
@@ -37,8 +43,8 @@ router.beforeEach((to, from, next) => {
 
   // If route requires auth and user is not logged in
   if (requiresAuth && !user) {
-    console.log("Not authenticated, redirecting to login");
-    next({ name: "login" });
+    console.log("Not authenticated, redirecting to signup");
+    next({ name: "signup" });
     return;
   }
 
