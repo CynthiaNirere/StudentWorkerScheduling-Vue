@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import Utils from "./config/utils";
 
 // Views
+import SignUp from "./views/SignUp.vue";
 import Login from "./views/Login.vue";
 import RoleSelect from "./views/RoleSelect.vue";
 
