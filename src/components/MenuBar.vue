@@ -6,7 +6,7 @@ import { useRouter } from "vue-router";
 
 const router = useRouter();
 const user = ref(null);
-const title = ref("Work Schedule JL");
+const title = ref("TalonTime");
 const initials = ref("");
 const name = ref("");
 
@@ -36,8 +36,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <!-- Only show app bar if user is logged in -->
-  <v-app-bar v-if="user" color="primary" elevation="2">
+  <!-- Only show app bar if user is logged in and NOT on employee dashboard -->
+  <v-app-bar v-if="user && $route.name !== 'employeeDashboard'" color="primary" elevation="2">
     <!-- App Title -->
     <v-toolbar-title class="mx-4">{{ title }}</v-toolbar-title>
     
