@@ -9,7 +9,8 @@ const currentDate = ref('');
 const user = ref(null);
 const showNotifications = ref(false);
 const unreadCount = ref(3);
-const businessArea = ref('The Brew'); // Business name
+const businessArea = ref('The Brew');
+const activeTab = ref(0); // 0: Dashboard, 1: Schedule, 2: Team
 
 const todaysTasks = ref([
   { id: 1, title: 'Restock supplies', dueTime: 'Due end of shift', completed: false },
@@ -43,15 +44,6 @@ const notifications = ref([
     timestamp: '1 hour ago',
     priority: 'normal',
     icon: 'mdi-calendar-check'
-  },
-  {
-    id: 4,
-    type: 'Shift Available',
-    message: 'Extra shift available Saturday 10AM-6PM',
-    timestamp: '2 hours ago',
-    action: 'Claim',
-    priority: 'normal',
-    icon: 'mdi-briefcase-plus'
   }
 ]);
 
@@ -101,12 +93,31 @@ const upcomingShifts = ref([
   }
 ]);
 
+// Calendar schedule data
+const calendarShifts = ref([
+  { date: '2026-02-16', employee: 'You', time: '9:00 AM - 5:00 PM', status: 'confirmed', color: '#4caf50' },
+  { date: '2026-02-16', employee: 'Alex Martinez', time: '2:00 PM - 10:00 PM', status: 'confirmed', color: '#4caf50' },
+  { date: '2026-02-16', employee: 'Sam Wilson', time: '10:00 AM - 6:00 PM', status: 'confirmed', color: '#4caf50' },
+  { date: '2026-02-17', employee: 'You', time: 'OFF', status: 'off', color: '#e0e0e0' },
+  { date: '2026-02-18', employee: 'You', time: '2:00 PM - 10:00 PM', status: 'confirmed', color: '#4caf50' },
+  { date: '2026-02-18', employee: 'Jordan Lee', time: '9:00 AM - 5:00 PM', status: 'pending-swap', color: '#ff9800' },
+  { date: '2026-02-19', employee: 'You', time: '9:00 AM - 1:00 PM', status: 'available', color: '#2196f3' },
+]);
+
+// Team members
+const teamMembers = ref([
+  { id: 1, name: 'You (Tessy)', role: 'Barista', status: 'off-shift', avatar: 'T' },
+  { id: 2, name: 'Alex Martinez', role: 'Barista', status: 'on-shift', avatar: 'AM', shiftEnd: '10:00 PM' },
+  { id: 3, name: 'Sam Wilson', role: 'Manager', status: 'on-shift', avatar: 'SW', shiftEnd: '6:00 PM' },
+  { id: 4, name: 'Jordan Lee', role: 'Barista', status: 'off-shift', avatar: 'JL' },
+  { id: 5, name: 'Maria Garcia', role: 'Barista', status: 'on-shift', avatar: 'MG', shiftEnd: '8:00 PM' },
+]);
+
 const quickStats = ref({
   hoursThisWeek: 32.5,
   nextShiftTime: '9:00 AM Tomorrow'
 });
 
-// Urgent notifications (high priority)
 const urgentNotifications = computed(() => {
   return notifications.value.filter(n => n.priority === 'high');
 });
@@ -231,6 +242,21 @@ const getStatusChipColor = (status) => {
     case 'needs-changes': return 'error';
     default: return 'grey';
   }
+};
+
+const getShiftStatusColor = (status) => {
+  switch(status) {
+    case 'confirmed': return '#4caf50';
+    case 'pending-swap': return '#ff9800';
+    case 'available': return '#2196f3';
+    case 'off': return '#e0e0e0';
+    default: return '#9e9e9e';
+  }
+};
+
+const requestShiftSwap = (shiftDate) => {
+  console.log('Request shift swap for:', shiftDate);
+  alert('Shift swap request submitted!');
 };
 </script>
 
@@ -399,262 +425,453 @@ const getStatusChipColor = (status) => {
         </div>
       </div>
 
-      <!-- Urgent Notifications Banner -->
-      <div v-if="urgentNotifications.length > 0" class="urgent-notifications-banner">
-        <div class="container">
-          <v-slide-group show-arrows class="pa-0">
-            <v-slide-group-item v-for="notification in urgentNotifications" :key="notification.id">
-              <v-card class="urgent-notification-card ma-2">
-                <v-card-text class="pa-4 d-flex justify-space-between align-center">
-                  <div class="d-flex gap-3 align-center flex-grow-1">
-                    <v-icon color="error" size="large">{{ notification.icon }}</v-icon>
-                    <div>
-                      <p class="text-body-2 font-weight-bold text-error mb-1">⚠️ {{ notification.type }}</p>
-                      <p class="text-body-2 mb-0">{{ notification.message }}</p>
+      <!-- Subtle Urgent Notifications Banner -->
+      <div v-if="urgentNotifications.length > 0" class="urgent-banner pa-4">
+        <v-row align="center" class="ma-0">
+          <v-col cols="auto">
+            <v-icon color="warning" size="small">mdi-alert</v-icon>
+          </v-col>
+          <v-col cols="auto" class="flex-grow-1">
+            <p class="text-body-2 mb-0">
+              <strong>{{ urgentNotifications[0].type }}:</strong> {{ urgentNotifications[0].message }}
+            </p>
+          </v-col>
+          <v-col cols="auto">
+            <v-btn size="small" variant="text" @click="viewAllNotifications">
+              View All
+            </v-btn>
+          </v-col>
+        </v-row>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs-container">
+        <v-tabs v-model="activeTab" class="pl-6">
+          <v-tab>
+            <v-icon start>mdi-view-dashboard</v-icon>
+            Dashboard
+          </v-tab>
+          <v-tab>
+            <v-icon start>mdi-calendar</v-icon>
+            Schedule
+          </v-tab>
+          <v-tab>
+            <v-icon start>mdi-people</v-icon>
+            Team
+          </v-tab>
+        </v-tabs>
+      </div>
+
+      <!-- Tab Content -->
+      <v-container fluid class="pa-6">
+        <!-- TAB 1: DASHBOARD -->
+        <div v-if="activeTab === 0">
+          <!-- Quick Stats Row -->
+          <v-row class="mb-6">
+            <v-col cols="12" sm="6" lg="3">
+              <v-card class="stat-card shadow-lg">
+                <v-card-text class="text-center pa-6">
+                  <v-icon size="large" color="primary" class="mb-2">mdi-clock-outline</v-icon>
+                  <p class="text-caption text-grey mb-1">Hours This Week</p>
+                  <p class="text-h5 font-weight-bold">{{ quickStats.hoursThisWeek }}h</p>
+                </v-card-text>
+              </v-card>
+            </v-col>
+            <v-col cols="12" sm="6" lg="3">
+              <v-card class="stat-card shadow-lg">
+                <v-card-text class="text-center pa-6">
+                  <v-icon size="large" color="success" class="mb-2">mdi-calendar</v-icon>
+                  <p class="text-caption text-grey mb-1">Next Shift</p>
+                  <p class="text-h6 font-weight-bold">{{ quickStats.nextShiftTime }}</p>
+                </v-card-text>
+              </v-card>
+            </v-col>
+            <v-col cols="12" sm="6" lg="3">
+              <v-card class="stat-card shadow-lg">
+                <v-card-text class="text-center pa-6">
+                  <v-icon size="large" color="info" class="mb-2">mdi-briefcase</v-icon>
+                  <p class="text-caption text-grey mb-1">Shifts This Week</p>
+                  <p class="text-h5 font-weight-bold">3</p>
+                </v-card-text>
+              </v-card>
+            </v-col>
+            <v-col cols="12" sm="6" lg="3">
+              <v-card class="stat-card shadow-lg" :class="'stat-' + scheduleStatus.status">
+                <v-card-text class="text-center pa-6">
+                  <v-icon size="large" :color="scheduleStatus.color" class="mb-2">
+                    {{ scheduleStatus.icon }}
+                  </v-icon>
+                  <p class="text-caption text-grey mb-1">Schedule Status</p>
+                  <p class="text-body-2 font-weight-bold">{{ scheduleStatus.status === 'approved' ? 'Approved' : 'Pending' }}</p>
+                </v-card-text>
+              </v-card>
+            </v-col>
+          </v-row>
+
+          <v-row>
+            <!-- Clock In/Out & Upcoming Shifts -->
+            <v-col cols="12" lg="8">
+              <!-- Clock In/Out Section -->
+              <v-card class="shadow-lg mb-6">
+                <v-card-text class="pa-6">
+                  <!-- Current Time -->
+                  <div class="text-center mb-6">
+                    <p class="text-caption text-grey mb-2">Current Time</p>
+                    <div class="clock-display">
+                      <p class="text-h3 font-weight-bold mb-0">{{ currentTime }}</p>
+                    </div>
+                    <p class="text-body-2 text-grey mt-4">{{ currentDate }}</p>
+                  </div>
+
+                  <v-divider class="my-6"></v-divider>
+
+                  <!-- Shift Info -->
+                  <div class="shift-info mb-6">
+                    <h3 class="text-h6 font-weight-bold mb-2">Today's Shift</h3>
+                    <p class="text-body-1 font-weight-bold">9:00 AM - 5:00 PM @ {{ businessArea }}</p>
+                  </div>
+
+                  <v-divider class="my-6"></v-divider>
+
+                  <!-- Current Shift Sessions -->
+                  <div class="shift-sessions">
+                    <div v-if="currentShift" class="active-shift mb-6">
+                      <div class="d-flex justify-space-between align-center mb-4">
+                        <h4 class="text-body-1 font-weight-bold">Shift #{{ currentShift.id }} - Active</h4>
+                        <v-chip color="success" size="small">In Progress</v-chip>
+                      </div>
+                      <v-row class="mb-4">
+                        <v-col cols="6" class="text-center">
+                          <p class="text-caption text-grey mb-2">Check In Time</p>
+                          <p class="text-body-2 font-weight-bold">{{ formatTime(currentShift.checkInTime) }}</p>
+                        </v-col>
+                        <v-col cols="6" class="text-center">
+                          <p class="text-caption text-grey mb-2">Duration</p>
+                          <p class="text-body-2 font-weight-bold text-primary">Running...</p>
+                        </v-col>
+                      </v-row>
+                      <v-btn block color="warning" @click="checkOut(currentShift.id)">
+                        <v-icon left>mdi-clock-out</v-icon>
+                        Check Out
+                      </v-btn>
+                    </div>
+
+                    <div v-if="completedShifts.length > 0" class="completed-shifts">
+                      <p class="text-body-2 font-weight-bold mb-3">Completed Shifts</p>
+                      <div v-for="shift in completedShifts" :key="shift.id" class="shift-card mb-3">
+                        <div class="d-flex justify-space-between align-center mb-2">
+                          <p class="text-body-2 font-weight-bold">Shift #{{ shift.id }}</p>
+                          <v-chip color="grey" size="small">Completed</v-chip>
+                        </div>
+                        <v-row class="mb-2">
+                          <v-col cols="4" class="text-center">
+                            <p class="text-caption text-grey">In</p>
+                            <p class="text-body-2 font-weight-bold">{{ formatTime(shift.checkInTime) }}</p>
+                          </v-col>
+                          <v-col cols="4" class="text-center">
+                            <p class="text-caption text-grey">Out</p>
+                            <p class="text-body-2 font-weight-bold">{{ formatTime(shift.checkOutTime) }}</p>
+                          </v-col>
+                          <v-col cols="4" class="text-center">
+                            <p class="text-caption text-grey">Hours</p>
+                            <p class="text-body-2 font-weight-bold text-success">{{ shift.totalHours }}h</p>
+                          </v-col>
+                        </v-row>
+                      </div>
+                    </div>
+
+                    <div v-if="!currentShift && shiftSessions.length === 0" class="text-center py-4">
+                      <v-btn block color="primary" size="large" @click="checkIn">
+                        <v-icon left>mdi-clock-in</v-icon>
+                        Start First Shift
+                      </v-btn>
+                    </div>
+
+                    <div v-if="!currentShift && shiftSessions.length > 0" class="text-center py-4">
+                      <v-btn block color="primary" size="large" @click="checkIn">
+                        <v-icon left>mdi-clock-in</v-icon>
+                        Start Shift #{{ shiftSessions.length + 1 }}
+                      </v-btn>
                     </div>
                   </div>
-                  <v-btn 
-                    icon 
-                    size="small"
-                    @click="viewAllNotifications"
-                    class="ml-4"
-                  >
-                    <v-icon>mdi-chevron-right</v-icon>
+                </v-card-text>
+              </v-card>
+
+              <!-- Upcoming Shifts -->
+              <v-card class="shadow-lg">
+                <v-card-title class="text-h6 font-weight-bold pa-6">
+                  <v-icon left>mdi-calendar-multiple</v-icon>
+                  Upcoming Shifts
+                </v-card-title>
+                <v-divider></v-divider>
+                <v-card-text class="pa-4">
+                  <div v-for="(shift, index) in upcomingShifts" :key="shift.id" class="upcoming-shift-item mb-4">
+                    <div class="d-flex gap-3">
+                      <div class="shift-date-badge">
+                        <p class="text-caption mb-0">{{ shift.date.split(',')[0] }}</p>
+                        <p class="text-h6 font-weight-bold mb-0">{{ shift.date.split(',')[1].trim().split(' ')[1] }}</p>
+                      </div>
+                      <div class="flex-grow-1">
+                        <p class="text-body-2 font-weight-bold mb-1">{{ shift.time }}</p>
+                        <p class="text-caption text-grey mb-0">📍 {{ shift.location }}</p>
+                      </div>
+                    </div>
+                    <v-divider v-if="index !== upcomingShifts.length - 1" class="my-3"></v-divider>
+                  </div>
+                </v-card-text>
+              </v-card>
+            </v-col>
+
+            <!-- Right Column: Tasks & Pending Requests -->
+            <v-col cols="12" lg="4">
+              <!-- Tasks -->
+              <v-card class="shadow-lg mb-6">
+                <v-card-title class="text-h6 font-weight-bold pa-4">
+                  <v-icon left>mdi-checkbox-marked-circle-outline</v-icon>
+                  Today's Tasks
+                </v-card-title>
+                <v-divider></v-divider>
+                <v-card-text class="pa-4">
+                  <div v-if="todaysTasks.length === 0" class="text-center py-4">
+                    <p class="text-grey text-body-2">No tasks assigned</p>
+                  </div>
+                  <div v-for="task in todaysTasks" :key="task.id" class="mb-3">
+                    <v-checkbox
+                      :model-value="task.completed"
+                      @update:model-value="toggleTask(task.id)"
+                      hide-details
+                      size="small"
+                    >
+                      <template #label>
+                        <div class="task-item">
+                          <p :class="['text-body-2 mb-0', { 'text-decoration-line-through text-grey': task.completed }]">
+                            {{ task.title }}
+                          </p>
+                          <p class="text-caption text-grey mb-0">{{ task.dueTime }}</p>
+                        </div>
+                      </template>
+                    </v-checkbox>
+                  </div>
+                </v-card-text>
+              </v-card>
+
+              <!-- Pending Requests -->
+              <v-card class="shadow-lg">
+                <v-card-title class="text-h6 font-weight-bold pa-4">
+                  <v-icon left>mdi-clock-alert</v-icon>
+                  Pending Requests
+                </v-card-title>
+                <v-divider></v-divider>
+                <v-card-text class="pa-4">
+                  <div v-if="pendingRequests.length === 0" class="text-center py-4">
+                    <p class="text-grey text-body-2">No pending requests</p>
+                  </div>
+                  <div v-for="(request, index) in pendingRequests" :key="request.id" class="pending-request-item mb-3">
+                    <div class="d-flex justify-space-between align-start mb-2">
+                      <div>
+                        <p class="text-body-2 font-weight-bold mb-1">{{ request.type }}</p>
+                        <p class="text-caption text-grey mb-1">{{ request.date }}</p>
+                      </div>
+                      <v-chip 
+                        :color="getStatusChipColor(request.status)"
+                        text-color="white"
+                        size="small"
+                      >
+                        {{ request.status }}
+                      </v-chip>
+                    </div>
+                    <p class="text-caption text-grey mb-0">{{ request.submitDate }}</p>
+                    <v-divider v-if="index !== pendingRequests.length - 1" class="my-3"></v-divider>
+                  </div>
+                </v-card-text>
+              </v-card>
+            </v-col>
+          </v-row>
+        </div>
+
+        <!-- TAB 2: SCHEDULE CALENDAR -->
+        <div v-if="activeTab === 1">
+          <v-row>
+            <v-col cols="12" lg="8">
+              <v-card class="shadow-lg">
+                <v-card-title class="text-h6 font-weight-bold pa-6">
+                  <v-icon left>mdi-calendar-range</v-icon>
+                  February 2026 Schedule
+                </v-card-title>
+                <v-divider></v-divider>
+                <v-card-text class="pa-6">
+                  <div class="schedule-legend mb-6">
+                    <div class="d-flex gap-3 align-center flex-wrap">
+                      <div class="d-flex align-center gap-2">
+                        <div class="legend-color" style="background: #4caf50;"></div>
+                        <span class="text-body-2">Confirmed</span>
+                      </div>
+                      <div class="d-flex align-center gap-2">
+                        <div class="legend-color" style="background: #ff9800;"></div>
+                        <span class="text-body-2">Pending Swap</span>
+                      </div>
+                      <div class="d-flex align-center gap-2">
+                        <div class="legend-color" style="background: #2196f3;"></div>
+                        <span class="text-body-2">Available</span>
+                      </div>
+                      <div class="d-flex align-center gap-2">
+                        <div class="legend-color" style="background: #e0e0e0;"></div>
+                        <span class="text-body-2">Off</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Simple Table View -->
+                  <v-table class="schedule-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Employee</th>
+                        <th>Time</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="shift in calendarShifts" :key="shift.date + shift.employee">
+                        <td>{{ shift.date }}</td>
+                        <td>
+                          <v-avatar size="32" class="mr-2" v-if="shift.employee === 'You'">
+                            <span class="font-weight-bold text-white" style="background: #8b3a42;">T</span>
+                          </v-avatar>
+                          {{ shift.employee }}
+                        </td>
+                        <td>{{ shift.time }}</td>
+                        <td>
+                          <v-chip 
+                            :color="getShiftStatusColor(shift.status)"
+                            :text-color="shift.status === 'off' ? 'black' : 'white'"
+                            size="small"
+                          >
+                            {{ shift.status.replace('-', ' ') }}
+                          </v-chip>
+                        </td>
+                        <td>
+                          <v-btn 
+                            v-if="shift.employee === 'You' && shift.status === 'pending-swap'"
+                            size="x-small" 
+                            color="primary"
+                            @click="requestShiftSwap(shift.date)"
+                          >
+                            Swap
+                          </v-btn>
+                          <v-btn 
+                            v-else-if="shift.employee === 'You' && shift.status === 'available'"
+                            size="x-small" 
+                            color="primary"
+                          >
+                            Claim
+                          </v-btn>
+                          <span v-else class="text-grey text-caption">-</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </v-table>
+                </v-card-text>
+              </v-card>
+            </v-col>
+
+            <!-- Requests Sidebar -->
+            <v-col cols="12" lg="4">
+              <v-card class="shadow-lg mb-6">
+                <v-card-title class="text-h6 font-weight-bold pa-4">
+                  <v-icon left>mdi-clock-alert</v-icon>
+                  Pending Requests
+                </v-card-title>
+                <v-divider></v-divider>
+                <v-card-text class="pa-4">
+                  <div v-for="(request, index) in pendingRequests" :key="request.id" class="pending-request-item mb-3">
+                    <div class="d-flex justify-space-between align-start mb-2">
+                      <div>
+                        <p class="text-body-2 font-weight-bold mb-1">{{ request.type }}</p>
+                        <p class="text-caption text-grey mb-1">{{ request.date }}</p>
+                      </div>
+                      <v-chip 
+                        :color="getStatusChipColor(request.status)"
+                        text-color="white"
+                        size="small"
+                      >
+                        {{ request.status }}
+                      </v-chip>
+                    </div>
+                    <p class="text-caption text-grey mb-0">{{ request.submitDate }}</p>
+                    <v-divider v-if="index !== pendingRequests.length - 1" class="my-3"></v-divider>
+                  </div>
+                </v-card-text>
+              </v-card>
+
+              <v-card class="shadow-lg">
+                <v-card-title class="text-h6 font-weight-bold pa-4">
+                  <v-icon left>mdi-plus-circle</v-icon>
+                  New Request
+                </v-card-title>
+                <v-divider></v-divider>
+                <v-card-text class="pa-4">
+                  <v-btn block color="primary" class="mb-2">
+                    <v-icon left>mdi-calendar-off</v-icon>
+                    Request Time Off
+                  </v-btn>
+                  <v-btn block color="primary" variant="outlined">
+                    <v-icon left>mdi-swap-horizontal</v-icon>
+                    Request Shift Swap
                   </v-btn>
                 </v-card-text>
               </v-card>
-            </v-slide-group-item>
-          </v-slide-group>
+            </v-col>
+          </v-row>
         </div>
-      </div>
 
-      <!-- Main Grid -->
-      <v-container fluid class="pa-6">
-        <!-- Quick Stats Row -->
-        <v-row class="mb-6">
-          <v-col cols="12" sm="6" lg="3">
-            <v-card class="stat-card shadow-lg">
-              <v-card-text class="text-center pa-6">
-                <v-icon size="large" color="primary" class="mb-2">mdi-clock-outline</v-icon>
-                <p class="text-caption text-grey mb-1">Hours This Week</p>
-                <p class="text-h5 font-weight-bold">{{ quickStats.hoursThisWeek }}h</p>
-              </v-card-text>
-            </v-card>
-          </v-col>
-          <v-col cols="12" sm="6" lg="3">
-            <v-card class="stat-card shadow-lg">
-              <v-card-text class="text-center pa-6">
-                <v-icon size="large" color="success" class="mb-2">mdi-calendar</v-icon>
-                <p class="text-caption text-grey mb-1">Next Shift</p>
-                <p class="text-h6 font-weight-bold">{{ quickStats.nextShiftTime }}</p>
-              </v-card-text>
-            </v-card>
-          </v-col>
-          <v-col cols="12" sm="6" lg="3">
-            <v-card class="stat-card shadow-lg">
-              <v-card-text class="text-center pa-6">
-                <v-icon size="large" color="info" class="mb-2">mdi-briefcase</v-icon>
-                <p class="text-caption text-grey mb-1">Shifts This Week</p>
-                <p class="text-h5 font-weight-bold">3</p>
-              </v-card-text>
-            </v-card>
-          </v-col>
-          <v-col cols="12" sm="6" lg="3">
-            <v-card class="stat-card shadow-lg" :class="'stat-' + scheduleStatus.status">
-              <v-card-text class="text-center pa-6">
-                <v-icon size="large" :color="scheduleStatus.color" class="mb-2">
-                  {{ scheduleStatus.icon }}
-                </v-icon>
-                <p class="text-caption text-grey mb-1">Schedule Status</p>
-                <p class="text-body-2 font-weight-bold">{{ scheduleStatus.status === 'approved' ? 'Approved' : scheduleStatus.status === 'pending' ? 'Pending' : 'Needs Review' }}</p>
-              </v-card-text>
-            </v-card>
-          </v-col>
-        </v-row>
-
-        <v-row>
-          <!-- Clock In/Out & Upcoming Shifts -->
-          <v-col cols="12" lg="8">
-            <!-- Clock In/Out Section -->
-            <v-card class="shadow-lg mb-6">
-              <v-card-text class="pa-6">
-                <!-- Current Time -->
-                <div class="text-center mb-6">
-                  <p class="text-caption text-grey mb-2">Current Time</p>
-                  <div class="clock-display">
-                    <p class="text-h3 font-weight-bold mb-0">{{ currentTime }}</p>
-                  </div>
-                  <p class="text-body-2 text-grey mt-4">{{ currentDate }}</p>
-                </div>
-
-                <v-divider class="my-6"></v-divider>
-
-                <!-- Shift Info -->
-                <div class="shift-info mb-6">
-                  <h3 class="text-h6 font-weight-bold mb-2">Today's Shift</h3>
-                  <p class="text-body-1 font-weight-bold">9:00 AM - 5:00 PM @ {{ businessArea }}</p>
-                </div>
-
-                <v-divider class="my-6"></v-divider>
-
-                <!-- Current Shift Sessions -->
-                <div class="shift-sessions">
-                  <!-- Active Shift -->
-                  <div v-if="currentShift" class="active-shift mb-6">
-                    <div class="d-flex justify-space-between align-center mb-4">
-                      <h4 class="text-body-1 font-weight-bold">Shift #{{ currentShift.id }} - Active</h4>
-                      <v-chip color="success" size="small">In Progress</v-chip>
-                    </div>
-                    <v-row class="mb-4">
-                      <v-col cols="6" class="text-center">
-                        <p class="text-caption text-grey mb-2">Check In Time</p>
-                        <p class="text-body-2 font-weight-bold">{{ formatTime(currentShift.checkInTime) }}</p>
-                      </v-col>
-                      <v-col cols="6" class="text-center">
-                        <p class="text-caption text-grey mb-2">Duration</p>
-                        <p class="text-body-2 font-weight-bold text-primary">Running...</p>
-                      </v-col>
-                    </v-row>
-                    <v-btn block color="warning" @click="checkOut(currentShift.id)">
-                      <v-icon left>mdi-clock-out</v-icon>
-                      Check Out
-                    </v-btn>
-                  </div>
-
-                  <!-- Completed Shifts -->
-                  <div v-if="completedShifts.length > 0" class="completed-shifts">
-                    <p class="text-body-2 font-weight-bold mb-3">Completed Shifts</p>
-                    <div v-for="shift in completedShifts" :key="shift.id" class="shift-card mb-3">
-                      <div class="d-flex justify-space-between align-center mb-2">
-                        <p class="text-body-2 font-weight-bold">Shift #{{ shift.id }}</p>
-                        <v-chip color="grey" size="small">Completed</v-chip>
-                      </div>
-                      <v-row class="mb-2">
-                        <v-col cols="4" class="text-center">
-                          <p class="text-caption text-grey">In</p>
-                          <p class="text-body-2 font-weight-bold">{{ formatTime(shift.checkInTime) }}</p>
-                        </v-col>
-                        <v-col cols="4" class="text-center">
-                          <p class="text-caption text-grey">Out</p>
-                          <p class="text-body-2 font-weight-bold">{{ formatTime(shift.checkOutTime) }}</p>
-                        </v-col>
-                        <v-col cols="4" class="text-center">
-                          <p class="text-caption text-grey">Hours</p>
-                          <p class="text-body-2 font-weight-bold text-success">{{ shift.totalHours }}h</p>
-                        </v-col>
-                      </v-row>
-                    </div>
-                  </div>
-
-                  <!-- No Active Shift - Show Check In Button -->
-                  <div v-if="!currentShift && shiftSessions.length === 0" class="text-center py-4">
-                    <v-btn block color="primary" size="large" @click="checkIn">
-                      <v-icon left>mdi-clock-in</v-icon>
-                      Start First Shift
-                    </v-btn>
-                  </div>
-
-                  <!-- No Active Shift But Had Shifts - Show Check In Button for Next Shift -->
-                  <div v-if="!currentShift && shiftSessions.length > 0" class="text-center py-4">
-                    <v-btn block color="primary" size="large" @click="checkIn">
-                      <v-icon left>mdi-clock-in</v-icon>
-                      Start Shift #{{ shiftSessions.length + 1 }}
-                    </v-btn>
-                  </div>
-                </div>
-              </v-card-text>
-            </v-card>
-
-            <!-- Upcoming Shifts -->
-            <v-card class="shadow-lg">
-              <v-card-title class="text-h6 font-weight-bold pa-6">
-                <v-icon left>mdi-calendar-multiple</v-icon>
-                Upcoming Shifts
-              </v-card-title>
-              <v-divider></v-divider>
-              <v-card-text class="pa-4">
-                <div v-for="(shift, index) in upcomingShifts" :key="shift.id" class="upcoming-shift-item mb-4">
-                  <div class="d-flex gap-3">
-                    <div class="shift-date-badge">
-                      <p class="text-caption mb-0">{{ shift.date.split(',')[0] }}</p>
-                      <p class="text-h6 font-weight-bold mb-0">{{ shift.date.split(',')[1].trim().split(' ')[1] }}</p>
-                    </div>
-                    <div class="flex-grow-1">
-                      <p class="text-body-2 font-weight-bold mb-1">{{ shift.time }}</p>
-                      <p class="text-caption text-grey mb-0">📍 {{ shift.location }}</p>
-                    </div>
-                  </div>
-                  <v-divider v-if="index !== upcomingShifts.length - 1" class="my-3"></v-divider>
-                </div>
-              </v-card-text>
-            </v-card>
-          </v-col>
-
-          <!-- Right Column: Tasks & Pending Requests -->
-          <v-col cols="12" lg="4">
-            <!-- Tasks -->
-            <v-card class="shadow-lg mb-6">
-              <v-card-title class="text-h6 font-weight-bold pa-4">
-                <v-icon left>mdi-checkbox-marked-circle-outline</v-icon>
-                Today's Tasks
-              </v-card-title>
-              <v-divider></v-divider>
-              <v-card-text class="pa-4">
-                <div v-if="todaysTasks.length === 0" class="text-center py-4">
-                  <p class="text-grey text-body-2">No tasks assigned</p>
-                </div>
-                <div v-for="task in todaysTasks" :key="task.id" class="mb-3">
-                  <v-checkbox
-                    :model-value="task.completed"
-                    @update:model-value="toggleTask(task.id)"
-                    hide-details
-                    size="small"
-                  >
-                    <template #label>
-                      <div class="task-item">
-                        <p :class="['text-body-2 mb-0', { 'text-decoration-line-through text-grey': task.completed }]">
-                          {{ task.title }}
-                        </p>
-                        <p class="text-caption text-grey mb-0">{{ task.dueTime }}</p>
-                      </div>
-                    </template>
-                  </v-checkbox>
-                </div>
-              </v-card-text>
-            </v-card>
-
-            <!-- Pending Requests -->
-            <v-card class="shadow-lg">
-              <v-card-title class="text-h6 font-weight-bold pa-4">
-                <v-icon left>mdi-clock-alert</v-icon>
-                Pending Requests
-              </v-card-title>
-              <v-divider></v-divider>
-              <v-card-text class="pa-4">
-                <div v-if="pendingRequests.length === 0" class="text-center py-4">
-                  <p class="text-grey text-body-2">No pending requests</p>
-                </div>
-                <div v-for="(request, index) in pendingRequests" :key="request.id" class="pending-request-item mb-3">
-                  <div class="d-flex justify-space-between align-start mb-2">
-                    <div>
-                      <p class="text-body-2 font-weight-bold mb-1">{{ request.type }}</p>
-                      <p class="text-caption text-grey mb-1">{{ request.date }}</p>
-                    </div>
-                    <v-chip 
-                      :color="getStatusChipColor(request.status)"
-                      text-color="white"
-                      size="small"
-                    >
-                      {{ request.status }}
-                    </v-chip>
-                  </div>
-                  <p class="text-caption text-grey mb-0">{{ request.submitDate }}</p>
-                  <v-divider v-if="index !== pendingRequests.length - 1" class="my-3"></v-divider>
-                </div>
-              </v-card-text>
-            </v-card>
-          </v-col>
-        </v-row>
+        <!-- TAB 3: TEAM -->
+        <div v-if="activeTab === 2">
+          <v-row>
+            <v-col cols="12">
+              <v-card class="shadow-lg">
+                <v-card-title class="text-h6 font-weight-bold pa-6">
+                  <v-icon left>mdi-people</v-icon>
+                  Team Members
+                </v-card-title>
+                <v-divider></v-divider>
+                <v-card-text class="pa-4">
+                  <v-row>
+                    <v-col v-for="member in teamMembers" :key="member.id" cols="12" sm="6" lg="4">
+                      <v-card class="team-member-card">
+                        <v-card-text class="pa-6">
+                          <div class="text-center mb-4">
+                            <v-avatar size="64" :color="member.status === 'on-shift' ? '#4caf50' : '#e0e0e0'" class="mb-3">
+                              <span class="font-weight-bold text-white">{{ member.avatar }}</span>
+                            </v-avatar>
+                            <p class="text-body-2 font-weight-bold mb-1">{{ member.name }}</p>
+                            <p class="text-caption text-grey mb-3">{{ member.role }}</p>
+                            <v-chip 
+                              :color="member.status === 'on-shift' ? 'success' : 'grey'"
+                              text-color="white"
+                              size="small"
+                            >
+                              {{ member.status === 'on-shift' ? '🟢 On Shift' : '⚫ Off Shift' }}
+                            </v-chip>
+                          </div>
+                          <v-divider class="my-4"></v-divider>
+                          <div v-if="member.status === 'on-shift'" class="text-center">
+                            <p class="text-caption text-grey mb-1">Shift Ends</p>
+                            <p class="text-body-2 font-weight-bold">{{ member.shiftEnd }}</p>
+                          </div>
+                          <div v-else class="text-center">
+                            <p class="text-caption text-grey">Next shift TBA</p>
+                          </div>
+                        </v-card-text>
+                      </v-card>
+                    </v-col>
+                  </v-row>
+                </v-card-text>
+              </v-card>
+            </v-col>
+          </v-row>
+        </div>
       </v-container>
     </div>
   </div>
@@ -719,17 +936,16 @@ const getStatusChipColor = (status) => {
   border-bottom: none;
 }
 
-/* Urgent Notifications Banner */
-.urgent-notifications-banner {
-  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
-  border-bottom: 2px solid #ff9800;
-  padding: 8px 0;
+/* Subtle Urgent Banner */
+.urgent-banner {
+  background-color: #fffde7;
+  border-bottom: 1px solid #fff9c4;
 }
 
-.urgent-notification-card {
-  background: white;
-  border-left: 4px solid #f44336;
-  min-width: 500px;
+/* Tabs */
+.tabs-container {
+  background-color: white;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 /* Stats Cards */
@@ -749,10 +965,6 @@ const getStatusChipColor = (status) => {
 
 .stat-pending {
   border-top: 3px solid #ff9800;
-}
-
-.stat-needs-changes {
-  border-top: 3px solid #f44336;
 }
 
 .clock-display {
@@ -809,6 +1021,41 @@ const getStatusChipColor = (status) => {
   border-left: 3px solid #ff9800;
 }
 
+/* Schedule Tab */
+.schedule-legend {
+  padding: 16px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+}
+
+.schedule-table {
+  background-color: white;
+}
+
+.schedule-table thead tr {
+  background-color: #f5f5f5;
+}
+
+.schedule-table tbody tr:hover {
+  background-color: #f9f9f9;
+}
+
+/* Team Tab */
+.team-member-card {
+  transition: transform 0.2s;
+}
+
+.team-member-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
 .profile-btn {
   transition: transform 0.2s;
 }
@@ -836,10 +1083,6 @@ const getStatusChipColor = (status) => {
 
   .dashboard-container {
     flex-direction: column;
-  }
-
-  .urgent-notification-card {
-    min-width: auto;
   }
 }
 </style>
