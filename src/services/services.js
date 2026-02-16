@@ -2,13 +2,12 @@ import axios from "axios";
 import Utils from "../config/utils.js";
 import Router from "../router.js";
 
-// Use environment variable for API URL
 var baseurl = import.meta.env.VITE_APP_API_URL;
 
-// Fallback logic
+
 if (!baseurl) {
   if (import.meta.env.DEV) {
-    baseurl = "http://localhost:3121/workerscheduling/api/";
+    baseurl = "http://localhost:3131/workerscheduling-t1/api/"; 
   } else {
     baseurl = "https://workerscheduling.eaglesoftwareteam.com/workerscheduling/api/";
   }
