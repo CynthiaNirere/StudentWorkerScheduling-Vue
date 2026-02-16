@@ -236,7 +236,6 @@ const showSnackbar = (message, color = "success") => {
           </v-btn>
         </div>
 
-        <!-- Layout: Lists on left, Items on right -->
         <v-row>
           <!-- Task Lists -->
           <v-col cols="12" md="4">
@@ -381,7 +380,6 @@ const showSnackbar = (message, color = "success") => {
       </v-container>
     </v-main>
 
-    <!-- ─── CREATE LIST DIALOG ───────────────────────────────────────────── -->
     <v-dialog v-model="showCreateListDialog" max-width="500">
       <v-card rounded="lg">
         <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4">
@@ -429,7 +427,7 @@ const showSnackbar = (message, color = "success") => {
       </v-card>
     </v-dialog>
 
-    <!-- ─── ADD ITEM DIALOG ──────────────────────────────────────────────── -->
+
     <v-dialog v-model="showAddItemDialog" max-width="500">
       <v-card rounded="lg">
         <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4">
