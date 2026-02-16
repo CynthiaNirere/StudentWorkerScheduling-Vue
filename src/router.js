@@ -25,6 +25,12 @@ const router = createRouter({
       component: Login,
       meta: { requiresAuth: false },
     },
+    {
+      path: "/role-select",
+      name: "roleSelect",
+      component: RoleSelect,
+      meta: { requiresAuth: true },
+    },
    
     {
       path: "/employer",
@@ -33,7 +39,7 @@ const router = createRouter({
     {
       path: "/employer/dashboard",
       name: "employerDashboard",
-      component: () => import("./views/EmployerDashboard.vue"),
+      component: EmployerDashboard,  
       meta: { requiresAuth: true },
     },
     {
@@ -78,13 +84,6 @@ const router = createRouter({
       component: () => import("./views/EmployerProfile.vue"),
       meta: { requiresAuth: true },
     },
-    {
-      path: "/role-select",
-      name: "roleSelect",
-      component: RoleSelect,
-      meta: { requiresAuth: true },
-    },
-    
     {
       path: "/:pathMatch(.*)*",
       redirect: "/login",
