@@ -6,6 +6,7 @@ import Login from "./views/Login.vue";
 import RoleSelect from "./views/RoleSelect.vue";
 import EmployerDashboard from "./views/EmployerDashboard.vue";
 import EmployerSchedule from "./views/EmployerSchedule.vue";
+import EmployerEmployees from "./views/EmployerEmployees.vue";
 import EmployerAvailability from "./views/EmployerAvailability.vue";
 import EmployerTimeOff from "./views/EmployerTimeOff.vue";
 import EmployerTasks from "./views/EmployerTasks.vue";
@@ -51,6 +52,12 @@ const router = createRouter({
       path: "/employer/schedule",
       name: "employerSchedule",
       component: EmployerSchedule,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/employer/employees",
+      name: "employerEmployees",
+      component: EmployerEmployees,
       meta: { requiresAuth: true },
     },
     {
