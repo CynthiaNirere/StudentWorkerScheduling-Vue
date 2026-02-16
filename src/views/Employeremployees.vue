@@ -466,7 +466,6 @@ const showSnackbar = (message, color = "success") => {
       </v-card>
     </v-dialog>
 
-    <!-- ─── SNACKBAR ─────────────────────────────────────────────────────── -->
     <v-snackbar
       v-model="snackbar"
       :color="snackbarColor"
