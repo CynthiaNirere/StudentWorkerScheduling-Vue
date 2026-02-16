@@ -8,16 +8,8 @@ const router = useRouter();
 const fName = ref("");
 const lName = ref("");
 const user = ref({});
-const useMockLogin = ref(true); // Set to true for testing, false for production
 
 const loginWithGoogle = () => {
-  // TEMPORARY: Mock login for testing employee dashboard
-  if (useMockLogin.value) {
-    handleMockLogin();
-    return;
-  }
-
-  // Real Google login
   window.handleCredentialResponse = handleCredentialResponse;
   const client = import.meta.env.VITE_APP_CLIENT_ID;
   console.log(client);
@@ -36,32 +28,6 @@ const loginWithGoogle = () => {
   });
 };
 
-const handleMockLogin = () => {
-  // Mock employee user for testing
-  user.value = {
-    user_id: 'mock-employee-001',
-    fName: 'Tessy',
-    lName: 'Mugisha',
-    email: 'tessy.p.mugisha@eagles.oc.edu',
-    role: 'employee' // This is the key - forces redirect to dashboard
-  };
-  
-  Utils.setStore("user", user.value);
-  fName.value = user.value.fName;
-  lName.value = user.value.lName;
-  
-  console.log('Mock login successful:', user.value.email, 'Role:', user.value.role);
-  
-  // Redirect based on role
-  if (user.value.role === 'admin') {
-    router.push({ name: 'roleSelect' });
-  } else if (user.value.role === 'employee') {
-    router.push({ name: 'employeeDashboard' });
-  } else {
-    alert(`Welcome ${user.value.fName} ${user.value.lName}! Role: ${user.value.role}`);
-  }
-};
-
 const handleCredentialResponse = async (response) => {
   let token = {
     credential: response.credential,
@@ -73,16 +39,13 @@ const handleCredentialResponse = async (response) => {
       fName.value = user.value.fName;
       lName.value = user.value.lName;
       
-      console.log('User logged in:', user.value.email, 'Role:', user.value.role);
+      // Login successful - for now just log the user info
+      console.log('User logged in successfully!');
+      console.log('User data:', user.value);
+      console.log('User role:', user.value.role);
       
-      // Redirect based on role
-      if (user.value.role === 'admin') {
-        router.push({ name: 'roleSelect' });
-      } else if (user.value.role === 'employee') {
-        router.push({ name: 'employeeDashboard' });
-      } else {
-        alert(`Welcome ${user.value.fName} ${user.value.lName}! Role: ${user.value.role}`);
-      }
+      // TODO: Add dashboard routes later
+      alert(`Welcome ${user.value.fName} ${user.value.lName}! Role: ${user.value.role}`);
     })
     .catch((error) => {
       console.log("Login error:", error);
@@ -97,21 +60,8 @@ onMounted(() => {
 
 <template>
   <div class="signup-buttons">
-    <!-- Show this when using real Google login -->
-    <v-row justify="center" v-if="!useMockLogin">
+    <v-row justify="center">
       <div display="flex" id="parent_id"></div>
-    </v-row>
-    
-    <!-- Show this when using mock login (for testing) -->
-    <v-row justify="center" v-if="useMockLogin">
-      <v-card class="pa-4" elevation="0">
-        <p class="text-caption text-grey text-center mb-2">
-          🧪 Mock Login (Testing Mode)
-        </p>
-        <p class="text-body-2 text-center">
-          Auto-logging in as Employee...
-        </p>
-      </v-card>
     </v-row>
   </div>
 </template>
