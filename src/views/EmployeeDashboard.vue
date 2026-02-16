@@ -12,7 +12,7 @@ const unreadCount = ref(3);
 const businessArea = ref('The Brew'); // Business name
 
 const todaysTasks = ref([
-  { id: 1, title: 'Restock supplies', dueTime: 'Due end of shift', completed: false },//any update?
+  { id: 1, title: 'Restock supplies', dueTime: 'Due end of shift', completed: false },
   { id: 2, title: 'Clean equipment', dueTime: 'Due end of shift', completed: false }
 ]);
 
