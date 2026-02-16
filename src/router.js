@@ -5,6 +5,7 @@ import Utils from "./config/utils";
 import SignUp from "./views/SignUp.vue";
 import Login from "./views/Login.vue";
 import RoleSelect from "./views/RoleSelect.vue";
+import AdminViewDashboard from "./views/adminViewDashboard.vue";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -35,6 +36,12 @@ const router = createRouter({
       path: "/:pathMatch(.*)*",
       redirect: "/signup",
     },
+    {
+  path: "/admin",
+  name: "adminViewDashboard",
+  component: AdminViewDashboard, 
+  meta: { requiresAuth: true, requiresAdmin: true },
+},
   ],
 });
 
