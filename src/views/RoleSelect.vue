@@ -12,6 +12,17 @@ onMounted(() => {
     router.push({ name: "login" });
   }
 });
+
+// Handle admin button click
+const handleAdminClick = () => {
+  router.push({ name: "adminViewDashboard" });
+};
+
+// Handle business area manager button click
+const handleManagerClick = () => {
+  // You can change this to whatever page managers should see
+  router.push({ name: "managerDashboard" }); // or keep it as login if needed
+};
 </script>
 
 <template>
@@ -34,7 +45,7 @@ onMounted(() => {
               color="primary"
               variant="elevated"
               prepend-icon="mdi-shield-crown"
-              @click="router.push({ name: 'login' })"
+              @click="handleAdminClick"
             >
               As Admin
             </v-btn>
@@ -44,7 +55,7 @@ onMounted(() => {
               color="secondary"
               variant="outlined"
               prepend-icon="mdi-store"
-              @click="router.push({ name: 'login' })"
+              @click="handleManagerClick"
             >
               As a Business area manager
             </v-btn>

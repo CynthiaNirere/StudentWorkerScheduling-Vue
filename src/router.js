@@ -5,6 +5,7 @@ import Utils from "./config/utils";
 import Login from "./views/Login.vue";
 import SignUp from "./views/SignUp.vue";
 import RoleSelect from "./views/RoleSelect.vue";
+import AdminViewDashboard from "./views/adminViewDashboard.vue";
 import EmployerDashboard from "./views/EmployerDashboard.vue";
 import EmployerSchedule from "./views/EmployerSchedule.vue";
 import EmployerEmployees from "./views/EmployerEmployees.vue";
@@ -96,6 +97,12 @@ const router = createRouter({
       path: "/:pathMatch(.*)*",
       redirect: "/login",
     },
+    {
+  path: "/admin",
+  name: "adminViewDashboard",
+  component: AdminViewDashboard, 
+  meta: { requiresAuth: true, requiresAdmin: true },
+},
   ],
 });
 
