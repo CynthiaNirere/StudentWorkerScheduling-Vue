@@ -1,17 +1,24 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Utils from "./config/utils";
-// Views
+
 import SignUp from "./views/SignUp.vue";
 import Login from "./views/Login.vue";
 import RoleSelect from "./views/RoleSelect.vue";
 import EmployerDashboard from "./views/EmployerDashboard.vue";
+import EmployerSchedule from "./views/EmployerSchedule.vue";
+import EmployerEmployees from "./views/EmployerEmployees.vue";
+import EmployerAvailability from "./views/EmployerAvailability.vue";
+import EmployerTimeOff from "./views/EmployerTimeOff.vue";
+import EmployerTasks from "./views/EmployerTasks.vue";
+import EmployerSwaps from "./views/EmployerSwaps.vue";
+import EmployerProfile from "./views/EmployerProfile.vue";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: "/",
-      redirect: "/login",  
+      redirect: "/login",
     },
     {
       path: "/signup",
@@ -31,7 +38,6 @@ const router = createRouter({
       component: RoleSelect,
       meta: { requiresAuth: true },
     },
-   
     {
       path: "/employer",
       redirect: "/employer/dashboard",
@@ -39,49 +45,49 @@ const router = createRouter({
     {
       path: "/employer/dashboard",
       name: "employerDashboard",
-      component: EmployerDashboard,  
+      component: EmployerDashboard,
       meta: { requiresAuth: true },
     },
     {
       path: "/employer/schedule",
       name: "employerSchedule",
-      component: () => import("./views/EmployerSchedule.vue"),
+      component: EmployerSchedule,
       meta: { requiresAuth: true },
     },
     {
       path: "/employer/employees",
       name: "employerEmployees",
-      component: () => import("./views/EmployerEmployees.vue"),
+      component: EmployerEmployees,
       meta: { requiresAuth: true },
     },
     {
       path: "/employer/availability",
       name: "employerAvailability",
-      component: () => import("./views/EmployerAvailability.vue"),
+      component: EmployerAvailability,
       meta: { requiresAuth: true },
     },
     {
       path: "/employer/time-off",
       name: "employerTimeOff",
-      component: () => import("./views/EmployerTimeOff.vue"),
+      component: EmployerTimeOff,
       meta: { requiresAuth: true },
     },
     {
       path: "/employer/tasks",
       name: "employerTasks",
-      component: () => import("./views/EmployerTasks.vue"),
+      component: EmployerTasks,
       meta: { requiresAuth: true },
     },
     {
       path: "/employer/swaps",
       name: "employerSwaps",
-      component: () => import("./views/EmployerSwaps.vue"),
+      component: EmployerSwaps,
       meta: { requiresAuth: true },
     },
     {
       path: "/employer/profile",
       name: "employerProfile",
-      component: () => import("./views/EmployerProfile.vue"),
+      component: EmployerProfile,
       meta: { requiresAuth: true },
     },
     {
@@ -94,13 +100,13 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const user = Utils.getStore("user");
   const requiresAuth = to.meta.requiresAuth;
-  
+
   if (requiresAuth && !user) {
     console.log("Not authenticated, redirecting to login");
     next({ name: "login" });
     return;
   }
-  
+
   next();
 });
 
