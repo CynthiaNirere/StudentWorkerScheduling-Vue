@@ -1,8 +1,9 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Utils from "./config/utils";
 
-import SignUp from "./views/SignUp.vue";
+// ─── IMPORTS ──────────────────────────────────────────────────────────────
 import Login from "./views/Login.vue";
+import SignUp from "./views/SignUp.vue";
 import RoleSelect from "./views/RoleSelect.vue";
 import EmployerDashboard from "./views/EmployerDashboard.vue";
 import EmployerSchedule from "./views/EmployerSchedule.vue";
@@ -13,6 +14,7 @@ import EmployerTasks from "./views/EmployerTasks.vue";
 import EmployerSwaps from "./views/EmployerSwaps.vue";
 import EmployerProfile from "./views/EmployerProfile.vue";
 
+// ─── ROUTER ───────────────────────────────────────────────────────────────
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -51,43 +53,43 @@ const router = createRouter({
     {
       path: "/employer/schedule",
       name: "employerSchedule",
-      component: EmployerSchedule,
+      component: EmployerSchedule,  // ← Direct reference, no import()
       meta: { requiresAuth: true },
     },
     {
       path: "/employer/employees",
       name: "employerEmployees",
-      component: EmployerEmployees,
+      component: EmployerEmployees,  // ← Direct reference
       meta: { requiresAuth: true },
     },
     {
       path: "/employer/availability",
       name: "employerAvailability",
-      component: EmployerAvailability,
+      component: EmployerAvailability,  // ← Direct reference
       meta: { requiresAuth: true },
     },
     {
       path: "/employer/time-off",
       name: "employerTimeOff",
-      component: EmployerTimeOff,
+      component: EmployerTimeOff,  // ← Direct reference
       meta: { requiresAuth: true },
     },
     {
       path: "/employer/tasks",
       name: "employerTasks",
-      component: EmployerTasks,
+      component: EmployerTasks,  // ← Direct reference
       meta: { requiresAuth: true },
     },
     {
       path: "/employer/swaps",
       name: "employerSwaps",
-      component: EmployerSwaps,
+      component: EmployerSwaps,  // ← Direct reference
       meta: { requiresAuth: true },
     },
     {
       path: "/employer/profile",
       name: "employerProfile",
-      component: EmployerProfile,
+      component: EmployerProfile,  // ← Direct reference
       meta: { requiresAuth: true },
     },
     {
