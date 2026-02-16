@@ -39,13 +39,15 @@ const handleCredentialResponse = async (response) => {
       fName.value = user.value.fName;
       lName.value = user.value.lName;
       
-      // Login successful - for now just log the user info
-      console.log('User logged in successfully!');
-      console.log('User data:', user.value);
-      console.log('User role:', user.value.role);
+      console.log('User logged in:', user.value.email, 'Role:', user.value.role);
       
-      // TODO: Add dashboard routes later
-      alert(`Welcome ${user.value.fName} ${user.value.lName}! Role: ${user.value.role}`);
+      // Redirect based on role
+      if (user.value.role === 'admin') {
+        router.push({ name: 'roleSelect' });
+      } else {
+        // TODO: Add employee dashboard route when ready
+        alert(`Welcome ${user.value.fName} ${user.value.lName}! Role: ${user.value.role}`);
+      }
     })
     .catch((error) => {
       console.log("Login error:", error);
