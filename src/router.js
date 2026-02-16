@@ -1,5 +1,3 @@
-
-
 import { createRouter, createWebHistory } from "vue-router";
 import Utils from "./config/utils";
 // Views
@@ -7,14 +5,13 @@ import SignUp from "./views/SignUp.vue";
 import Login from "./views/Login.vue";
 import RoleSelect from "./views/RoleSelect.vue";
 import EmployerDashboard from "./views/EmployerDashboard.vue";
-import EmployeeDashboard from "./views/EmployeeDashboard.vue";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: "/",
-      redirect: "/signup",
+      redirect: "/login",  
     },
     {
       path: "/signup",
@@ -28,7 +25,6 @@ const router = createRouter({
       component: Login,
       meta: { requiresAuth: false },
     },
-
    
     {
       path: "/employer",
@@ -37,7 +33,7 @@ const router = createRouter({
     {
       path: "/employer/dashboard",
       name: "employerDashboard",
-      component: EmployerDashboard,
+      component: () => import("./views/EmployerDashboard.vue"),
       meta: { requiresAuth: true },
     },
     {
@@ -82,22 +78,16 @@ const router = createRouter({
       component: () => import("./views/EmployerProfile.vue"),
       meta: { requiresAuth: true },
     },
-
     {
       path: "/role-select",
       name: "roleSelect",
       component: RoleSelect,
       meta: { requiresAuth: true },
     },
-    {
-      path: "/dashboard",
-      name: "employeeDashboard",
-      component: EmployeeDashboard,
-      meta: { requiresAuth: true },
-    },
+    
     {
       path: "/:pathMatch(.*)*",
-      redirect: "/signup",
+      redirect: "/login",
     },
   ],
 });
