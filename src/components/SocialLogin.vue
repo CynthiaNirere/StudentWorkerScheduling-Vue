@@ -32,6 +32,7 @@ const handleCredentialResponse = async (response) => {
   let token = {
     credential: response.credential,
   };
+  
   await AuthServices.loginUser(token)
     .then((response) => {
       user.value = response.data;
@@ -39,13 +40,21 @@ const handleCredentialResponse = async (response) => {
       fName.value = user.value.fName;
       lName.value = user.value.lName;
       
-      // Login successful - for now just log the user info
       console.log('User logged in successfully!');
       console.log('User data:', user.value);
       console.log('User role:', user.value.role);
       
-      // TODO: Add dashboard routes later
-      alert(`Welcome ${user.value.fName} ${user.value.lName}! Role: ${user.value.role}`);
+      // Show welcome message
+      alert(`Welcome ${user.value.fName} ${user.value.lName}! Role: ${user.value.role}`);  // ← FIXED: alert( not alert`
+      
+      // Route based on role
+      if (user.value.role === 'employer') {
+        router.push({ name: 'employerDashboard' });
+      } else if (user.value.role === 'employee') {
+        router.push({ name: 'employeeDashboard' });
+      } else {
+        router.push({ name: 'login' });
+      }
     })
     .catch((error) => {
       console.log("Login error:", error);
