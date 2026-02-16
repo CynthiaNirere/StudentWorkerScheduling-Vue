@@ -4,4 +4,5 @@ import router from "./router.js";
 import vuetify from "./plugins/vuetify.js";
 import store from "./store/store.js";
 
+
 createApp(App).use(vuetify).use(router).mount("#app");
