@@ -7,7 +7,7 @@ import EmployerService from "../services/employerServices.js";
 const router = useRouter();
 const user = ref(null);
 
-// ─── DATA ─────────────────────────────────────────────────────────────────
+// ─── DATA ────────────────────────────────────────────────────────────────
 const availability = ref([]);
 const employees = ref([]);
 const loading = ref(false);
