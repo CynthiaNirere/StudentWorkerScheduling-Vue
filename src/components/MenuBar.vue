@@ -71,7 +71,7 @@ onMounted(() => {
               :color="
                 user.role === 'admin'
                   ? 'error'
-                  : user.role === 'coach'
+                  : user.role === 'employer'
                   ? 'primary'
                   : 'success'
               "

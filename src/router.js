@@ -3,8 +3,10 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Utils from "./config/utils";
 
-import Login from "./views/Login.vue";
+// Views
 import SignUp from "./views/SignUp.vue";
+import Login from "./views/Login.vue";
+import RoleSelect from "./views/RoleSelect.vue";
 import EmployerDashboard from "./views/EmployerDashboard.vue";
 
 const router = createRouter({
@@ -81,6 +83,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
 
+    {
+      path: "/role-select",
+      name: "roleSelect",
+      component: RoleSelect,
+      meta: { requiresAuth: true },
+    },
     {
       path: "/:pathMatch(.*)*",
       redirect: "/signup",

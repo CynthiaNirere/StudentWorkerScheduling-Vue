@@ -9,9 +9,9 @@ import SocialLogin from "../components/SocialLogin.vue";
         <v-card class="pa-8" elevation="3">
           <!-- Header -->
           <div class="text-center mb-6">
-            <v-icon size="64" color="primary" class="mb-4">mdi-dumbbell</v-icon>
-            <h1 class="text-h5 font-weight-bold mb-2"> Work Schedule JL </h1>
-            <p class="text-body-2 text-grey">Sign in to get started</p>
+            <v-icon size="64" color="primary" class="mb-4">mdi-calendar-clock</v-icon>
+            <h1 class="text-h4 font-weight-black mb-1">TalonTime</h1>
+            <p class="text-body-2 text-grey">"Talons Up, Scheduled Right"</p>
           </div>
 
           <!-- Social Login Component -->
