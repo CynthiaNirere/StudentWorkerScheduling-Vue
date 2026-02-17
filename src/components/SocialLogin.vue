@@ -12,7 +12,6 @@ const user = ref({});
 const loginWithGoogle = () => {
   window.handleCredentialResponse = handleCredentialResponse;
   const client = import.meta.env.VITE_APP_CLIENT_ID;
-  console.log(client);
   window.google.accounts.id.initialize({
     client_id: client,
     cancel_on_tap_outside: false,
@@ -40,24 +39,16 @@ const handleCredentialResponse = async (response) => {
       fName.value = user.value.fName;
       lName.value = user.value.lName;
       
-      console.log('User logged in successfully!');
-      console.log('User data:', user.value);
-      console.log('User role:', user.value.role);
-      
-      // Show welcome message
-      alert(`Welcome ${user.value.fName} ${user.value.lName}! Role: ${user.value.role}`);  // ← FIXED: alert( not alert`
-      
       // Route based on role
-if (user.value.role === 'admin') {
-  router.push({ name: 'roleSelect' }); // ✅ Admin goes to role selection
-} else if (user.value.role === 'employer') {
-  router.push({ name: 'employerDashboard' });
-} else if (user.value.role === 'employee') {
-  router.push({ name: 'employeeDashboard' });
-} else {
-  console.error('Unknown role:', user.value.role);
-  alert('Unknown role. Please contact support.');
-}
+      if (user.value.role === 'admin') {
+        router.push({ name: 'roleSelect' });
+      } else if (user.value.role === 'employer') {
+        router.push({ name: 'employerDashboard' });
+      } else if (user.value.role === 'employee') {
+        router.push({ name: 'employeeDashboard' });
+      } else {
+        router.push({ name: 'login' });
+      }
     })
     .catch((error) => {
       console.log("Login error:", error);
