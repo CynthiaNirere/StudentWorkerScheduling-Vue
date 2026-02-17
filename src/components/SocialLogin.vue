@@ -48,13 +48,16 @@ const handleCredentialResponse = async (response) => {
       alert(`Welcome ${user.value.fName} ${user.value.lName}! Role: ${user.value.role}`);  // ← FIXED: alert( not alert`
       
       // Route based on role
-      if (user.value.role === 'employer') {
-        router.push({ name: 'employerDashboard' });
-      } else if (user.value.role === 'employee') {
-        router.push({ name: 'employeeDashboard' });
-      } else {
-        router.push({ name: 'login' });
-      }
+if (user.value.role === 'admin') {
+  router.push({ name: 'roleSelect' }); // ✅ Admin goes to role selection
+} else if (user.value.role === 'employer') {
+  router.push({ name: 'employerDashboard' });
+} else if (user.value.role === 'employee') {
+  router.push({ name: 'employeeDashboard' });
+} else {
+  console.error('Unknown role:', user.value.role);
+  alert('Unknown role. Please contact support.');
+}
     })
     .catch((error) => {
       console.log("Login error:", error);
