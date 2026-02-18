@@ -21,7 +21,7 @@ const handleAdminClick = () => {
 // Handle business area manager button click
 const handleManagerClick = () => {
   // You can change this to whatever page managers should see
-  router.push({ name: "managerDashboard" }); // or keep it as login if needed
+  router.push({ name: "employerDashboard" });
 };
 </script>
 
