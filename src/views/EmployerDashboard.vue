@@ -9,7 +9,7 @@ const currentDate = ref('');
 const user = ref(null);
 const showNotifications = ref(false);
 const unreadCount = ref(3);
-const businessArea = ref('The Brew'); // Business name
+const businessArea = ref(''); // Business name
 
 const todaysTasks = ref([
   { id: 1, title: 'Restock supplies', dueTime: 'Due end of shift', completed: false },
@@ -148,6 +148,10 @@ const calculateTotalHours = (checkIn, checkOut) => {
 
 onMounted(() => {
   user.value = Utils.getStore('user');
+  const selectedArea = Utils.getStore('selectedBusinessArea');
+  if (selectedArea) {
+    businessArea.value = selectedArea.name;
+  }
   updateTime();
   setInterval(updateTime, 1000);
 });
