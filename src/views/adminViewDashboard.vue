@@ -19,6 +19,7 @@ const successMessage = ref(null)
 const showAddEmployeeDialog = ref(false)
 const showDeleteDialog = ref(false)
 const showChangeBusinessAreaDialog = ref(false)
+const showAddBusinessAreaDialog = ref(false)
 const employeeToDelete = ref(null)
 
 const newEmployee = ref({
@@ -28,6 +29,11 @@ const newEmployee = ref({
   phoneNumber: '',
   role: 'employee',
   workLocation: null
+})
+
+const newBusinessArea = ref({
+  name: '',
+  address: ''
 })
 
 const employeeCount = computed(() => employees.value.length)
@@ -96,6 +102,50 @@ const openAddEmployeeDialog = () => {
 
 const closeAddEmployeeDialog = () => {
   showAddEmployeeDialog.value = false
+}
+
+const openAddBusinessAreaDialog = () => {
+  showAddBusinessAreaDialog.value = true
+  newBusinessArea.value = {
+    name: '',
+    address: ''
+  }
+}
+
+const closeAddBusinessAreaDialog = () => {
+  showAddBusinessAreaDialog.value = false
+}
+
+const addBusinessArea = async () => {
+  console.log("Attempting to create business area with data:", newBusinessArea.value)
+  if (!newBusinessArea.value.name || !newBusinessArea.value.address) {
+    error.value = 'Please fill in all required fields'
+    return
+  }
+
+  try {
+    const response = await businessAreaServices.create(newBusinessArea.value)
+    console.log("✅ Business area created:", response.data)
+    
+    businessAreas.value.push(response.data)
+    
+    // Set as current business area if it's the first one
+    if (businessAreas.value.length === 1) {
+      currentBusinessArea.value = response.data
+      await loadEmployees()
+    }
+    
+    closeAddBusinessAreaDialog()
+    showSuccess('Business area added successfully')
+  } catch (err) {
+    console.error("❌ Error creating business area:", err)
+    if (err.response?.status === 401) {
+      error.value = 'Session expired. Please log in again.'
+      setTimeout(() => router.push('/login'), 2000)
+    } else {
+      error.value = err.response?.data?.message || 'Unable to add business area. Please try again.'
+    }
+  }
 }
 
 const addEmployee = async () => {
@@ -239,6 +289,9 @@ onMounted(async () => {
         <div class="d-flex gap-3">
           <v-btn color="primary" @click="openAddEmployeeDialog">
             Add New Employee
+          </v-btn>
+          <v-btn color="secondary" @click="openAddBusinessAreaDialog">
+            Add Business Area
           </v-btn>
           <v-btn variant="outlined" @click="openChangeBusinessAreaDialog">
             Change Business Area
@@ -442,6 +495,53 @@ onMounted(async () => {
           <v-card-actions>
             <v-spacer></v-spacer>
             <v-btn variant="text" @click="showChangeBusinessAreaDialog = false">Close</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <!-- Add Business Area Dialog -->
+      <v-dialog v-model="showAddBusinessAreaDialog" max-width="500px" persistent>
+        <v-card>
+          <v-card-title class="bg-secondary">
+            <div class="d-flex justify-space-between align-center">
+              <span class="text-h5">Add New Business Area</span>
+              <v-btn icon variant="text" @click="closeAddBusinessAreaDialog">
+                <v-icon>mdi-close</v-icon>
+              </v-btn>
+            </div>
+          </v-card-title>
+
+          <v-card-text class="pt-4">
+            <v-form>
+              <v-text-field
+                v-model="newBusinessArea.name"
+                label="Business Area Name *"
+                variant="outlined"
+                required
+                placeholder="e.g., Main Office, Library Services"
+              ></v-text-field>
+
+              <v-textarea
+                v-model="newBusinessArea.address"
+                label="Address *"
+                variant="outlined"
+                required
+                rows="3"
+                placeholder="e.g., 123 Main St, Campus City, State 12345"
+              ></v-textarea>
+            </v-form>
+          </v-card-text>
+
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn variant="text" @click="closeAddBusinessAreaDialog">Cancel</v-btn>
+            <v-btn 
+              color="secondary" 
+              @click="addBusinessArea"
+              :disabled="!newBusinessArea.name || !newBusinessArea.address"
+            >
+              Add Business Area
+            </v-btn>
           </v-card-actions>
         </v-card>
       </v-dialog>
