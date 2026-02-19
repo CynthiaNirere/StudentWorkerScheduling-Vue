@@ -27,34 +27,36 @@ const loginWithGoogle = () => {
   });
 };
 
-const handleCredentialResponse = async (response) => {
+const handleCredentialResponse = async (googleResponse) => {
   let token = {
-    credential: response.credential,
+    credential: googleResponse.credential,
   };
   
-  await AuthServices.loginUser(token)
-    .then((response) => {
-      user.value = response.data;  // ✅ FIXED: Use response.data
-      Utils.setStore("user", user.value);
-      fName.value = user.value.fName;
-      lName.value = user.value.lName;
-      
-      // Route based on role
-      if (user.value.role === 'admin') {
-        router.push({ name: 'roleSelect' });
-      } else if (user.value.role === 'employer') {
-        router.push({ name: 'employerDashboard' });
-      } else if (user.value.role === 'employee') {
-        router.push({ name: 'employeeDashboard' });
-      } else {
-        router.push({ name: 'login' });
-      }
-    })
-    .catch((error) => {
-      console.log("Login error:", error);
-      console.log("Error details:", error.response);
-      alert("Login failed. Please try again.");
-    });
+  try {
+    const apiResponse = await AuthServices.loginUser(token);
+    console.log("API Response:", apiResponse.data);
+    
+    // Store the user data
+    user.value = apiResponse.data;
+    Utils.setStore("user", user.value);
+    
+    console.log("User role:", user.value.role);
+    
+    // Route based on role
+    if (user.value.role === 'admin') {
+      router.push({ name: 'roleSelect' });
+    } else if (user.value.role === 'employer') {
+      router.push({ name: 'employerDashboard' });
+    } else if (user.value.role === 'employee') {
+      router.push({ name: 'employeeDashboard' });
+    } else {
+      router.push({ name: 'login' });
+    }
+  } catch (error) {
+    console.error("Login error:", error);
+    console.error("Error response:", error.response?.data);
+    alert("Login failed. Please try again.");
+  }
 };
 
 onMounted(() => {
