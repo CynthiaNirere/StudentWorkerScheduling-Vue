@@ -6,6 +6,8 @@ import Login from "./views/Login.vue";
 import SignUp from "./views/SignUp.vue";
 import RoleSelect from "./views/RoleSelect.vue";
 import AdminViewDashboard from "./views/adminViewDashboard.vue";
+import EmployeeDashboard from "./views/EmployeeDashboard.vue";
+import BusinessAreaSelect from "./views/BusinessAreaSelect.vue";
 import EmployerDashboard from "./views/EmployerDashboard.vue";
 import EmployerSchedule from "./views/EmployerSchedule.vue";
 import EmployerEmployees from "./views/EmployerEmployees.vue";
@@ -42,6 +44,29 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresAdmin: true },
     },
     // ─── EMPLOYER / MANAGER ROUTES ─────────────────────────────────────
+    {
+      path: "/admin",
+      name: "adminViewDashboard",
+      component: AdminViewDashboard, 
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+    // ─── EMPLOYEE ROUTES ────────────────────────────────────────────────
+    {
+      path: "/employee",
+      redirect: "/employee/dashboard",
+    },
+    {
+      path: "/employee/dashboard",
+      name: "employeeDashboard",
+      component: EmployeeDashboard,
+      meta: { requiresAuth: true },
+    },
+    // ─── EMPLOYER ROUTES ────────────────────────────────────────────────
+    { path: "/business-area-select",
+      name: "businessAreaSelect",
+      component: BusinessAreaSelect,
+      meta: { requiresAuth: true },
+    },
     {
       path: "/employer",
       redirect: "/employer/dashboard",
