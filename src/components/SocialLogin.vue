@@ -33,13 +33,17 @@ const handleCredentialResponse = async (response) => {
   };
   
   await AuthServices.loginUser(token)
-    .then((response) => {
-      user.value = response.data;  // ✅ FIXED: Use response.data
+    .then((userData) => {
+      user.value = userData;  // AuthServices already returns response.data
       Utils.setStore("user", user.value);
       fName.value = user.value.fName;
       lName.value = user.value.lName;
       
       // Route based on role
+      if (!user.value.role) {
+        user.value.role = 'unknown'; // Default role if not present
+      }
+
       if (user.value.role === 'admin') {
         router.push({ name: 'roleSelect' });
       } else if (user.value.role === 'employer') {
@@ -47,7 +51,7 @@ const handleCredentialResponse = async (response) => {
       } else if (user.value.role === 'employee') {
         router.push({ name: 'employeeDashboard' });
       } else {
-        router.push({ name: 'login' });
+        router.push({ name: 'roleSelect' }); // Route to roleSelect if role is unknown or not explicitly handled
       }
     })
     .catch((error) => {
