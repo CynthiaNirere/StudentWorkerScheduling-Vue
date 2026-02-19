@@ -5,7 +5,6 @@
     permanent
     color="primary"
     dark
-    @click="rail = false"
   >
     <v-list-item
       prepend-icon="mdi-calendar-clock"

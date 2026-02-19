@@ -4,10 +4,9 @@ import Router from "../router.js";
 
 var baseurl = import.meta.env.VITE_APP_API_URL;
 
-
 if (!baseurl) {
   if (import.meta.env.DEV) {
-    baseurl = "http://localhost:3131/workerscheduling-t1/api/"; 
+    baseurl = "http://localhost:3131/api/"; // CHANGED: removed /workerscheduling-t1
   } else {
     baseurl = "https://workerscheduling.eaglesoftwareteam.com/workerscheduling/api/";
   }
