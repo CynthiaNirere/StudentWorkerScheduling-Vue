@@ -5,8 +5,6 @@ import Utils from "../config/utils.js";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
-const fName = ref("");
-const lName = ref("");
 const user = ref({});
 
 const loginWithGoogle = () => {
@@ -33,11 +31,12 @@ const handleCredentialResponse = async (googleResponse) => {
   };
   
   try {
-    const apiResponse = await AuthServices.loginUser(token);
-    console.log("API Response:", apiResponse.data);
+    // authServices.js already returns response.data
+    const userData = await AuthServices.loginUser(token);
+    console.log("User data from API:", userData);
     
     // Store the user data
-    user.value = apiResponse.data;
+    user.value = userData;
     Utils.setStore("user", user.value);
     
     console.log("User role:", user.value.role);
