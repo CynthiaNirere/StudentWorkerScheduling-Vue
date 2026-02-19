@@ -17,9 +17,11 @@ const error = ref(null)
 const successMessage = ref(null)
 
 const showAddEmployeeDialog = ref(false)
+const showEditEmployeeDialog = ref(false)
 const showDeleteDialog = ref(false)
 const showChangeBusinessAreaDialog = ref(false)
 const employeeToDelete = ref(null)
+const employeeToEdit = ref(null)
 
 const newEmployee = ref({
   firstName: '',
@@ -27,6 +29,16 @@ const newEmployee = ref({
   email: '',
   phoneNumber: '',
   role: 'employee',
+  workLocation: null
+})
+
+const editEmployee = ref({
+  userId: '',
+  firstName: '',
+  lastName: '',
+  email: '',
+  phoneNumber: '',
+  role: '',
   workLocation: null
 })
 
@@ -44,7 +56,6 @@ const loadBusinessAreas = async () => {
     const response = await businessAreaServices.getAll()
     businessAreas.value = response.data
     
-    // Set default business area if exists
     if (businessAreas.value.length > 0) {
       currentBusinessArea.value = businessAreas.value[0]
       await loadEmployees()
@@ -63,7 +74,6 @@ const loadEmployees = async () => {
     const response = await adminServices.getAllUsers()
     console.log("✅ Employees loaded:", response.data)
     
-    // Filter employees by current business area if set
     employees.value = response.data.filter(emp => {
       if (!currentBusinessArea.value) return true
       return emp.work_location === currentBusinessArea.value.location_id
@@ -96,6 +106,75 @@ const openAddEmployeeDialog = () => {
 
 const closeAddEmployeeDialog = () => {
   showAddEmployeeDialog.value = false
+}
+
+const openEditEmployeeDialog = (employee) => {
+  console.log("✏️ Opening edit dialog for employee:", employee)
+  employeeToEdit.value = employee
+  editEmployee.value = {
+    userId: employee.user_id,
+    firstName: employee.first_name,
+    lastName: employee.last_name,
+    email: employee.email,
+    phoneNumber: employee.phone_number || '',
+    role: employee.role,
+    workLocation: employee.work_location
+  }
+  showEditEmployeeDialog.value = true
+}
+
+const closeEditEmployeeDialog = () => {
+  showEditEmployeeDialog.value = false
+  employeeToEdit.value = null
+}
+
+const saveEditEmployee = async () => {
+  if (!editEmployee.value.firstName || !editEmployee.value.lastName || !editEmployee.value.email) {
+    error.value = 'Please fill in all required fields'
+    return
+  }
+
+  try {
+    const employeeData = {
+      first_name: editEmployee.value.firstName,
+      last_name: editEmployee.value.lastName,
+      email: editEmployee.value.email,
+      phone_number: editEmployee.value.phoneNumber,
+      role: editEmployee.value.role,
+      work_location: editEmployee.value.workLocation
+    }
+
+    console.log("✏️ Updating employee:", editEmployee.value.userId, employeeData)
+    const response = await adminServices.updateUser(editEmployee.value.userId, employeeData)
+    console.log("✅ Employee updated:", response.data)
+    
+    // Update the employee in the list
+    const index = employees.value.findIndex(e => e.user_id === editEmployee.value.userId)
+    if (index !== -1) {
+      employees.value[index] = {
+        ...employees.value[index],
+        first_name: editEmployee.value.firstName,
+        last_name: editEmployee.value.lastName,
+        email: editEmployee.value.email,
+        phone_number: editEmployee.value.phoneNumber,
+        role: editEmployee.value.role,
+        work_location: editEmployee.value.workLocation
+      }
+    }
+    
+    closeEditEmployeeDialog()
+    showSuccess('Employee updated successfully')
+  } catch (err) {
+    console.error("❌ Error updating employee:", err)
+    if (err.response?.status === 401) {
+      error.value = 'Session expired. Please log in again.'
+      setTimeout(() => router.push('/login'), 2000)
+    } else if (err.response?.status === 400) {
+      error.value = 'Email already exists. Please use a different email.'
+    } else {
+      error.value = err.response?.data?.message || 'Unable to update employee. Please try again.'
+    }
+  }
 }
 
 const addEmployee = async () => {
@@ -287,7 +366,7 @@ onMounted(async () => {
                   variant="outlined" 
                   size="small" 
                   class="mr-2"
-                  @click="() => {}"
+                  @click="openEditEmployeeDialog(employee)"
                 >
                   Edit
                 </v-btn>
@@ -355,7 +434,7 @@ onMounted(async () => {
               <v-select
                 v-model="newEmployee.role"
                 label="Role *"
-                :items="['admin', 'employee']"
+                :items="['admin', 'employee', 'employer']"
                 variant="outlined"
                 required
               ></v-select>
@@ -380,6 +459,86 @@ onMounted(async () => {
               :disabled="!newEmployee.firstName || !newEmployee.lastName || !newEmployee.email"
             >
               Add Employee
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <!-- Edit Employee Dialog -->
+      <v-dialog v-model="showEditEmployeeDialog" max-width="600px" persistent>
+        <v-card>
+          <v-card-title class="bg-primary">
+            <div class="d-flex justify-space-between align-center">
+              <span class="text-h5">Edit Employee</span>
+              <v-btn icon variant="text" @click="closeEditEmployeeDialog">
+                <v-icon>mdi-close</v-icon>
+              </v-btn>
+            </div>
+          </v-card-title>
+
+          <v-card-text class="pt-4">
+            <v-form>
+              <v-row>
+                <v-col cols="6">
+                  <v-text-field
+                    v-model="editEmployee.firstName"
+                    label="First Name *"
+                    variant="outlined"
+                    required
+                  ></v-text-field>
+                </v-col>
+                <v-col cols="6">
+                  <v-text-field
+                    v-model="editEmployee.lastName"
+                    label="Last Name *"
+                    variant="outlined"
+                    required
+                  ></v-text-field>
+                </v-col>
+              </v-row>
+
+              <v-text-field
+                v-model="editEmployee.email"
+                label="Email *"
+                type="email"
+                variant="outlined"
+                required
+              ></v-text-field>
+
+              <v-text-field
+                v-model="editEmployee.phoneNumber"
+                label="Phone Number"
+                variant="outlined"
+              ></v-text-field>
+
+              <v-select
+                v-model="editEmployee.role"
+                label="Role *"
+                :items="['admin', 'employee', 'employer']"
+                variant="outlined"
+                required
+              ></v-select>
+
+              <v-select
+                v-model="editEmployee.workLocation"
+                label="Work Location"
+                :items="businessAreas"
+                item-title="name"
+                item-value="location_id"
+                variant="outlined"
+              ></v-select>
+            </v-form>
+          </v-card-text>
+
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn variant="text" @click="closeEditEmployeeDialog">Cancel</v-btn>
+            <v-btn 
+              color="primary" 
+              @click="saveEditEmployee"
+              :disabled="!editEmployee.firstName || !editEmployee.lastName || !editEmployee.email"
+            >
+              Save Changes
             </v-btn>
           </v-card-actions>
         </v-card>
