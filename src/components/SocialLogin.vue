@@ -34,7 +34,7 @@ const handleCredentialResponse = async (response) => {
   
   await AuthServices.loginUser(token)
     .then((response) => {
-      user.value = response;
+      user.value = response.data;  // ✅ FIXED: Use response.data
       Utils.setStore("user", user.value);
       fName.value = user.value.fName;
       lName.value = user.value.lName;
@@ -52,6 +52,7 @@ const handleCredentialResponse = async (response) => {
     })
     .catch((error) => {
       console.log("Login error:", error);
+      console.log("Error details:", error.response);
       alert("Login failed. Please try again.");
     });
 };
