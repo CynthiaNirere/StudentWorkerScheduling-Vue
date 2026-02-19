@@ -6,6 +6,7 @@ import Login from "./views/Login.vue";
 import SignUp from "./views/SignUp.vue";
 import RoleSelect from "./views/RoleSelect.vue";
 import AdminViewDashboard from "./views/adminViewDashboard.vue";
+import EmployeeDashboard from "./views/EmployeeDashboard.vue";
 import EmployerDashboard from "./views/EmployerDashboard.vue";
 import EmployerSchedule from "./views/EmployerSchedule.vue";
 import EmployerEmployees from "./views/EmployerEmployees.vue";
@@ -42,6 +43,24 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: "/admin",
+      name: "adminViewDashboard",
+      component: AdminViewDashboard, 
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+    // ─── EMPLOYEE ROUTES ────────────────────────────────────────────────
+    {
+      path: "/employee",
+      redirect: "/employee/dashboard",
+    },
+    {
+      path: "/employee/dashboard",
+      name: "employeeDashboard",
+      component: EmployeeDashboard,
+      meta: { requiresAuth: true },
+    },
+    // ─── EMPLOYER ROUTES ────────────────────────────────────────────────
+    {
       path: "/employer",
       redirect: "/employer/dashboard",
     },
@@ -54,55 +73,50 @@ const router = createRouter({
     {
       path: "/employer/schedule",
       name: "employerSchedule",
-      component: EmployerSchedule,  // ← Direct reference, no import()
+      component: EmployerSchedule,
       meta: { requiresAuth: true },
     },
     {
       path: "/employer/employees",
       name: "employerEmployees",
-      component: EmployerEmployees,  // ← Direct reference
+      component: EmployerEmployees,
       meta: { requiresAuth: true },
     },
     {
       path: "/employer/availability",
       name: "employerAvailability",
-      component: EmployerAvailability,  // ← Direct reference
+      component: EmployerAvailability,
       meta: { requiresAuth: true },
     },
     {
       path: "/employer/time-off",
       name: "employerTimeOff",
-      component: EmployerTimeOff,  // ← Direct reference
+      component: EmployerTimeOff,
       meta: { requiresAuth: true },
     },
     {
       path: "/employer/tasks",
       name: "employerTasks",
-      component: EmployerTasks,  // ← Direct reference
+      component: EmployerTasks,
       meta: { requiresAuth: true },
     },
     {
       path: "/employer/swaps",
       name: "employerSwaps",
-      component: EmployerSwaps,  // ← Direct reference
+      component: EmployerSwaps,
       meta: { requiresAuth: true },
     },
     {
       path: "/employer/profile",
       name: "employerProfile",
-      component: EmployerProfile,  // ← Direct reference
+      component: EmployerProfile,
       meta: { requiresAuth: true },
     },
+    // ─── CATCH ALL ──────────────────────────────────────────────────────
     {
       path: "/:pathMatch(.*)*",
       redirect: "/login",
     },
-    {
-  path: "/admin",
-  name: "adminViewDashboard",
-  component: AdminViewDashboard, 
-  meta: { requiresAuth: true, requiresAdmin: true },
-},
   ],
 });
 
