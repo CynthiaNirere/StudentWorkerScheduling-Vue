@@ -1,265 +1,131 @@
 import apiClient from "./services.js";
 
+// ─── EMPLOYEES ────────────────────────────────────────────────────────────
+const getAllEmployees = () => apiClient.get("/users");
+const getEmployeeById = (id) => apiClient.get(`/users/${id}`);
+const createEmployee = (data) => apiClient.post("/users", data);
+const updateEmployee = (id, data) => apiClient.put(`/users/${id}`, data);
+const deleteEmployee = (id) => apiClient.delete(`/users/${id}`);
+
+// ─── LOCATIONS (Business Areas) ───────────────────────────────────────────
+const getAllLocations = () => apiClient.get("/business-areas");
+const getLocationById = (id) => apiClient.get(`/business-areas/${id}`);
+
+// ─── JOB ROLES ────────────────────────────────────────────────────────────
+const getAllJobRoles = (locationId) =>
+  locationId
+    ? apiClient.get("/job-roles", { params: { location_id: locationId } })
+    : apiClient.get("/job-roles");
+
+// ─── SHIFTS ───────────────────────────────────────────────────────────────
+const getShiftsByWeek = (startDate, endDate) =>
+  apiClient.get("/shifts", { params: { start: startDate, end: endDate } });
+
+const getShiftsByLocation = (locationId) =>
+  apiClient.get("/shifts", { params: { location_id: locationId } });
+
+const getShiftsByUser = (userId) =>
+  apiClient.get("/shifts", { params: { user_id: userId } });
+
+const createShift = (data) => apiClient.post("/shifts", data);
+const updateShift = (id, data) => apiClient.put(`/shifts/${id}`, data);
+const deleteShift = (id) => apiClient.delete(`/shifts/${id}`);
+const publishShift = (id) => apiClient.put(`/shifts/${id}`, { status: "published" });
+
+// ─── CLOCK IN / OUT ───────────────────────────────────────────────────────
+const clockIn = (data) => apiClient.post("/clock/in", data);
+const clockOut = (data) => apiClient.post("/clock/out", data);
+const getClockHistory = (userId) => apiClient.get(`/clock/${userId}`);
+
+// ─── AVAILABILITY ─────────────────────────────────────────────────────────
+const getAvailability = (userId) => apiClient.get(`/availability/${userId}`);
+const createAvailability = (data) => apiClient.post("/availability", data);
+const updateAvailability = (id, data) => apiClient.put(`/availability/${id}`, data);
+const deleteAvailability = (id) => apiClient.delete(`/availability/${id}`);
+
+// ─── TIME OFF REQUESTS ────────────────────────────────────────────────────
+const getTimeOffRequests = (userId) =>
+  apiClient.get("/time-off-requests", { params: { user_id: userId } });
+const getAllTimeOffRequests = () => apiClient.get("/time-off-requests");
+const createTimeOffRequest = (data) => apiClient.post("/time-off-requests", data);
+const updateTimeOffRequest = (id, data) =>
+  apiClient.put(`/time-off-requests/${id}`, data);
+
+// ─── SHIFT SWAP REQUESTS ──────────────────────────────────────────────────
+const getShiftSwapRequests = (userId) =>
+  apiClient.get("/shift-swaps", { params: { user_id: userId } });
+const getAllShiftSwapRequests = () => apiClient.get("/shift-swaps");
+const createShiftSwapRequest = (data) => apiClient.post("/shift-swaps", data);
+const updateShiftSwapRequest = (id, data) =>
+  apiClient.put(`/shift-swaps/${id}`, data);
+
+// ─── NOTIFICATIONS ────────────────────────────────────────────────────────
+const getNotifications = (userId) => apiClient.get(`/notifications/${userId}`);
+const markNotificationRead = (id) => apiClient.put(`/notifications/${id}/read`);
+
+// ─── TASKS ────────────────────────────────────────────────────────────────
+const getTasksForUser = (userId) =>
+  apiClient.get("/tasklist/items", { params: { assigned_to: userId } });
+const updateTaskItem = (id, data) => apiClient.put(`/tasklist/items/${id}`, data);
+const getAllTaskLists = () => apiClient.get("/tasklist");
+const createTaskList = (data) => apiClient.post("/tasklist", data);
+const createTaskItem = (data) => apiClient.post("/tasklist/items", data);
+
 export default {
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // SHIFTS
-  // ═══════════════════════════════════════════════════════════════════════
-
-  getAllShifts() {
-    return apiClient.get("/shifts");
-  },
-
-  getShiftsByWeek(startDate, endDate) {
-    return apiClient.get(`/shifts?startDate=${startDate}&endDate=${endDate}`);
-  },
-
-  getShiftsByLocation(locationId) {
-    return apiClient.get(`/shifts?locationId=${locationId}`);
-  },
-
-  getShiftById(id) {
-    return apiClient.get(`/shifts/${id}`);
-  },
-
-  createShift(shift) {
-    return apiClient.post("/shifts", shift);
-  },
-
-  updateShift(id, shift) {
-    return apiClient.put(`/shifts/${id}`, shift);
-  },
-
-  deleteShift(id) {
-    return apiClient.delete(`/shifts/${id}`);
-  },
-
-  assignUserToShift(id, userId) {
-    return apiClient.put(`/shifts/${id}/assign`, { userId });
-  },
-
-  publishShift(id) {
-    return apiClient.put(`/shifts/${id}/publish`);
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // NOTIFICATIONS
-  // ═══════════════════════════════════════════════════════════════════════
-
-  getAllNotifications() {
-    return apiClient.get("/notifications");
-  },
-
-  createNotification(notification) {
-    return apiClient.post("/notifications", notification);
-  },
-
-  markNotificationRead(id) {
-    return apiClient.put(`/notifications/${id}/read`);
-  },
-
-  deleteNotification(id) {
-    return apiClient.delete(`/notifications/${id}`);
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // SHIFT SWAP REQUESTS
-  // ═══════════════════════════════════════════════════════════════════════
-
-  getAllSwapRequests() {
-    return apiClient.get("/shift-swap-requests");
-  },
-
-  getPendingSwapRequests() {
-    return apiClient.get("/shift-swap-requests?status=pending");
-  },
-
-  getSwapRequestById(id) {
-    return apiClient.get(`/shift-swap-requests/${id}`);
-  },
-
-  approveSwapRequest(id) {
-    return apiClient.put(`/shift-swap-requests/${id}/approve`);
-  },
-
-  rejectSwapRequest(id) {
-    return apiClient.put(`/shift-swap-requests/${id}/reject`);
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // TIME OFF REQUESTS
-  // ═══════════════════════════════════════════════════════════════════════
-
-  getAllTimeOffRequests() {
-    return apiClient.get("/time-off-requests");
-  },
-
-  getPendingTimeOffRequests() {
-    return apiClient.get("/time-off-requests?status=pending");
-  },
-
-  getTimeOffRequestById(id) {
-    return apiClient.get(`/time-off-requests/${id}`);
-  },
-
-  approveTimeOffRequest(id) {
-    return apiClient.put(`/time-off-requests/${id}/approve`);
-  },
-
-  denyTimeOffRequest(id) {
-    return apiClient.put(`/time-off-requests/${id}/deny`);
-  },
-
-  deleteTimeOffRequest(id) {
-    return apiClient.delete(`/time-off-requests/${id}`);
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // EMPLOYEES (USERS)
-  // ═══════════════════════════════════════════════════════════════════════
-
-  getAllEmployees() {
-    return apiClient.get("/users");
-  },
-
-  getEmployeeById(id) {
-    return apiClient.get(`/users/${id}`);
-  },
-
-  createEmployee(employee) {
-    return apiClient.post("/users", employee);
-  },
-
-  updateEmployee(id, employee) {
-    return apiClient.put(`/users/${id}`, employee);
-  },
-
-  deleteEmployee(id) {
-    return apiClient.delete(`/users/${id}`);
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // AVAILABILITY
-  // ═══════════════════════════════════════════════════════════════════════
-
-  getAllAvailability() {
-    return apiClient.get("/availability");
-  },
-
-  getAvailabilityByUser(userId) {
-    return apiClient.get(`/availability?userId=${userId}`);
-  },
-
-  createAvailability(availability) {
-    return apiClient.post("/availability", availability);
-  },
-
-  updateAvailability(id, availability) {
-    return apiClient.put(`/availability/${id}`, availability);
-  },
-
-  deleteAvailability(id) {
-    return apiClient.delete(`/availability/${id}`);
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // TASK LISTS
-  // ═══════════════════════════════════════════════════════════════════════
-
-  getAllTaskLists() {
-    return apiClient.get("/task-lists");
-  },
-
-  getTaskListById(id) {
-    return apiClient.get(`/task-lists/${id}`);
-  },
-
-  createTaskList(taskList) {
-    return apiClient.post("/task-lists", taskList);
-  },
-
-  updateTaskList(id, taskList) {
-    return apiClient.put(`/task-lists/${id}`, taskList);
-  },
-
-  deleteTaskList(id) {
-    return apiClient.delete(`/task-lists/${id}`);
-  },
-
-  completeTaskList(id) {
-    return apiClient.put(`/task-lists/${id}/complete`);
-  },
-
-  archiveTaskList(id) {
-    return apiClient.put(`/task-lists/${id}/archive`);
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // TASK LIST ITEMS
-  // ═══════════════════════════════════════════════════════════════════════
-
-  getAllTaskItems() {
-    return apiClient.get("/task-list-items");
-  },
-
-  getTaskItemsByList(tasklistId) {
-    return apiClient.get(`/task-list-items?tasklistId=${tasklistId}`);
-  },
-
-  createTaskItem(item) {
-    return apiClient.post("/task-list-items", item);
-  },
-
-  updateTaskItem(id, item) {
-    return apiClient.put(`/task-list-items/${id}`, item);
-  },
-
-  deleteTaskItem(id) {
-    return apiClient.delete(`/task-list-items/${id}`);
-  },
-
-  completeTaskItem(id) {
-    return apiClient.put(`/task-list-items/${id}/complete`);
-  },
-
-  reorderTaskItems(items) {
-    return apiClient.put("/task-list-items/reorder", { items });
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // BUSINESS AREAS (LOCATIONS)
-  // ═══════════════════════════════════════════════════════════════════════
-
-  getAllLocations() {
-    return apiClient.get("/business-areas");
-  },
-
-  getLocationById(id) {
-    return apiClient.get(`/business-areas/${id}`);
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // JOB ROLES
-  // ═══════════════════════════════════════════════════════════════════════
-
-  getAllJobRoles() {
-    return apiClient.get("/job-roles");
-  },
-
-  getJobRoleById(id) {
-    return apiClient.get(`/job-roles/${id}`);
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // CLOCK IN/OUT
-  // ═══════════════════════════════════════════════════════════════════════
-
-  getAllClockRecords() {
-    return apiClient.get("/clock-records");
-  },
-
-  approveClockRecord(id) {
-    return apiClient.put(`/clock-records/${id}/approve`);
-  },
-
+  // Employees
+  getAllEmployees,
+  getEmployeeById,
+  createEmployee,
+  updateEmployee,
+  deleteEmployee,
+
+  // Locations
+  getAllLocations,
+  getLocationById,
+
+  // Job Roles
+  getAllJobRoles,
+
+  // Shifts
+  getShiftsByWeek,
+  getShiftsByLocation,
+  getShiftsByUser,
+  createShift,
+  updateShift,
+  deleteShift,
+  publishShift,
+
+  // Clock
+  clockIn,
+  clockOut,
+  getClockHistory,
+
+  // Availability
+  getAvailability,
+  createAvailability,
+  updateAvailability,
+  deleteAvailability,
+
+  // Time Off
+  getTimeOffRequests,
+  getAllTimeOffRequests,
+  createTimeOffRequest,
+  updateTimeOffRequest,
+
+  // Swap
+  getShiftSwapRequests,
+  getAllShiftSwapRequests,
+  createShiftSwapRequest,
+  updateShiftSwapRequest,
+
+  // Notifications
+  getNotifications,
+  markNotificationRead,
+
+  // Tasks
+  getTasksForUser,
+  updateTaskItem,
+  getAllTaskLists,
+  createTaskList,
+  createTaskItem,
 };
