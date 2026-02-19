@@ -37,7 +37,7 @@ onMounted(() => {
 
 <template>
   <!-- Only show app bar if user is logged in and NOT on employee dashboard -->
-  <v-app-bar v-if="user && $route.name !== 'employeeDashboard'" color="primary" elevation="2">
+  <v-app-bar v-if="user && !$route.path.startsWith('/employer') && $route.name !== 'employeeDashboard'" color="primary" elevation="2">
     <!-- App Title -->
     <v-toolbar-title class="mx-4">{{ title }}</v-toolbar-title>
     

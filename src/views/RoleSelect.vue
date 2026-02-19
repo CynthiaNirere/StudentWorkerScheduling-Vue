@@ -33,7 +33,7 @@ const handleManagerClick = () => {
           <!-- Header -->
           <div class="text-center mb-6">
             <p class="text-body-2 text-grey">
-              Welcome Admin, who would you like to log in as
+              Welcome !! , who would you like to log in as
             </p>
           </div>
 
