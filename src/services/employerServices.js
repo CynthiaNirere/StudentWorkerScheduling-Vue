@@ -38,6 +38,7 @@ const clockOut = (data) => apiClient.post("/clock/out", data);
 const getClockHistory = (userId) => apiClient.get(`/clock/${userId}`);
 
 // ─── AVAILABILITY ─────────────────────────────────────────────────────────
+const getAllAvailability = () => apiClient.get("/availability");
 const getAvailability = (userId) => apiClient.get(`/availability/${userId}`);
 const createAvailability = (data) => apiClient.post("/availability", data);
 const updateAvailability = (id, data) => apiClient.put(`/availability/${id}`, data);
@@ -101,6 +102,7 @@ export default {
   getClockHistory,
 
   // Availability
+  getAllAvailability,
   getAvailability,
   createAvailability,
   updateAvailability,
