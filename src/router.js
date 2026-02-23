@@ -26,10 +26,10 @@ const router = createRouter({
       redirect: "/login",
     },
     {
-      // Keep /signup but redirect to login — we use Google OAuth only
       path: "/signup",
       name: "signup",
-      redirect: "/login",
+      component: SignUp,
+      meta: { requiresAuth: false },
     },
     {
       path: "/login",
@@ -41,9 +41,8 @@ const router = createRouter({
       path: "/role-select",
       name: "roleSelect",
       component: RoleSelect,
-      meta: { requiresAuth: true, requiresAdmin: true },
+      meta: { requiresAuth: true },
     },
-    // ─── EMPLOYER / MANAGER ROUTES ─────────────────────────────────────
     {
       path: "/admin",
       name: "adminViewDashboard",
@@ -75,58 +74,51 @@ const router = createRouter({
       path: "/employer/dashboard",
       name: "employerDashboard",
       component: EmployerDashboard,
-      meta: { requiresAuth: true, requiresRole: ["employer", "admin"] },
+      meta: { requiresAuth: true },
     },
     {
       path: "/employer/schedule",
       name: "employerSchedule",
       component: EmployerSchedule,
-      meta: { requiresAuth: true, requiresRole: ["employer", "admin"] },
+      meta: { requiresAuth: true },
     },
     {
       path: "/employer/employees",
       name: "employerEmployees",
       component: EmployerEmployees,
-      meta: { requiresAuth: true, requiresRole: ["employer", "admin"] },
+      meta: { requiresAuth: true },
     },
     {
       path: "/employer/availability",
       name: "employerAvailability",
       component: EmployerAvailability,
-      meta: { requiresAuth: true, requiresRole: ["employer", "admin"] },
+      meta: { requiresAuth: true },
     },
     {
       path: "/employer/time-off",
       name: "employerTimeOff",
       component: EmployerTimeOff,
-      meta: { requiresAuth: true, requiresRole: ["employer", "admin"] },
+      meta: { requiresAuth: true },
     },
     {
       path: "/employer/tasks",
       name: "employerTasks",
       component: EmployerTasks,
-      meta: { requiresAuth: true, requiresRole: ["employer", "admin"] },
+      meta: { requiresAuth: true },
     },
     {
       path: "/employer/swaps",
       name: "employerSwaps",
       component: EmployerSwaps,
-      meta: { requiresAuth: true, requiresRole: ["employer", "admin"] },
+      meta: { requiresAuth: true },
     },
     {
       path: "/employer/profile",
       name: "employerProfile",
       component: EmployerProfile,
-      meta: { requiresAuth: true, requiresRole: ["employer", "admin"] },
+      meta: { requiresAuth: true },
     },
-    // ─── ADMIN ROUTES ──────────────────────────────────────────────────
-    {
-      path: "/admin",
-      name: "adminViewDashboard",
-      component: AdminViewDashboard,
-      meta: { requiresAuth: true, requiresAdmin: true },
-    },
-    // ─── CATCH-ALL ─────────────────────────────────────────────────────
+    // ─── CATCH ALL ──────────────────────────────────────────────────────
     {
       path: "/:pathMatch(.*)*",
       redirect: "/login",
@@ -134,65 +126,17 @@ const router = createRouter({
   ],
 });
 
-// ─── NAVIGATION GUARD ─────────────────────────────────────────────────────
 router.beforeEach((to, from, next) => {
   const user = Utils.getStore("user");
   const requiresAuth = to.meta.requiresAuth;
-  const requiresAdmin = to.meta.requiresAdmin;
-  const requiresRole = to.meta.requiresRole; // array of allowed roles
 
-  // 1. Not logged in → send to login
   if (requiresAuth && !user) {
-    console.log("Not authenticated → /login");
+    console.log("Not authenticated, redirecting to login");
     next({ name: "login" });
-    return;
-  }
-
-  // 2. Route requires admin role specifically
-  if (requiresAdmin && user?.role !== "admin") {
-    console.log("Not admin → /login");
-    next({ name: "login" });
-    return;
-  }
-
-  // 3. Route requires one of a set of roles
-  if (requiresRole && !requiresRole.includes(user?.role)) {
-    console.log(`Role "${user?.role}" not allowed → /login`);
-    next({ name: "login" });
-    return;
-  }
-
-  // 4. Already logged in and trying to visit /login → redirect by role
-  if (to.name === "login" && user) {
-    redirectByRole(user, next);
     return;
   }
 
   next();
 });
-
-// ─── ROLE-BASED REDIRECT HELPER ───────────────────────────────────────────
-export function redirectByRole(user, next) {
-  if (!user) {
-    next({ name: "login" });
-    return;
-  }
-  switch (user.role) {
-    case "admin":
-      // Admin sees role-select to choose admin view vs manager view
-      next({ name: "roleSelect" });
-      break;
-    case "employer":
-      next({ name: "employerDashboard" });
-      break;
-    case "employee":
-      // When employee dashboard exists, redirect there
-      // For now fall through to employer as placeholder
-      next({ name: "employerDashboard" });
-      break;
-    default:
-      next({ name: "login" });
-  }
-}
 
 export default router;

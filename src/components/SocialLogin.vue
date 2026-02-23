@@ -5,6 +5,8 @@ import Utils from "../config/utils.js";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
+const fName = ref("");
+const lName = ref("");
 const user = ref({});
 
 const loginWithGoogle = () => {
@@ -25,37 +27,33 @@ const loginWithGoogle = () => {
   });
 };
 
-const handleCredentialResponse = async (googleResponse) => {
+const handleCredentialResponse = async (response) => {
   let token = {
-    credential: googleResponse.credential,
+    credential: response.credential,
   };
   
-  try {
-    // authServices.js already returns response.data
-    const userData = await AuthServices.loginUser(token);
-    console.log("User data from API:", userData);
-    
-    // Store the user data
-    user.value = userData;
-    Utils.setStore("user", user.value);
-    
-    console.log("User role:", user.value.role);
-    
-    // Route based on role
-    if (user.value.role === 'admin') {
-      router.push({ name: 'roleSelect' });
-    } else if (user.value.role === 'employer') {
-      router.push({ name: 'employerDashboard' });
-    } else if (user.value.role === 'employee') {
-      router.push({ name: 'employeeDashboard' });
-    } else {
-      router.push({ name: 'login' });
-    }
-  } catch (error) {
-    console.error("Login error:", error);
-    console.error("Error response:", error.response?.data);
-    alert("Login failed. Please try again.");
-  }
+  await AuthServices.loginUser(token)
+    .then((response) => {
+      user.value = response;
+      Utils.setStore("user", user.value);
+      fName.value = user.value.fName;
+      lName.value = user.value.lName;
+      
+      // Route based on role
+      if (user.value.role === 'admin') {
+        router.push({ name: 'roleSelect' });
+      } else if (user.value.role === 'employer') {
+        router.push({ name: 'employerDashboard' });
+      } else if (user.value.role === 'employee') {
+        router.push({ name: 'employeeDashboard' });
+      } else {
+        router.push({ name: 'login' });
+      }
+    })
+    .catch((error) => {
+      console.log("Login error:", error);
+      alert("Login failed. Please try again.");
+    });
 };
 
 onMounted(() => {
