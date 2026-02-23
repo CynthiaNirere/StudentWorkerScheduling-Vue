@@ -94,6 +94,8 @@ const notifications = ref([
 const urgentNotifications = computed(() => notifications.value.filter(n => n.priority === 'high'));
 
 const handleNotificationAction = (notificationId) => {
+  const notif = notifications.value.find(n => n.id === notificationId);
+  if (notif?.action) showSnackbar('Shift taken! Pending employer approval.', 'success');
   notifications.value = notifications.value.filter(n => n.id !== notificationId);
   unreadCount.value = Math.max(0, unreadCount.value - 1);
 };
@@ -104,6 +106,18 @@ const dismissNotification = (notificationId) => {
 };
 
 const viewAllNotifications = () => { showNotifications.value = true; };
+
+const claimShift = () => showSnackbar('Shift claimed! Pending employer approval.', 'success');
+
+// ─── SNACKBAR ─────────────────────────────────────────────────────────────
+const snackbar      = ref(false);
+const snackbarMsg   = ref('');
+const snackbarColor = ref('success');
+const showSnackbar  = (msg, color = 'success') => {
+  snackbarMsg.value   = msg;
+  snackbarColor.value = color;
+  snackbar.value      = true;
+};
 
 // ─── SCHEDULE & STATUS ────────────────────────────────────────────────────
 const scheduleStatus = ref({
@@ -222,6 +236,7 @@ onMounted(() => {
           title="My Availability"
           rounded="lg"
           class="mb-1"
+          @click="router.push({ name: 'employeeAvailability' })"
         />
         <v-list-item
           prepend-icon="mdi-calendar-clock"
@@ -234,6 +249,13 @@ onMounted(() => {
           title="My Tasks"
           rounded="lg"
           class="mb-1"
+        />
+        <v-list-item
+          prepend-icon="mdi-account-circle-outline"
+          title="Profile"
+          rounded="lg"
+          class="mb-1"
+          @click="router.push({ name: 'employeeProfile' })"
         />
       </v-list>
     </v-navigation-drawer>
@@ -311,7 +333,7 @@ onMounted(() => {
             </div>
             <v-divider class="mb-2" />
             <v-list density="compact" class="pa-0">
-              <v-list-item prepend-icon="mdi-account" title="Profile" @click="() => {}" />
+              <v-list-item prepend-icon="mdi-account" title="Profile" @click="router.push({ name: 'employeeProfile' })" />
               <v-list-item
                 prepend-icon="mdi-logout"
                 title="Sign Out"
@@ -497,7 +519,7 @@ onMounted(() => {
                     <v-icon start size="small">{{ scheduleStatus.icon }}</v-icon>
                     {{ scheduleStatus.status === 'approved' ? 'Approved' : 'Pending' }}
                   </v-chip>
-                  <v-btn variant="text" size="small" color="#4361EE">View Full Schedule</v-btn>
+                  <v-btn variant="text" size="small" color="#4361EE" @click="router.push({ name: 'employeeAvailability' })">View Full Schedule</v-btn>
                 </div>
               </v-card-title>
               <v-divider />
@@ -569,7 +591,7 @@ onMounted(() => {
                             <div class="shift-time">9AM–1PM</div>
                             <div class="shift-person">You</div>
                             <div class="shift-status-text">Available</div>
-                            <v-btn size="x-small" color="#12086F" variant="flat" class="claim-btn mt-1">CLAIM</v-btn>
+                            <v-btn size="x-small" color="#12086F" variant="flat" class="claim-btn mt-1" @click="claimShift">CLAIM</v-btn>
                           </div>
                           <p class="no-shifts-text">No shifts</p>
                         </div>
@@ -637,6 +659,9 @@ onMounted(() => {
         </v-row>
       </v-container>
     </v-main>
+    <v-snackbar v-model="snackbar" :color="snackbarColor" timeout="3000" location="bottom right">
+      {{ snackbarMsg }}
+    </v-snackbar>
   </v-app>
 </template>
 
