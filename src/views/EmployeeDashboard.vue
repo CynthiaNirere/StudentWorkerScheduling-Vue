@@ -300,21 +300,6 @@ onMounted(() => {
           prepend-icon="mdi-checkbox-marked-circle-outline"
           title="My Tasks"
         ></v-list-item>
-        <v-list-item
-          prepend-icon="mdi-file-document-outline"
-          title="Profile"
-        ></v-list-item>
-      </v-list>
-
-      <v-spacer></v-spacer>
-
-      <!-- Sign Out -->
-      <v-list nav class="pb-4">
-        <v-list-item
-          prepend-icon="mdi-logout"
-          title="Sign Out"
-          @click="logout"
-        ></v-list-item>
       </v-list>
     </v-navigation-drawer>
 
@@ -350,7 +335,7 @@ onMounted(() => {
               <div v-else class="notification-list">
                 <div v-for="(notification, index) in notifications" :key="notification.id" class="notification-item pa-4">
                   <div class="d-flex gap-3">
-                    <v-icon :color="notification.priority === 'high' ? 'error' : 'primary'" size="large">
+                    <v-icon color="primary" size="large">
                       {{ notification.icon }}
                     </v-icon>
                     <div class="flex-grow-1">
@@ -437,7 +422,7 @@ onMounted(() => {
       <div v-if="urgentNotifications.length > 0" class="urgent-banner pa-4">
         <v-row align="center" class="ma-0">
           <v-col cols="auto">
-            <v-icon color="warning" size="small">mdi-alert</v-icon>
+            <v-icon color="primary" size="small">mdi-alert</v-icon>
           </v-col>
           <v-col cols="auto" class="flex-grow-1">
             <p class="text-body-2 mb-0">
@@ -496,7 +481,7 @@ onMounted(() => {
                         <p class="text-body-2 font-weight-bold text-primary">Running...</p>
                       </v-col>
                     </v-row>
-                    <v-btn block color="warning" @click="checkOut(currentShift.id)">
+                    <v-btn block color="primary" @click="checkOut(currentShift.id)">
                       <v-icon left>mdi-clock-out</v-icon>
                       Check Out
                     </v-btn>
@@ -617,53 +602,52 @@ onMounted(() => {
               <v-divider></v-divider>
 
               <v-card-text class="pa-6">
-                <div class="schedule-legend mb-4">
-                  <div class="d-flex gap-3 align-center flex-wrap">
-                    <div class="d-flex align-center gap-2">
-                      <div class="legend-color" style="background: #4caf50;"></div>
-                      <span class="text-body-2">Confirmed</span>
-                    </div>
-                    <div class="d-flex align-center gap-2">
-                      <div class="legend-color" style="background: #ff9800;"></div>
-                      <span class="text-body-2">Pending Swap</span>
-                    </div>
-                    <div class="d-flex align-center gap-2">
-                      <div class="legend-color" style="background: #2196f3;"></div>
-                      <span class="text-body-2">Available</span>
-                    </div>
-                    <div class="d-flex align-center gap-2">
-                      <div class="legend-color" style="background: #e0e0e0;"></div>
-                      <span class="text-body-2">Off</span>
-                    </div>
-                  </div>
-                </div>
-
                 <!-- Calendar Grid -->
                 <div class="calendar-scroll">
                   <div class="calendar-grid">
                     <div class="calendar-header">
-                      <div class="calendar-day-header">MON</div>
-                      <div class="calendar-day-header">TUE</div>
-                      <div class="calendar-day-header">WED</div>
-                      <div class="calendar-day-header">THU</div>
-                      <div class="calendar-day-header">FRI</div>
-                      <div class="calendar-day-header">SAT</div>
-                      <div class="calendar-day-header">SUN</div>
+                      <div class="calendar-day-header">
+                        <span class="day-header-name">MON</span>
+                        <span class="day-header-number">16</span>
+                      </div>
+                      <div class="calendar-day-header">
+                        <span class="day-header-name">TUE</span>
+                        <span class="day-header-number">17</span>
+                      </div>
+                      <div class="calendar-day-header">
+                        <span class="day-header-name">WED</span>
+                        <span class="day-header-number">18</span>
+                      </div>
+                      <div class="calendar-day-header">
+                        <span class="day-header-name">THU</span>
+                        <span class="day-header-number">19</span>
+                      </div>
+                      <div class="calendar-day-header">
+                        <span class="day-header-name">FRI</span>
+                        <span class="day-header-number">20</span>
+                      </div>
+                      <div class="calendar-day-header">
+                        <span class="day-header-name">SAT</span>
+                        <span class="day-header-number">21</span>
+                      </div>
+                      <div class="calendar-day-header">
+                        <span class="day-header-name">SUN</span>
+                        <span class="day-header-number">22</span>
+                      </div>
                     </div>
 
                     <div class="calendar-body">
                       <div class="calendar-day">
-                        <div class="day-number">16</div>
                         <div class="shifts-container">
-                          <div class="shift-box shift-confirmed">
+                          <div class="shift-box">
                             <div class="shift-time">9AM-5PM</div>
                             <div class="shift-person">You</div>
                           </div>
-                          <div class="shift-box shift-confirmed">
+                          <div class="shift-box">
                             <div class="shift-time">2PM-10PM</div>
                             <div class="shift-person">Alex M.</div>
                           </div>
-                          <div class="shift-box shift-confirmed">
+                          <div class="shift-box">
                             <div class="shift-time">10AM-6PM</div>
                             <div class="shift-person">Sam W.</div>
                           </div>
@@ -671,85 +655,62 @@ onMounted(() => {
                       </div>
 
                       <div class="calendar-day">
-                        <div class="day-number">17</div>
                         <div class="shifts-container">
                           <div class="shift-box shift-off">
-                            <div class="shift-person">You - OFF</div>
+                            <div class="shift-person">You</div>
+                            <div class="shift-status-text">Day Off</div>
                           </div>
-                          <div class="shift-box-empty">
-                            <v-btn size="x-small" variant="text" class="add-shift-btn">
-                              + Add Shift
-                            </v-btn>
-                          </div>
+                          <p class="no-shifts-text">No shifts</p>
                         </div>
                       </div>
 
                       <div class="calendar-day">
-                        <div class="day-number">18</div>
                         <div class="shifts-container">
-                          <div class="shift-box shift-confirmed">
+                          <div class="shift-box">
                             <div class="shift-time">2PM-10PM</div>
                             <div class="shift-person">You</div>
                           </div>
-                          <div class="shift-box shift-swap">
+                          <div class="shift-box">
                             <div class="shift-time">9AM-5PM</div>
                             <div class="shift-person">Jordan L.</div>
+                            <div class="shift-status-text">Pending Swap</div>
                           </div>
                         </div>
                       </div>
 
                       <div class="calendar-day">
-                        <div class="day-number">19</div>
                         <div class="shifts-container">
-                          <div class="shift-box shift-available">
+                          <div class="shift-box">
                             <div class="shift-time">9AM-1PM</div>
                             <div class="shift-person">You</div>
-                            <v-btn size="x-small" color="primary" class="mt-1">
+                            <div class="shift-status-text">Available</div>
+                            <v-btn size="x-small" color="primary" variant="flat" class="claim-btn mt-1">
                               CLAIM
                             </v-btn>
                           </div>
-                          <div class="shift-box-empty">
-                            <v-btn size="x-small" variant="text" class="add-shift-btn">
-                              + Add Shift
-                            </v-btn>
-                          </div>
+                          <p class="no-shifts-text">No shifts</p>
                         </div>
                       </div>
 
                       <div class="calendar-day">
-                        <div class="day-number">20</div>
                         <div class="shifts-container">
-                          <div class="shift-box shift-confirmed">
+                          <div class="shift-box">
                             <div class="shift-time">10AM-6PM</div>
                             <div class="shift-person">You</div>
                           </div>
-                          <div class="shift-box-empty">
-                            <v-btn size="x-small" variant="text" class="add-shift-btn">
-                              + Add Shift
-                            </v-btn>
-                          </div>
+                          <p class="no-shifts-text">No shifts</p>
                         </div>
                       </div>
 
                       <div class="calendar-day">
-                        <div class="day-number">21</div>
                         <div class="shifts-container">
-                          <div class="shift-box-empty">
-                            <v-btn size="x-small" variant="text" class="add-shift-btn">
-                              + Add Shift
-                            </v-btn>
-                          </div>
+                          <p class="no-shifts-text">No shifts</p>
                         </div>
                       </div>
 
                       <div class="calendar-day">
-                        <div class="day-number">22</div>
                         <div class="shifts-container">
-                          <div class="shift-box-empty">
-                            <v-btn size="x-small" variant="text" class="add-shift-btn">
-                              + Add Shift
-                            </v-btn>
-                          </div>
+                          <p class="no-shifts-text">No shifts</p>
                         </div>
                       </div>
                     </div>
@@ -827,12 +788,17 @@ onMounted(() => {
 
 .sidebar {
   width: 280px;
-  background: linear-gradient(to bottom, #8b3a42 0%, #a04a52 100%);
+  background: linear-gradient(180deg, #0c0558 0%, #12086f 60%, #1a0f85 100%);
   color: white;
 }
 
+.sidebar :deep(.v-list-item--active) {
+  background-color: rgba(255, 255, 255, 0.14) !important;
+  border-radius: 8px;
+}
+
 .sidebar-header {
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: rgba(0, 0, 0, 0.15);
 }
 
 .white-80 {
@@ -887,8 +853,8 @@ onMounted(() => {
 }
 
 .urgent-banner {
-  background-color: #fffde7;
-  border-bottom: 1px solid #fff9c4;
+  background-color: #eef0fb;
+  border-bottom: 1px solid #c5cae9;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -897,7 +863,7 @@ onMounted(() => {
 
 .clock-display {
   padding: 20px;
-  background: linear-gradient(135deg, #8b3a42 0%, #a04a52 100%);
+  background: linear-gradient(135deg, #12086f 0%, #1c10a8 100%);
   border-radius: 12px;
   margin: 16px 0;
   color: white;
@@ -913,7 +879,7 @@ onMounted(() => {
   padding: 12px;
   background-color: #f9f9f9;
   border-radius: 8px;
-  border-left: 3px solid #8b3a42;
+  border-left: 3px solid #12086f;
 }
 
 .active-shift {
@@ -1030,21 +996,37 @@ onMounted(() => {
 .calendar-header {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  background-color: #f5f5f5;
-  border-bottom: 2px solid #e0e0e0;
+  background-color: #12086f;
+  border-bottom: 2px solid #0d0660;
 }
 
 .calendar-day-header {
-  padding: 12px;
+  padding: 10px 8px 8px;
   text-align: center;
-  font-weight: bold;
-  font-size: 0.875rem;
-  color: #666;
-  border-right: 1px solid #e0e0e0;
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
 }
 
 .calendar-day-header:last-child {
   border-right: none;
+}
+
+.day-header-name {
+  font-weight: 700;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.day-header-number {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.18);
+  line-height: 1;
 }
 
 .calendar-body {
@@ -1065,13 +1047,6 @@ onMounted(() => {
   border-right: none;
 }
 
-.day-number {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 8px;
-}
-
 .shifts-container {
   display: flex;
   flex-direction: column;
@@ -1082,39 +1057,44 @@ onMounted(() => {
   padding: 8px;
   border-radius: 6px;
   font-size: 0.75rem;
-  border-left: 3px solid transparent;
-}
-
-.shift-confirmed {
-  background-color: #e8f5e9;
-  border-left-color: #4caf50;
-}
-
-.shift-swap {
-  background-color: #fff3e0;
-  border-left-color: #ff9800;
-}
-
-.shift-available {
-  background-color: #e3f2fd;
-  border-left-color: #2196f3;
+  background-color: #dbeafe;
 }
 
 .shift-off {
-  background-color: #f5f5f5;
-  border-left-color: #9e9e9e;
-  text-align: center;
+  background-color: #f1f5f9;
 }
 
 .shift-time {
   font-weight: bold;
-  color: #333;
-  margin-bottom: 4px;
+  color: #1e293b;
+  margin-bottom: 2px;
 }
 
 .shift-person {
-  color: #666;
+  color: #475569;
   font-size: 0.7rem;
+}
+
+.shift-status-text {
+  font-style: italic;
+  font-size: 0.65rem;
+  color: #64748b;
+  margin-top: 3px;
+}
+
+.no-shifts-text {
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.75rem;
+  margin: 6px 0 0 0;
+  padding: 4px 0;
+}
+
+.claim-btn {
+  font-size: 0.6rem;
+  height: 20px;
+  min-width: unset;
+  padding: 0 6px;
 }
 
 .shift-box-empty {
