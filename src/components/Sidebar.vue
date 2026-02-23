@@ -43,13 +43,7 @@
         value="profile"
         to="/profile"
       ></v-list-item>
-
-      <v-list-item
-        prepend-icon="mdi-logout"
-        title="Sign Out"
-        value="signout"
-        @click="handleLogout"
-      ></v-list-item>
+      
     </v-list>
   </v-navigation-drawer>
 </template>
