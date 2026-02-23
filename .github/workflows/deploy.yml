@@ -36,10 +36,6 @@ jobs:
       - run: npm run bundle
       
 
-      - name: Ensure assets directory exists on remote server
-        run: |
-          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SERVER_SSH_KEY }} ubuntu@workerscheduling.eaglesoftwareteam.com "mkdir -p /var/www/html/sev2026/t1/assets"
-
       - name: Deploy to Server
         uses: easingthemes/ssh-deploy@v2.1.1
         env:
