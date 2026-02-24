@@ -18,11 +18,9 @@ const error = ref(null)
 const successMessage = ref(null)
 
 const showAddEmployeeDialog = ref(false)
-const showEditEmployeeDialog = ref(false)
 const showDeleteDialog = ref(false)
 const showChangeBusinessAreaDialog = ref(false)
 const employeeToDelete = ref(null)
-const employeeToEdit = ref(null)
 
 const newEmployee = ref({
   firstName: '',
@@ -30,16 +28,6 @@ const newEmployee = ref({
   email: '',
   phoneNumber: '',
   role: 'employee',
-  workLocation: null
-})
-
-const editEmployee = ref({
-  userId: '',
-  firstName: '',
-  lastName: '',
-  email: '',
-  phoneNumber: '',
-  role: '',
   workLocation: null
 })
 
@@ -57,6 +45,7 @@ const loadBusinessAreas = async () => {
     const response = await businessAreaServices.getAll()
     businessAreas.value = response.data
     
+    // Set default business area if exists
     if (businessAreas.value.length > 0) {
       currentBusinessArea.value = businessAreas.value[0]
       await loadEmployees()
@@ -75,6 +64,7 @@ const loadEmployees = async () => {
     const response = await adminServices.getAllUsers()
     console.log("✅ Employees loaded:", response.data)
     
+    // Filter employees by current business area if set
     employees.value = response.data.filter(emp => {
       if (!currentBusinessArea.value) return true
       return emp.work_location === currentBusinessArea.value.location_id
@@ -426,7 +416,7 @@ onMounted(async () => {
                   size="small"
                   color="primary"
                   class="mr-2"
-                  @click="openEditEmployeeDialog(employee)"
+                  @click="() => {}"
                 >
                   Edit
                 </v-btn>
@@ -494,7 +484,7 @@ onMounted(async () => {
               <v-select
                 v-model="newEmployee.role"
                 label="Role *"
-                :items="['admin', 'employee', 'employer']"
+                :items="['admin', 'employee']"
                 variant="outlined"
                 required
               ></v-select>

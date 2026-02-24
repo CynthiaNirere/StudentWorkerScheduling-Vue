@@ -7,6 +7,7 @@ import SignUp from "./views/SignUp.vue";
 import RoleSelect from "./views/RoleSelect.vue";
 import AdminViewDashboard from "./views/adminViewDashboard.vue";
 import EmployeeDashboard from "./views/EmployeeDashboard.vue";
+import EmployeeAvailability from "./views/EmployeeAvailabiliy.vue";
 import BusinessAreaSelect from "./views/BusinessAreaSelect.vue";
 import EmployerDashboard from "./views/EmployerDashboard.vue";
 import EmployerSchedule from "./views/EmployerSchedule.vue";
@@ -28,10 +29,10 @@ const router = createRouter({
       redirect: "/login",
     },
     {
-      // Keep /signup but redirect to login — we use Google OAuth only
       path: "/signup",
       name: "signup",
-      redirect: "/login",
+      component: SignUp,
+      meta: { requiresAuth: false },
     },
     {
       path: "/login",
@@ -43,7 +44,7 @@ const router = createRouter({
       path: "/role-select",
       name: "roleSelect",
       component: RoleSelect,
-      meta: { requiresAuth: true, requiresAdmin: true },
+      meta: { requiresAuth: true },
     },
     // ─── SHARED ROUTES (All Authenticated Users) ───────────────────────
     {
@@ -76,6 +77,12 @@ const router = createRouter({
       component: EmployeeDashboard,
       meta: { requiresAuth: true },
     },
+    {
+      path: "/employee/availability",
+      name: "employeeAvailability",
+      component: EmployeeAvailability,
+      meta: { requiresAuth: true },
+    },
     // ─── EMPLOYER ROUTES ────────────────────────────────────────────────
     { 
       path: "/business-area-select",
@@ -91,43 +98,43 @@ const router = createRouter({
       path: "/employer/dashboard",
       name: "employerDashboard",
       component: EmployerDashboard,
-      meta: { requiresAuth: true, requiresRole: ["employer", "admin"] },
+      meta: { requiresAuth: true },
     },
     {
       path: "/employer/schedule",
       name: "employerSchedule",
       component: EmployerSchedule,
-      meta: { requiresAuth: true, requiresRole: ["employer", "admin"] },
+      meta: { requiresAuth: true },
     },
     {
       path: "/employer/employees",
       name: "employerEmployees",
       component: EmployerEmployees,
-      meta: { requiresAuth: true, requiresRole: ["employer", "admin"] },
+      meta: { requiresAuth: true },
     },
     {
       path: "/employer/availability",
       name: "employerAvailability",
       component: EmployerAvailability,
-      meta: { requiresAuth: true, requiresRole: ["employer", "admin"] },
+      meta: { requiresAuth: true },
     },
     {
       path: "/employer/time-off",
       name: "employerTimeOff",
       component: EmployerTimeOff,
-      meta: { requiresAuth: true, requiresRole: ["employer", "admin"] },
+      meta: { requiresAuth: true },
     },
     {
       path: "/employer/tasks",
       name: "employerTasks",
       component: EmployerTasks,
-      meta: { requiresAuth: true, requiresRole: ["employer", "admin"] },
+      meta: { requiresAuth: true },
     },
     {
       path: "/employer/swaps",
       name: "employerSwaps",
       component: EmployerSwaps,
-      meta: { requiresAuth: true, requiresRole: ["employer", "admin"] },
+      meta: { requiresAuth: true },
     },
     {
       path: "/employer/profile",
@@ -136,6 +143,9 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresRole: ["employer", "admin"] },
     },
     // ─── CATCH-ALL ─────────────────────────────────────────────────────
+      meta: { requiresAuth: true },
+    },
+    // ─── CATCH ALL ──────────────────────────────────────────────────────
     {
       path: "/:pathMatch(.*)*",
       redirect: "/login",
@@ -143,37 +153,13 @@ const router = createRouter({
   ],
 });
 
-// ─── NAVIGATION GUARD ─────────────────────────────────────────────────────
 router.beforeEach((to, from, next) => {
   const user = Utils.getStore("user");
   const requiresAuth = to.meta.requiresAuth;
-  const requiresAdmin = to.meta.requiresAdmin;
-  const requiresRole = to.meta.requiresRole; // array of allowed roles
 
-  // 1. Not logged in → send to login
   if (requiresAuth && !user) {
-    console.log("Not authenticated → /login");
+    console.log("Not authenticated, redirecting to login");
     next({ name: "login" });
-    return;
-  }
-
-  // 2. Route requires admin role specifically
-  if (requiresAdmin && user?.role !== "admin") {
-    console.log("Not admin → /login");
-    next({ name: "login" });
-    return;
-  }
-
-  // 3. Route requires one of a set of roles
-  if (requiresRole && !requiresRole.includes(user?.role)) {
-    console.log(`Role "${user?.role}" not allowed → /login`);
-    next({ name: "login" });
-    return;
-  }
-
-  // 4. Already logged in and trying to visit /login → redirect by role
-  if (to.name === "login" && user) {
-    redirectByRole(user, next);
     return;
   }
 

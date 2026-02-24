@@ -68,6 +68,13 @@
         to="/profile"
         active-class="bg-accent"
       ></v-list-item>
+
+      <v-list-item
+        prepend-icon="mdi-logout"
+        title="Sign Out"
+        value="signout"
+        @click="handleLogout"
+      ></v-list-item>
     </v-list>
   </v-navigation-drawer>
 </template>

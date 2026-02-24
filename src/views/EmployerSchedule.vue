@@ -3,7 +3,6 @@ import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import Utils from "../config/utils";
 import EmployerService from "../services/employerServices.js";
-import EmployerLayout from '../components/EmployerLayout.vue';
 
 const router = useRouter();
 const user = ref(null);
@@ -218,8 +217,8 @@ const showSnackbar = (message, color = "success") => {
 </script>
 
 <template>
-  <EmployerLayout>
-  
+  <v-app>
+    <v-main style="background: #f5f5f5;">
       <v-container fluid class="pa-6">
         
         <!-- Header -->
@@ -358,7 +357,7 @@ const showSnackbar = (message, color = "success") => {
         </v-card>
 
       </v-container>
-   
+    </v-main>
 
     <v-dialog v-model="showCreateShiftDialog" max-width="500">
       <v-card rounded="lg">
@@ -449,7 +448,7 @@ const showSnackbar = (message, color = "success") => {
       {{ snackbarMessage }}
     </v-snackbar>
 
-  </EmployerLayout>
+  </v-app>
 </template>
 
 <style scoped>
