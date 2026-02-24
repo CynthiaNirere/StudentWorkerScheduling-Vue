@@ -156,19 +156,19 @@ const getActionColor = (action) => {
   <EmployerLayout>
     <v-container fluid class="pa-6">
       <div class="mb-6">
-        <h1 class="text-h4 font-weight-bold navy-text mb-2">Dashboard</h1>
+        <h1 class="text-h4 font-weight-bold navy-text mb-2">Home</h1>
       </div>
 
       <!-- Quick Actions -->
       <v-row class="mb-6">
         <v-col cols="auto">
           <v-btn color="#12086F" variant="flat" size="large" @click="createSchedule">
-            Create Schedule
+            Create New Schedule
           </v-btn>
         </v-col>
         <v-col cols="auto">
           <v-btn color="#4361EE" variant="outlined" size="large" @click="addEmployee">
-            Add Employee
+            Add New Employee
           </v-btn>
         </v-col>
         <v-col cols="auto">
