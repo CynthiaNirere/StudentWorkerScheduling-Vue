@@ -68,7 +68,8 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     // ─── EMPLOYER ROUTES ────────────────────────────────────────────────
-    { path: "/business-area-select",
+    {
+      path: "/business-area-select",
       name: "businessAreaSelect",
       component: BusinessAreaSelect,
       meta: { requiresAuth: true },
