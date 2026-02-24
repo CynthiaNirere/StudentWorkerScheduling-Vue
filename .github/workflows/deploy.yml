@@ -30,7 +30,7 @@ jobs:
           echo VITE_APP_GOOGLE_API_URL="${{ secrets.VITE_APP_GOOGLE_API_URL }}" >> .env
           echo "=== .env file contents ==="
           cat .env
-          echo "=========================="
+          echo "==============================="
       
       - run: npm install
       - run: npm run build
@@ -61,7 +61,7 @@ jobs:
           echo VITE_APP_GOOGLE_API_URL="${{ secrets.VITE_APP_GOOGLE_API_URL }}" >> .env
           echo "=== .env file contents ==="
           cat .env
-          echo "=========================="
+          echo "==============================="
       
       - run: npm install
       - run: npm run build
