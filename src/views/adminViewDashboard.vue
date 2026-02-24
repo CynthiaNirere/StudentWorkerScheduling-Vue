@@ -5,6 +5,7 @@ import Utils from '../config/utils'
 import adminServices from '../services/adminViewServices'
 import businessAreaServices from '../services/businessAreaServices'
 import DashboardLayout from '../layouts/DashboardLayout.vue'
+import AuthServices from '../services/authServices'
 
 const router = useRouter()
 
@@ -148,7 +149,6 @@ const saveEditEmployee = async () => {
     const response = await adminServices.updateUser(editEmployee.value.userId, employeeData)
     console.log("✅ Employee updated:", response.data)
     
-    // Update the employee in the list
     const index = employees.value.findIndex(e => e.user_id === editEmployee.value.userId)
     if (index !== -1) {
       employees.value[index] = {
@@ -258,13 +258,41 @@ const changeBusinessArea = async (businessArea) => {
 const getStatusColor = (role) => {
   switch(role) {
     case 'admin': return 'error'
+    case 'employer': return 'secondary'
     case 'employee': return 'success'
     default: return 'grey'
   }
 }
 
 const getStatusText = (role) => {
-  return role === 'admin' ? 'Active' : 'Active'
+  return 'Active'
+}
+
+const getRoleColor = (role) => {
+  const colorMap = {
+    'admin': 'error',
+    'employer': 'secondary',
+    'employee': 'success'
+  };
+  return colorMap[role] || 'primary';
+}
+
+const handleLogout = async () => {
+  try {
+    await AuthServices.logoutUser({ token: user.value?.token });
+  } catch (error) {
+    console.error('Logout error:', error);
+  } finally {
+    Utils.removeItem('user');
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    if (window.google && window.google.accounts) {
+      window.google.accounts.id.disableAutoSelect();
+    }
+    
+    router.push({ name: 'login' });
+  }
 }
 
 onMounted(async () => {
@@ -288,13 +316,46 @@ onMounted(async () => {
       <div class="d-flex justify-space-between align-center mb-6">
         <div>
           <h1 class="text-h4 font-weight-bold">Dashboard</h1>
-          <v-chip v-if="currentBusinessArea" class="mt-2" color="primary" variant="outlined">
+          <v-chip v-if="currentBusinessArea" class="mt-2" color="accent" variant="outlined">
             {{ currentBusinessArea.name }}
           </v-chip>
         </div>
-        <v-avatar color="primary" size="48">
-          <span class="text-h6">{{ user?.fName?.[0] }}{{ user?.lName?.[0] }}</span>
-        </v-avatar>
+        
+        <!-- User Profile Menu with Logout -->
+        <v-menu location="bottom">
+          <template v-slot:activator="{ props }">
+            <v-btn v-bind="props" icon>
+              <v-avatar color="primary" size="48">
+                <span class="text-h6 text-white">{{ user?.fName?.[0] }}{{ user?.lName?.[0] }}</span>
+              </v-avatar>
+            </v-btn>
+          </template>
+
+          <v-card min-width="250" color="surface">
+            <v-card-text>
+              <div class="text-center">
+                <v-avatar color="primary" class="mt-2 mb-3" size="large">
+                  <span class="text-h5 font-weight-bold text-white">
+                    {{ user?.fName?.[0] }}{{ user?.lName?.[0] }}
+                  </span>
+                </v-avatar>
+                <h3 class="mb-1">{{ user?.fName }} {{ user?.lName }}</h3>
+                <p class="text-caption text-medium-emphasis mb-2">{{ user?.email }}</p>
+                <v-chip
+                  size="small"
+                  :color="getRoleColor(user?.role)"
+                  class="mb-3"
+                >
+                  {{ user?.role }}
+                </v-chip>
+                <v-divider class="my-3"></v-divider>
+                <v-btn variant="text" color="error" block @click="handleLogout" prepend-icon="mdi-logout">
+                  Logout
+                </v-btn>
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-menu>
       </div>
 
       <!-- Success Message -->
@@ -319,7 +380,7 @@ onMounted(async () => {
           <v-btn color="primary" @click="openAddEmployeeDialog">
             Add New Employee
           </v-btn>
-          <v-btn variant="outlined" @click="openChangeBusinessAreaDialog">
+          <v-btn variant="outlined" color="primary" @click="openChangeBusinessAreaDialog">
             Change Business Area
           </v-btn>
         </div>
@@ -327,13 +388,11 @@ onMounted(async () => {
 
       <!-- Employees Table -->
       <v-card elevation="2">
-        <!-- Loading -->
         <div v-if="loading" class="text-center py-12">
           <v-progress-circular indeterminate color="primary"></v-progress-circular>
           <p class="mt-4">Loading employees...</p>
         </div>
 
-        <!-- Table -->
         <v-table v-else>
           <thead>
             <tr>
@@ -345,7 +404,7 @@ onMounted(async () => {
           </thead>
           <tbody>
             <tr v-if="employees.length === 0">
-              <td colspan="4" class="text-center py-8 text-grey">
+              <td colspan="4" class="text-center py-8 text-medium-emphasis">
                 No employees found. Click "Add New Employee" to get started!
               </td>
             </tr>
@@ -364,7 +423,8 @@ onMounted(async () => {
               <td>
                 <v-btn 
                   variant="outlined" 
-                  size="small" 
+                  size="small"
+                  color="primary"
                   class="mr-2"
                   @click="openEditEmployeeDialog(employee)"
                 >
@@ -387,10 +447,10 @@ onMounted(async () => {
       <!-- Add Employee Dialog -->
       <v-dialog v-model="showAddEmployeeDialog" max-width="600px" persistent>
         <v-card>
-          <v-card-title class="bg-primary">
+          <v-card-title class="bg-primary text-white">
             <div class="d-flex justify-space-between align-center">
               <span class="text-h5">Add New Employee</span>
-              <v-btn icon variant="text" @click="closeAddEmployeeDialog">
+              <v-btn icon variant="text" color="white" @click="closeAddEmployeeDialog">
                 <v-icon>mdi-close</v-icon>
               </v-btn>
             </div>
@@ -467,10 +527,10 @@ onMounted(async () => {
       <!-- Edit Employee Dialog -->
       <v-dialog v-model="showEditEmployeeDialog" max-width="600px" persistent>
         <v-card>
-          <v-card-title class="bg-primary">
+          <v-card-title class="bg-primary text-white">
             <div class="d-flex justify-space-between align-center">
               <span class="text-h5">Edit Employee</span>
-              <v-btn icon variant="text" @click="closeEditEmployeeDialog">
+              <v-btn icon variant="text" color="white" @click="closeEditEmployeeDialog">
                 <v-icon>mdi-close</v-icon>
               </v-btn>
             </div>
@@ -547,8 +607,8 @@ onMounted(async () => {
       <!-- Delete Employee Dialog -->
       <v-dialog v-model="showDeleteDialog" max-width="500px">
         <v-card>
-          <v-card-title class="bg-error text-white">
-            <v-icon left color="white">mdi-alert-circle</v-icon>
+          <v-card-title class="bg-error text-white d-flex align-center">
+            <v-icon color="white" class="mr-2">mdi-alert-circle</v-icon>
             Delete Employee
           </v-card-title>
 
@@ -557,7 +617,7 @@ onMounted(async () => {
               <v-icon size="64" color="error" class="mb-4">mdi-account-remove</v-icon>
               <p class="text-h6 mb-2">Are you sure you want to delete this employee?</p>
               <p class="text-body-1 font-weight-bold">{{ employeeToDelete.first_name }} {{ employeeToDelete.last_name }}</p>
-              <p class="text-caption text-grey">{{ employeeToDelete.email }}</p>
+              <p class="text-caption text-medium-emphasis">{{ employeeToDelete.email }}</p>
               <v-alert type="warning" variant="tonal" class="mt-4">
                 <strong>Warning:</strong> This action cannot be undone.
               </v-alert>
@@ -569,8 +629,7 @@ onMounted(async () => {
             <v-btn variant="text" @click="showDeleteDialog = false; employeeToDelete = null">
               Cancel
             </v-btn>
-            <v-btn color="error" @click="deleteEmployee">
-              <v-icon left>mdi-delete</v-icon>
+            <v-btn color="error" @click="deleteEmployee" prepend-icon="mdi-delete">
               Delete Employee
             </v-btn>
           </v-card-actions>
@@ -591,6 +650,7 @@ onMounted(async () => {
                 :key="area.location_id"
                 @click="changeBusinessArea(area)"
                 :active="currentBusinessArea?.location_id === area.location_id"
+                active-class="bg-accent"
               >
                 <v-list-item-title>{{ area.name }}</v-list-item-title>
                 <v-list-item-subtitle>{{ area.address }}</v-list-item-subtitle>
@@ -611,5 +671,9 @@ onMounted(async () => {
 <style scoped>
 .gap-3 {
   gap: 12px;
+}
+
+.bg-accent {
+  background-color: rgba(67, 97, 238, 0.15) !important;
 }
 </style>

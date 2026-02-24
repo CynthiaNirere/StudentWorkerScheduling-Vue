@@ -16,6 +16,8 @@ import EmployerTimeOff from "./views/EmployerTimeOff.vue";
 import EmployerTasks from "./views/EmployerTasks.vue";
 import EmployerSwaps from "./views/EmployerSwaps.vue";
 import EmployerProfile from "./views/EmployerProfile.vue";
+import Workplace from "./views/Workplace.vue";  // ✅ ADDED
+import Profile from "./views/Profile.vue";  // ✅ ADDED
 
 // ─── ROUTER ───────────────────────────────────────────────────────────────
 const router = createRouter({
@@ -43,7 +45,20 @@ const router = createRouter({
       component: RoleSelect,
       meta: { requiresAuth: true, requiresAdmin: true },
     },
-    // ─── EMPLOYER / MANAGER ROUTES ─────────────────────────────────────
+    // ─── SHARED ROUTES (All Authenticated Users) ───────────────────────
+    {
+      path: "/workplace",  // ✅ ADDED
+      name: "workplace",
+      component: Workplace,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/profile",  // ✅ ADDED
+      name: "profile",
+      component: Profile,
+      meta: { requiresAuth: true },
+    },
+    // ─── ADMIN ROUTES ──────────────────────────────────────────────────
     {
       path: "/admin",
       name: "adminViewDashboard",
@@ -62,7 +77,8 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     // ─── EMPLOYER ROUTES ────────────────────────────────────────────────
-    { path: "/business-area-select",
+    { 
+      path: "/business-area-select",
       name: "businessAreaSelect",
       component: BusinessAreaSelect,
       meta: { requiresAuth: true },
@@ -118,13 +134,6 @@ const router = createRouter({
       name: "employerProfile",
       component: EmployerProfile,
       meta: { requiresAuth: true, requiresRole: ["employer", "admin"] },
-    },
-    // ─── ADMIN ROUTES ──────────────────────────────────────────────────
-    {
-      path: "/admin",
-      name: "adminViewDashboard",
-      component: AdminViewDashboard,
-      meta: { requiresAuth: true, requiresAdmin: true },
     },
     // ─── CATCH-ALL ─────────────────────────────────────────────────────
     {
@@ -186,9 +195,7 @@ export function redirectByRole(user, next) {
       next({ name: "employerDashboard" });
       break;
     case "employee":
-      // When employee dashboard exists, redirect there
-      // For now fall through to employer as placeholder
-      next({ name: "employerDashboard" });
+      next({ name: "employeeDashboard" });  // ✅ FIXED: Now goes to employee dashboard
       break;
     default:
       next({ name: "login" });
