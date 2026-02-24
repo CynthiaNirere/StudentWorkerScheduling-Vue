@@ -17,8 +17,6 @@ import EmployerTimeOff from "./views/EmployerTimeOff.vue";
 import EmployerTasks from "./views/EmployerTasks.vue";
 import EmployerSwaps from "./views/EmployerSwaps.vue";
 import EmployerProfile from "./views/EmployerProfile.vue";
-import Workplace from "./views/Workplace.vue";  // ✅ ADDED
-import Profile from "./views/Profile.vue";  // ✅ ADDED
 
 // ─── ROUTER ───────────────────────────────────────────────────────────────
 const router = createRouter({
@@ -46,20 +44,6 @@ const router = createRouter({
       component: RoleSelect,
       meta: { requiresAuth: true },
     },
-    // ─── SHARED ROUTES (All Authenticated Users) ───────────────────────
-    {
-      path: "/workplace",  // ✅ ADDED
-      name: "workplace",
-      component: Workplace,
-      meta: { requiresAuth: true },
-    },
-    {
-      path: "/profile",  // ✅ ADDED
-      name: "profile",
-      component: Profile,
-      meta: { requiresAuth: true },
-    },
-    // ─── ADMIN ROUTES ──────────────────────────────────────────────────
     {
       path: "/admin",
       name: "adminViewDashboard",
@@ -140,9 +124,6 @@ const router = createRouter({
       path: "/employer/profile",
       name: "employerProfile",
       component: EmployerProfile,
-      meta: { requiresAuth: true, requiresRole: ["employer", "admin"] },
-    },
-    // ─── CATCH-ALL ─────────────────────────────────────────────────────
       meta: { requiresAuth: true },
     },
     // ─── CATCH ALL ──────────────────────────────────────────────────────
@@ -165,27 +146,5 @@ router.beforeEach((to, from, next) => {
 
   next();
 });
-
-// ─── ROLE-BASED REDIRECT HELPER ───────────────────────────────────────────
-export function redirectByRole(user, next) {
-  if (!user) {
-    next({ name: "login" });
-    return;
-  }
-  switch (user.role) {
-    case "admin":
-      // Admin sees role-select to choose admin view vs manager view
-      next({ name: "roleSelect" });
-      break;
-    case "employer":
-      next({ name: "employerDashboard" });
-      break;
-    case "employee":
-      next({ name: "employeeDashboard" });  // ✅ FIXED: Now goes to employee dashboard
-      break;
-    default:
-      next({ name: "login" });
-  }
-}
 
 export default router;
