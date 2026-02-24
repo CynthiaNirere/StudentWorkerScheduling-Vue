@@ -255,7 +255,7 @@ const getStatusChipColor = (status) => {
     <v-navigation-drawer permanent class="sidebar">
       <!-- Logo/Header -->
       <div class="sidebar-header pa-4">
-        <h2 class="text-h6 font-weight-bold text-white">TalonTime</h2>
+        <h2 class="text-h6 font-weight-bold text-white">ShiftBoard</h2>
         <p class="text-caption text-white-80 mt-2 mb-0">{{ businessArea }}</p>
       </div>
 

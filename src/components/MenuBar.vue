@@ -6,7 +6,7 @@ import { useRouter } from "vue-router";
 
 const router = useRouter();
 const user = ref(null);
-const title = ref("TalonTime");
+const title = ref("ShiftBoard");
 const initials = ref("");
 const name = ref("");
 

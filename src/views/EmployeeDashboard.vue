@@ -214,7 +214,7 @@ onMounted(() => {
       <div class="sidebar-header d-flex align-center pa-4" style="min-height: 64px; background: rgba(0,0,0,0.15);">
         <template v-if="!rail">
           <div>
-            <h2 class="text-h6 font-weight-bold text-white mb-0">TalonTime</h2>
+            <h2 class="text-h6 font-weight-bold text-white mb-0">ShiftBoard</h2>
             <p class="text-caption text-white mb-0" style="opacity: 0.8">{{ businessArea }}</p>
           </div>
         </template>
