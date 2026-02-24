@@ -36,9 +36,14 @@ onMounted(() => {
 </script>
 
 <template>
-  <!-- Only show app bar if user is logged in AND NOT on login/signup/roleSelect pages -->
+  <!-- Hide app bar on admin, employer, employee dashboards and workplace -->
   <v-app-bar 
-    v-if="user && $route.name !== 'employeeDashboard' && $route.name !== 'employeeAvailability' && $route.name !== 'employerProfile' && $route.name !== 'login' && $route.name !== 'signup' && $route.name !== 'roleSelect'"
+    v-if="user && 
+          !$route.path.startsWith('/employer') && 
+          !$route.path.startsWith('/admin') && 
+          !$route.path.startsWith('/workplace') &&
+          !$route.path.startsWith('/profile') &&
+          $route.name !== 'employeeDashboard'" 
     color="primary" 
     elevation="2"
   >
