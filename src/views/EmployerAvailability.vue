@@ -3,59 +3,56 @@ import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import Utils from "../config/utils";
 import EmployerService from "../services/employerServices.js";
+import EmployerLayout from '../components/EmployerLayout.vue';
 
 const router = useRouter();
 const user = ref(null);
 
-// ─── DATA ─────────────────────────────────────────────────────────────────
 const availability = ref([]);
 const employees = ref([]);
 const loading = ref(false);
 const selectedEmployee = ref(null);
 
-// ─── SNACKBAR ─────────────────────────────────────────────────────────────
 const snackbar = ref(false);
 const snackbarMessage = ref("");
 const snackbarColor = ref("success");
 
-// ─── DAYS ─────────────────────────────────────────────────────────────────
 const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-// ─── COMPUTED ─────────────────────────────────────────────────────────────
 const availabilityGrid = computed(() => {
+  const currentUserId = user.value?.user_id || user.value?.userId;
   const filteredEmployees = selectedEmployee.value
-    ? employees.value.filter((e) => e.user_id === selectedEmployee.value)
-    : employees.value;
+    ? employees.value.filter((e) => (e.user_id || e.userId) === selectedEmployee.value)
+    : employees.value.filter((e) => (e.user_id || e.userId) !== currentUserId);
 
   return filteredEmployees.map((employee) => {
+    const empId = employee.user_id || employee.userId;
     const employeeAvailability = availability.value.filter(
-      (a) => a.user_id === employee.user_id && a.is_active
+      (a) => (a.user_id || a.userId) === empId && a.is_active
     );
 
     const weekSchedule = {};
     daysOfWeek.forEach((day, index) => {
-      const dayAvail = employeeAvailability.filter((a) => a.day_of_week === index);
+      const dayAvail = employeeAvailability.filter((a) => (a.day_of_week || a.dayOfWeek) === index);
       weekSchedule[day] = dayAvail.map((a) => ({
-        start: formatTime(a.start_time),
-        end: formatTime(a.end_time),
+        start: formatTime(a.start_time || a.startTime),
+        end: formatTime(a.end_time || a.endTime),
       }));
     });
 
     return {
-      employeeName: `${employee.fName} ${employee.lName}`,
-      employeeId: employee.user_id,
+      employeeName: `${employee.fName || employee.first_name || ''} ${employee.lName || employee.last_name || ''}`.trim(),
+      employeeId: empId,
       schedule: weekSchedule,
     };
   });
 });
 
-// ─── LIFECYCLE ────────────────────────────────────────────────────────────
 onMounted(async () => {
   user.value = Utils.getStore("user");
   await Promise.all([loadAvailability(), loadEmployees()]);
 });
 
-// ─── LOADERS ──────────────────────────────────────────────────────────────
 const loadAvailability = async () => {
   loading.value = true;
   try {
@@ -73,13 +70,16 @@ const loadEmployees = async () => {
   try {
     const res = await EmployerService.getAllEmployees();
     const all = Array.isArray(res.data) ? res.data : [];
-    employees.value = all.filter((u) => u.role === "employee");
+    const currentUserId = user.value?.user_id || user.value?.userId;
+    employees.value = all.filter((u) => {
+      const empId = u.user_id || u.userId;
+      return u.role === "employee" && empId !== currentUserId;
+    });
   } catch (err) {
     console.error("Error loading employees:", err);
   }
 };
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────
 const formatTime = (minutes) => {
   if (minutes === undefined || minutes === null) return "";
   const h = Math.floor(minutes / 60);
@@ -104,96 +104,92 @@ const viewEmployeeDetails = (employeeId) => {
 </script>
 
 <template>
-  <v-app>
-    <v-main style="background: #f5f5f5;">
-      <v-container fluid class="pa-6">
-        
-        <!-- Header -->
-        <div class="d-flex align-center justify-space-between mb-5">
-          <div>
-            <h1 class="text-h5 font-weight-bold">Employee Availability</h1>
-            <p class="text-body-2 text-medium-emphasis">
-              View when employees are available to work
-            </p>
-          </div>
-          <v-select
-            v-model="selectedEmployee"
-            :items="employees"
-            :item-title="(e) => `${e.fName} ${e.lName}`"
-            item-value="user_id"
-            label="Filter by employee"
-            variant="outlined"
-            density="compact"
-            style="max-width: 300px"
-            clearable
-          />
+  <EmployerLayout>
+    <v-container fluid class="pa-6">
+      <!-- Header -->
+      <div class="d-flex align-center justify-space-between mb-5">
+        <div>
+          <h1 class="text-h4 font-weight-bold navy-text">Employee Availability</h1>
+          <p class="text-body-2 text-grey">
+            View when employees are available to work
+          </p>
         </div>
+        <v-select
+          v-model="selectedEmployee"
+          :items="employees"
+          :item-title="(e) => `${e.fName || e.first_name || ''} ${e.lName || e.last_name || ''}`"
+          item-value="user_id"
+          label="Filter by employee"
+          variant="outlined"
+          density="compact"
+          style="max-width: 300px"
+          clearable
+          color="#12086F"
+        />
+      </div>
 
-        <!-- Loading -->
-        <v-card v-if="loading" variant="outlined" rounded="lg" class="pa-6 text-center">
-          <v-progress-circular indeterminate color="#7b1c2e" size="32" />
-        </v-card>
+      <!-- Loading -->
+      <v-card v-if="loading" variant="outlined" rounded="lg" class="pa-6 text-center navy-card">
+        <v-progress-circular indeterminate color="#12086F" size="32" />
+      </v-card>
 
-        <!-- Availability Grid -->
-        <v-card v-else variant="outlined" rounded="lg">
-          <div class="pa-4">
-            <div class="availability-grid-header">
-              <div class="employee-column">Employee</div>
-              <div v-for="day in daysOfWeek" :key="day" class="day-column">
-                {{ day }}
-              </div>
-            </div>
-
-            <div
-              v-for="row in availabilityGrid"
-              :key="row.employeeId"
-              class="availability-grid-row"
-            >
-              <div class="employee-column">
-                <div class="font-weight-medium">{{ row.employeeName }}</div>
-                <v-btn
-                  size="x-small"
-                  variant="text"
-                  color="#7b1c2e"
-                  @click="viewEmployeeDetails(row.employeeId)"
-                >
-                  View Details
-                </v-btn>
-              </div>
-              
-              <div v-for="day in daysOfWeek" :key="day" class="day-column">
-                <div v-if="row.schedule[day].length === 0" class="unavailable">
-                  Unavailable
-                </div>
-                <div
-                  v-else
-                  v-for="(slot, index) in row.schedule[day]"
-                  :key="index"
-                  class="available-slot"
-                >
-                  {{ slot.start }} - {{ slot.end }}
-                </div>
-              </div>
-            </div>
-
-            <!-- Empty state -->
-            <div v-if="availabilityGrid.length === 0" class="text-center pa-6">
-              <v-icon size="48" class="mb-2 text-disabled">mdi-calendar-clock</v-icon>
-              <div class="text-body-2 text-medium-emphasis">No availability data</div>
+      <!-- Availability Grid -->
+      <v-card v-else variant="outlined" rounded="lg" class="navy-card">
+        <div class="pa-4">
+          <div class="availability-grid-header">
+            <div class="employee-column">Employee</div>
+            <div v-for="day in daysOfWeek" :key="day" class="day-column">
+              {{ day }}
             </div>
           </div>
-        </v-card>
 
-        <!-- Info Alert -->
-        <v-alert type="info" variant="tonal" class="mt-4">
-          <strong>Tip:</strong> Use this view to quickly see who's available when scheduling shifts. 
-          Filter by employee to see their full weekly availability.
-        </v-alert>
+          <div
+            v-for="row in availabilityGrid"
+            :key="row.employeeId"
+            class="availability-grid-row"
+          >
+            <div class="employee-column">
+              <div class="font-weight-medium">{{ row.employeeName }}</div>
+              <v-btn
+                size="x-small"
+                variant="text"
+                color="#4361EE"
+                @click="viewEmployeeDetails(row.employeeId)"
+              >
+                View Details
+              </v-btn>
+            </div>
+            
+            <div v-for="day in daysOfWeek" :key="day" class="day-column">
+              <div v-if="row.schedule[day].length === 0" class="unavailable">
+                Unavailable
+              </div>
+              <div
+                v-else
+                v-for="(slot, index) in row.schedule[day]"
+                :key="index"
+                class="available-slot"
+              >
+                {{ slot.start }} - {{ slot.end }}
+              </div>
+            </div>
+          </div>
 
-      </v-container>
-    </v-main>
+          <!-- Empty state -->
+          <div v-if="availabilityGrid.length === 0" class="text-center pa-6">
+            <v-icon size="48" class="mb-2 text-grey">mdi-calendar-clock</v-icon>
+            <div class="text-body-2 text-grey">No availability data</div>
+          </div>
+        </div>
+      </v-card>
 
-    <!-- ─── SNACKBAR ─────────────────────────────────────────────────────── -->
+      <!-- Info Alert -->
+      <v-alert type="info" variant="tonal" class="mt-4" color="#4361EE">
+        <strong>Tip:</strong> Use this view to quickly see who's available when scheduling shifts. 
+        Filter by employee to see their full weekly availability.
+      </v-alert>
+    </v-container>
+
     <v-snackbar
       v-model="snackbar"
       :color="snackbarColor"
@@ -202,11 +198,19 @@ const viewEmployeeDetails = (employeeId) => {
     >
       {{ snackbarMessage }}
     </v-snackbar>
-
-  </v-app>
+  </EmployerLayout>
 </template>
 
 <style scoped>
+.navy-text {
+  color: #12086F !important;
+}
+
+.navy-card {
+  border-color: #e0e0e0;
+  box-shadow: 0 1px 3px rgba(18, 8, 111, 0.05);
+}
+
 .availability-grid-header,
 .availability-grid-row {
   display: grid;
@@ -216,11 +220,13 @@ const viewEmployeeDetails = (employeeId) => {
 }
 
 .availability-grid-header {
-  background: #f8f8f8;
+  background: linear-gradient(135deg, #12086F 0%, #2B354F 100%);
+  color: white;
   font-weight: 600;
   font-size: 13px;
   padding: 12px 8px;
-  border-bottom: 2px solid #e0e0e0;
+  border-bottom: 2px solid #12086F;
+  border-radius: 8px 8px 0 0;
 }
 
 .availability-grid-row {
@@ -252,13 +258,14 @@ const viewEmployeeDetails = (employeeId) => {
 }
 
 .available-slot {
-  background: #d4edda;
-  color: #155724;
+  background: #e8f5e9;
+  color: #2e7d32;
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 11px;
   margin-bottom: 4px;
   white-space: nowrap;
+  border-left: 3px solid #2e7d32;
 }
 
 .unavailable {
