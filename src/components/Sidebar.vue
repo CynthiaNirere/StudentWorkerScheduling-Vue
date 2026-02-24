@@ -10,7 +10,7 @@
     <!-- Logo/Header -->
     <v-list-item
       prepend-icon="mdi-calendar-clock"
-      title="TalonTime"
+      title="ShiftBoard"
       nav
     >
       <template v-slot:append>
