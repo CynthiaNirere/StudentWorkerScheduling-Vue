@@ -1,3 +1,4 @@
+
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
@@ -23,7 +24,8 @@ const weekDays = computed(() => {
     date.setDate(monday.getDate() + i);
     const dateNum = date.getDate();
     const shifts = weeklySchedule.value.filter(s => {
-      const shiftDate = new Date(Number(s.shift_time || s.shiftTime));
+      const shiftTime = s.shift_time || s.shiftTime;
+      const shiftDate = new Date(Number(shiftTime));
       return shiftDate.toDateString() === date.toDateString();
     });
     return { label, dateNum, shifts };
@@ -61,17 +63,17 @@ const loadAlerts = async () => {
     
     alerts.value = [
       ...swaps.filter(s => s.status === 'pending').slice(0, 2).map(s => ({
-        id: `swap-${s.swap_id}`,
+        id: `swap-${s.swap_id || s.id}`,
         type: 'Shift Cover Request',
-        message: `Employee needs someone for ${formatShiftDate(s.shift_time)}`,
-        time: timeAgo(s.created_at),
+        message: `Employee needs someone for ${formatShiftDate(s.shift_time || s.shiftTime)}`,
+        time: timeAgo(s.created_at || s.createdAt),
         actions: ['Approve', 'Deny'],
       })),
       ...timeOffs.filter(t => t.status === 'pending').slice(0, 1).map(t => ({
-        id: `timeoff-${t.request_id}`,
+        id: `timeoff-${t.request_id || t.id}`,
         type: 'Time Off Request',
-        message: `Employee requested time off for ${formatDate(t.start_date)} - ${formatDate(t.end_date)}`,
-        time: timeAgo(t.created_at),
+        message: `Employee requested time off for ${formatDate(t.start_date || t.startDate)} - ${formatDate(t.end_date || t.endDate)}`,
+        time: timeAgo(t.created_at || t.createdAt),
         actions: ['Approve', 'Deny'],
       })),
     ];
@@ -113,7 +115,7 @@ const getMonday = (date) => {
 };
 
 const formatShiftTime = (minutes) => {
-  if (!minutes) return '';
+  if (!minutes && minutes !== 0) return '';
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   const ampm = h >= 12 ? 'PM' : 'AM';
@@ -155,20 +157,21 @@ const getActionColor = (action) => {
 <template>
   <EmployerLayout>
     <v-container fluid class="pa-6">
+      <!-- Header -->
       <div class="mb-6">
-        <h1 class="text-h4 font-weight-bold navy-text mb-2">Home</h1>
+        <h1 class="text-h4 font-weight-bold navy-text mb-2">Dashboard</h1>
       </div>
 
       <!-- Quick Actions -->
       <v-row class="mb-6">
         <v-col cols="auto">
           <v-btn color="#12086F" variant="flat" size="large" @click="createSchedule">
-            Create New Schedule
+            Create Schedule
           </v-btn>
         </v-col>
         <v-col cols="auto">
           <v-btn color="#4361EE" variant="outlined" size="large" @click="addEmployee">
-            Add New Employee
+            Add Employee
           </v-btn>
         </v-col>
         <v-col cols="auto">
@@ -196,8 +199,12 @@ const getActionColor = (action) => {
           </div>
           
           <div v-else>
-            <div v-for="(alert, idx) in alerts" :key="alert.id" class="pa-4"
-              :class="{ 'bg-grey-lighten-5': idx % 2 === 0 }">
+            <div
+              v-for="(alert, idx) in alerts"
+              :key="alert.id"
+              class="pa-4"
+              :class="{ 'bg-grey-lighten-5': idx % 2 === 0 }"
+            >
               <div class="d-flex justify-space-between align-start mb-2">
                 <div class="flex-grow-1">
                   <v-chip size="small" color="#12086F" variant="tonal" class="mb-2">
@@ -206,15 +213,23 @@ const getActionColor = (action) => {
                   <p class="text-body-1 mb-1">{{ alert.message }}</p>
                   <p class="text-caption text-grey">{{ alert.time }}</p>
                 </div>
-                <v-btn icon="mdi-close" size="small" variant="text"
-                  @click="alerts.splice(idx, 1)" />
+                <v-btn
+                  icon="mdi-close"
+                  size="small"
+                  variant="text"
+                  @click="alerts.splice(idx, 1)"
+                />
               </div>
               
               <div class="d-flex gap-2 mt-3">
-                <v-btn v-for="action in alert.actions" :key="action"
+                <v-btn
+                  v-for="action in alert.actions"
+                  :key="action"
                   :color="getActionColor(action)"
                   :variant="action === 'Approve' ? 'flat' : 'outlined'"
-                  size="small" @click="handleAction(alert.id, action)">
+                  size="small"
+                  @click="handleAction(alert.id, action)"
+                >
                   {{ action }}
                 </v-btn>
               </div>
@@ -228,8 +243,11 @@ const getActionColor = (action) => {
         <v-card-title class="d-flex justify-space-between align-center pa-4">
           <span class="text-h6 font-weight-bold">This Week's Schedule Preview</span>
           <div class="d-flex align-center gap-3">
-            <v-chip :color="schedulePublished ? '#2e7d32' : '#f57c00'"
-              size="small" variant="tonal">
+            <v-chip
+              :color="schedulePublished ? '#2e7d32' : '#f57c00'"
+              size="small"
+              variant="tonal"
+            >
               {{ schedulePublished ? 'Schedule Published' : 'Schedule Not Published' }}
             </v-chip>
             <v-btn variant="text" size="small" color="#4361EE" @click="viewFullSchedule">
@@ -246,12 +264,16 @@ const getActionColor = (action) => {
           <div v-else class="schedule-grid">
             <div v-for="day in weekDays" :key="day.label" class="schedule-column">
               <div class="schedule-header pa-3 text-center">
-                <div class="text-subtitle-2 font-weight-bold navy-text">{{ day.label }}</div>
-                <div class="text-h6 font-weight-bold navy-text">{{ day.dateNum }}</div>
+                <div class="text-subtitle-2 font-weight-bold text-white">{{ day.label }}</div>
+                <div class="text-h6 font-weight-bold text-white">{{ day.dateNum }}</div>
               </div>
               
               <div class="schedule-body pa-2">
-                <div v-for="shift in day.shifts" :key="shift.shift_id" class="shift-item pa-2 mb-2">
+                <div
+                  v-for="shift in day.shifts"
+                  :key="shift.shift_id || shift.id"
+                  class="shift-item pa-2 mb-2"
+                >
                   <div class="text-caption font-weight-bold">
                     {{ formatShiftTime(shift.start_time || shift.startTime) }}
                   </div>
@@ -299,7 +321,7 @@ const getActionColor = (action) => {
 
 .schedule-header {
   background: linear-gradient(135deg, #12086F 0%, #2B354F 100%);
-  color: white;
+  border-bottom: 2px solid #12086F;
 }
 
 .schedule-body {
