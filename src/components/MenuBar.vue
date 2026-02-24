@@ -38,7 +38,7 @@ onMounted(() => {
 <template>
   <!-- Only show app bar if user is logged in AND NOT on login/signup/roleSelect pages -->
   <v-app-bar 
-    v-if="user && $route.name !== 'employeeDashboard' && $route.name !== 'employeeAvailability' && $route.name !== 'login' && $route.name !== 'signup' && $route.name !== 'roleSelect'"
+    v-if="user && $route.name !== 'employeeDashboard' && $route.name !== 'employeeAvailability' && $route.name !== 'employerProfile' && $route.name !== 'login' && $route.name !== 'signup' && $route.name !== 'roleSelect'"
     color="primary" 
     elevation="2"
   >
