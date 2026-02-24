@@ -250,80 +250,62 @@ const getStatusChipColor = (status) => {
 </script>
 
 <template>
-  <div class="dashboard-container">
-    <!-- Sidebar Navigation -->
-    <v-navigation-drawer permanent class="sidebar">
-      <!-- Logo/Header -->
-      <div class="sidebar-header pa-4">
-        <h2 class="text-h6 font-weight-bold text-white">TalonTime</h2>
-        <p class="text-caption text-white-80 mt-2 mb-0">{{ businessArea }}</p>
+  <EmployerLayout>
+    <v-container fluid class="pa-6">
+      <div class="mb-6">
+        <h1 class="text-h4 font-weight-bold navy-text mb-2">Home</h1>
       </div>
 
-      <v-divider></v-divider>
+      <!-- Quick Actions -->
+      <v-row class="mb-6">
+        <v-col cols="auto">
+          <v-btn color="#12086F" variant="flat" size="large" @click="createSchedule">
+            Create New Schedule
+          </v-btn>
+        </v-col>
+        <v-col cols="auto">
+          <v-btn color="#4361EE" variant="outlined" size="large" @click="addEmployee">
+            Add New Employee
+          </v-btn>
+        </v-col>
+        <v-col cols="auto">
+          <v-btn color="#4361EE" variant="outlined" size="large" @click="createShift">
+            Create Shift
+          </v-btn>
+        </v-col>
+      </v-row>
 
-      <!-- Navigation Items -->
-      <v-list nav>
-        <v-list-item
-          prepend-icon="mdi-view-dashboard"
-          title="Dashboard"
-          active
-          color="primary"
-        ></v-list-item>
-        <v-list-item
-          prepend-icon="mdi-clock-outline"
-          title="My Availability"
-        ></v-list-item>
-        <v-list-item
-          prepend-icon="mdi-calendar-clock"
-          title="Shift Requests"
-        ></v-list-item>
-        <v-list-item
-          prepend-icon="mdi-checkbox-marked-circle-outline"
-          title="My Tasks"
-        ></v-list-item>
-        <v-list-item
-          prepend-icon="mdi-file-document-outline"
-          title="Profile"
-          @click="router.push({ name: 'employerProfile' })"
-        ></v-list-item>
-      </v-list>
-
-      <v-spacer></v-spacer>
-
-      <!-- Sign Out -->
-      <v-list nav class="pb-4">
-        <v-list-item
-          prepend-icon="mdi-logout"
-          title="Sign Out"
-          @click="logout"
-        ></v-list-item>
-      </v-list>
-    </v-navigation-drawer>
-
-    <!-- Main Content Area -->
-    <div class="main-content">
-      <!-- Header -->
-      <div class="dashboard-header pa-6 d-flex justify-space-between align-center">
-        <div>
-          <h1 class="text-h4 font-weight-bold mb-1">Dashboard</h1>
-          <p class="text-body-2 text-grey">Hi, {{ userGreeting }}! • {{ businessArea }}</p>
-        </div>
-        <div class="header-right d-flex align-center gap-3">
-          <!-- Notifications Bell -->
-          <v-menu location="bottom" v-model="showNotifications">
-            <template v-slot:activator="{ props }">
-              <v-btn v-bind="props" icon size="large" class="notification-bell">
-                <v-badge :content="unreadCount" :value="unreadCount > 0" color="error">
-                  <v-icon>mdi-bell</v-icon>
-                </v-badge>
-              </v-btn>
-            </template>
-            
-            <v-card min-width="400" max-width="500" class="notification-panel">
-              <v-card-title class="text-h6 font-weight-bold pa-4">
-                Notifications
-              </v-card-title>
-              <v-divider></v-divider>
+      <!-- Alerts & Notifications -->
+      <v-card class="mb-6 navy-card" variant="outlined" rounded="lg">
+        <v-card-title class="d-flex justify-space-between align-center pa-4">
+          <span class="text-h6 font-weight-bold">Alerts & Notifications</span>
+          <v-btn variant="text" size="small" color="#4361EE">View All</v-btn>
+        </v-card-title>
+        <v-divider />
+        <v-card-text class="pa-0">
+          <div v-if="loading" class="text-center py-8">
+            <v-progress-circular indeterminate color="#12086F" />
+          </div>
+          
+          <div v-else-if="alerts.length === 0" class="text-center py-8">
+            <v-icon color="grey" size="48">mdi-check-circle-outline</v-icon>
+            <p class="text-grey mt-2">No pending alerts</p>
+          </div>
+          
+          <div v-else>
+            <div v-for="(alert, idx) in alerts" :key="alert.id" class="pa-4"
+              :class="{ 'bg-grey-lighten-5': idx % 2 === 0 }">
+              <div class="d-flex justify-space-between align-start mb-2">
+                <div class="flex-grow-1">
+                  <v-chip size="small" color="#12086F" variant="tonal" class="mb-2">
+                    {{ alert.type }}
+                  </v-chip>
+                  <p class="text-body-1 mb-1">{{ alert.message }}</p>
+                  <p class="text-caption text-grey">{{ alert.time }}</p>
+                </div>
+                <v-btn icon="mdi-close" size="small" variant="text"
+                  @click="alerts.splice(idx, 1)" />
+              </div>
               
               <div v-if="notifications.length === 0" class="text-center pa-6">
                 <p class="text-grey">No notifications</p>
