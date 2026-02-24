@@ -3,7 +3,6 @@ import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import Utils from "../config/utils";
 import EmployerService from "../services/employerServices.js";
-import EmployerLayout from '../components/EmployerLayout.vue';
 
 const router = useRouter();
 const user = ref(null);
@@ -105,7 +104,8 @@ const viewEmployeeDetails = (employeeId) => {
 </script>
 
 <template>
-  <EmployerLayout>
+  <v-app>
+    <v-main style="background: #f5f5f5;">
       <v-container fluid class="pa-6">
         
         <!-- Header -->
@@ -191,7 +191,7 @@ const viewEmployeeDetails = (employeeId) => {
         </v-alert>
 
       </v-container>
-    
+    </v-main>
 
     <!-- ─── SNACKBAR ─────────────────────────────────────────────────────── -->
     <v-snackbar
@@ -203,7 +203,7 @@ const viewEmployeeDetails = (employeeId) => {
       {{ snackbarMessage }}
     </v-snackbar>
 
-  </EmployerLayout>
+  </v-app>
 </template>
 
 <style scoped>
