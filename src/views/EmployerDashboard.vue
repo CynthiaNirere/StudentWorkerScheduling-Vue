@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import Utils from '../config/utils.js';
+import businessAreaServices from '../services/businessAreaServices.js';
 
 const router = useRouter();
 const currentTime = ref('');
@@ -146,12 +147,22 @@ const calculateTotalHours = (checkIn, checkOut) => {
   return 0;
 };
 
-onMounted(() => {
+onMounted(async () => {
   user.value = Utils.getStore('user');
-  const selectedArea = Utils.getStore('selectedBusinessArea');
-  if (selectedArea) {
-    businessArea.value = selectedArea.name;
+  
+  // Fetch workplace from backend using user's work_location ID
+  if (user.value?.work_location) {
+    try {
+      const response = await businessAreaServices.getById(user.value.work_location);
+      const area = response.data || response;
+      businessArea.value = area.name || '';
+    } catch (err) {
+      console.error('Error fetching workplace:', err);
+      const selectedArea = Utils.getStore('selectedBusinessArea');
+      businessArea.value = selectedArea?.name || '';
+    }
   }
+  
   updateTime();
   setInterval(updateTime, 1000);
 });
@@ -273,6 +284,7 @@ const getStatusChipColor = (status) => {
         <v-list-item
           prepend-icon="mdi-file-document-outline"
           title="Profile"
+          @click="router.push({ name: 'employerProfile' })"
         ></v-list-item>
       </v-list>
 
