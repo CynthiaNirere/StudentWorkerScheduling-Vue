@@ -2,11 +2,9 @@ import apiClient from "./services.js";
 
 export default {
 
-  // ═══════════════════════════════════════════════════════════════════════
   // SHIFTS
-  // ═══════════════════════════════════════════════════════════════════════
 
-  getAllShifts() {
+  getAllShifts(){
     return apiClient.get("/shifts");
   },
 
@@ -42,9 +40,7 @@ export default {
     return apiClient.put(`/shifts/${id}/publish`);
   },
 
-  // ═══════════════════════════════════════════════════════════════════════
   // NOTIFICATIONS
-  // ═══════════════════════════════════════════════════════════════════════
 
   getAllNotifications() {
     return apiClient.get("/notifications");
@@ -62,9 +58,9 @@ export default {
     return apiClient.delete(`/notifications/${id}`);
   },
 
-  // ═══════════════════════════════════════════════════════════════════════
+ 
   // SHIFT SWAP REQUESTS
-  // ═══════════════════════════════════════════════════════════════════════
+
 
   getAllSwapRequests() {
     return apiClient.get("/shift-swap-requests");
@@ -86,9 +82,7 @@ export default {
     return apiClient.put(`/shift-swap-requests/${id}/reject`);
   },
 
-  // ═══════════════════════════════════════════════════════════════════════
   // TIME OFF REQUESTS
-  // ═══════════════════════════════════════════════════════════════════════
 
   getAllTimeOffRequests() {
     return apiClient.get("/time-off-requests");
@@ -114,9 +108,7 @@ export default {
     return apiClient.delete(`/time-off-requests/${id}`);
   },
 
-  // ═══════════════════════════════════════════════════════════════════════
   // EMPLOYEES (USERS)
-  // ═══════════════════════════════════════════════════════════════════════
 
   getAllEmployees() {
     return apiClient.get("/users");
@@ -138,9 +130,8 @@ export default {
     return apiClient.delete(`/users/${id}`);
   },
 
-  // ═══════════════════════════════════════════════════════════════════════
+  
   // AVAILABILITY
-  // ═══════════════════════════════════════════════════════════════════════
 
   getAllAvailability() {
     return apiClient.get("/availability");
@@ -162,9 +153,7 @@ export default {
     return apiClient.delete(`/availability/${id}`);
   },
 
-  // ═══════════════════════════════════════════════════════════════════════
   // TASK LISTS
-  // ═══════════════════════════════════════════════════════════════════════
 
   getAllTaskLists() {
     return apiClient.get("/task-lists");
@@ -194,9 +183,7 @@ export default {
     return apiClient.put(`/task-lists/${id}/archive`);
   },
 
-  // ═══════════════════════════════════════════════════════════════════════
   // TASK LIST ITEMS
-  // ═══════════════════════════════════════════════════════════════════════
 
   getAllTaskItems() {
     return apiClient.get("/task-list-items");
@@ -226,9 +213,7 @@ export default {
     return apiClient.put("/task-list-items/reorder", { items });
   },
 
-  // ═══════════════════════════════════════════════════════════════════════
   // BUSINESS AREAS (LOCATIONS)
-  // ═══════════════════════════════════════════════════════════════════════
 
   getAllLocations() {
     return apiClient.get("/business-areas");
@@ -238,9 +223,7 @@ export default {
     return apiClient.get(`/business-areas/${id}`);
   },
 
-  // ═══════════════════════════════════════════════════════════════════════
   // JOB ROLES
-  // ═══════════════════════════════════════════════════════════════════════
 
   getAllJobRoles() {
     return apiClient.get("/job-roles");
@@ -250,9 +233,7 @@ export default {
     return apiClient.get(`/job-roles/${id}`);
   },
 
-  // ═══════════════════════════════════════════════════════════════════════
   // CLOCK IN/OUT
-  // ═══════════════════════════════════════════════════════════════════════
 
   getAllClockRecords() {
     return apiClient.get("/clock-records");
