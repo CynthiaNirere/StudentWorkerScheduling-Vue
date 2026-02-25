@@ -17,6 +17,8 @@ import EmployerTimeOff from "./views/EmployerTimeOff.vue";
 import EmployerTasks from "./views/EmployerTasks.vue";
 import EmployerSwaps from "./views/EmployerSwaps.vue";
 import EmployerProfile from "./views/EmployerProfile.vue";
+import Workplace from "./views/Workplace.vue";  // ✅ ADDED
+import Profile from "./views/Profile.vue";  // ✅ ADDED
 
 // ─── ROUTER ───────────────────────────────────────────────────────────────
 const router = createRouter({
@@ -44,6 +46,20 @@ const router = createRouter({
       component: RoleSelect,
       meta: { requiresAuth: true },
     },
+    // ─── SHARED ROUTES (All Authenticated Users) ───────────────────────
+    {
+      path: "/workplace",  // ✅ ADDED
+      name: "workplace",
+      component: Workplace,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/profile",  // ✅ ADDED
+      name: "profile",
+      component: Profile,
+      meta: { requiresAuth: true },
+    },
+    // ─── ADMIN ROUTES ──────────────────────────────────────────────────
     {
       path: "/admin",
       name: "adminViewDashboard",
