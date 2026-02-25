@@ -27,6 +27,7 @@ jobs:
           echo VITE_APP_CLIENT_ID="${{ secrets.VITE_APP_CLIENT_ID }}" >> .env
           echo VITE_APP_CLIENT_URL="${{ secrets.VITE_APP_CLIENT_URL }}" >> .env
           echo VITE_APP_API_URL="${{ secrets.VITE_APP_API_URL }}" >> .env
+          echo VITE_API_CLIENT_SECRET="${{ secrets.VITE_API_CLIENT_SECRET }}" >> .env
           echo VITE_APP_GOOGLE_API_URL="${{ secrets.VITE_APP_GOOGLE_API_URL }}" >> .env
           echo "=== .env file contents ==="
           cat .env
