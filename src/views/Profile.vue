@@ -5,7 +5,6 @@
 
       <v-card max-width="900" class="mx-auto pa-8">
         <v-form @submit.prevent="saveProfile">
-          <!-- First Name and Last Name -->
           <v-row>
             <v-col cols="12" md="6">
               <label class="text-subtitle-1 font-weight-medium mb-2 d-block">First Name</label>
