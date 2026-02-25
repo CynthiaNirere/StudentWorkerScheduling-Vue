@@ -17,8 +17,8 @@ import EmployerTimeOff from "./views/EmployerTimeOff.vue";
 import EmployerTasks from "./views/EmployerTasks.vue";
 import EmployerSwaps from "./views/EmployerSwaps.vue";
 import EmployerProfile from "./views/EmployerProfile.vue";
-import Workplace from "./views/Workplace.vue";  // ✅ ADDED
-import Profile from "./views/Profile.vue";  // ✅ ADDED
+import Workplace from "./views/Workplace.vue";  
+import Profile from "./views/Profile.vue";  
 
 // ─── ROUTER ───────────────────────────────────────────────────────────────
 const router = createRouter({
@@ -48,13 +48,13 @@ const router = createRouter({
     },
     // ─── SHARED ROUTES (All Authenticated Users) ───────────────────────
     {
-      path: "/workplace",  // ✅ ADDED
+      path: "/workplace",  
       name: "workplace",
       component: Workplace,
       meta: { requiresAuth: true },
     },
     {
-      path: "/profile",  // ✅ ADDED
+      path: "/profile",  
       name: "profile",
       component: Profile,
       meta: { requiresAuth: true },
