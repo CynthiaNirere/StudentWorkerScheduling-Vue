@@ -55,7 +55,7 @@ const logout = () => {
     >
       <div class="sidebar-header pa-4">
         <div v-show="!rail">
-          <h2 class="text-h6 font-weight-bold text-white">TalonTime</h2>
+          <h2 class="text-h6 font-weight-bold text-white">ShiftBoard</h2>
           <p class="text-caption text-white-80 mt-1 mb-0">{{ businessArea || '...' }}</p>
         </div>
         <div v-show="rail" class="text-center">
