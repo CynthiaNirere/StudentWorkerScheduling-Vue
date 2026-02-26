@@ -18,9 +18,11 @@ const error = ref(null)
 const successMessage = ref(null)
 
 const showAddEmployeeDialog = ref(false)
+const showEditEmployeeDialog = ref(false)  // ✅ ADDED
 const showDeleteDialog = ref(false)
 const showChangeBusinessAreaDialog = ref(false)
 const employeeToDelete = ref(null)
+const employeeToEdit = ref(null)  // ✅ ADDED
 
 const newEmployee = ref({
   firstName: '',
@@ -28,6 +30,17 @@ const newEmployee = ref({
   email: '',
   phoneNumber: '',
   role: 'employee',
+  workLocation: null
+})
+
+// ✅ ADDED
+const editEmployee = ref({
+  userId: '',
+  firstName: '',
+  lastName: '',
+  email: '',
+  phoneNumber: '',
+  role: '',
   workLocation: null
 })
 
@@ -416,7 +429,7 @@ onMounted(async () => {
                   size="small"
                   color="primary"
                   class="mr-2"
-                  @click="() => {}"
+                  @click="openEditEmployeeDialog(employee)"
                 >
                   Edit
                 </v-btn>
@@ -484,7 +497,7 @@ onMounted(async () => {
               <v-select
                 v-model="newEmployee.role"
                 label="Role *"
-                :items="['admin', 'employee']"
+                :items="['admin', 'employee', 'employer']"
                 variant="outlined"
                 required
               ></v-select>
