@@ -2,6 +2,7 @@
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import Utils from '../config/utils.js';
+import EmployerService from '../services/employerServices.js';
 
 const router       = useRouter();
 const user         = ref(null);
@@ -231,12 +232,40 @@ const snackColor = ref('success');
 
 const submitAvailability = async () => {
   submitting.value = true;
-  await new Promise(r => setTimeout(r, 700));
-  submitting.value = false;
-  submittedWeeks[weekKey.value] = true;
-  snackMsg.value   = 'Availability submitted for review!';
-  snackColor.value = 'success';
-  snackbar.value   = true;
+  try {
+    const userId = user.value?.user_id || user.value?.userId;
+    const weekData = allWeeks[weekKey.value];
+    console.log('DEBUG submit: userId=', userId, 'weekKey=', weekKey.value, 'weekData=', JSON.stringify(weekData));
+
+    for (let dayIndex = 0; dayIndex < weekData.length; dayIndex++) {
+      for (const slot of weekData[dayIndex]) {
+        const weekStartDate = new Date(weekKey.value);
+        weekStartDate.setDate(weekStartDate.getDate() + dayIndex);
+        const payload = {
+          userId: userId,
+          dayOfWeek: dayIndex,
+          startTime: slot.s,
+          endTime: slot.e,
+          isActive: 1,
+          effectiveDate: weekStartDate.getTime(),
+          createdAt: Date.now(),
+        };
+        console.log('DEBUG posting slot:', JSON.stringify(payload));
+        await EmployerService.createAvailability(payload);
+      }
+    }
+
+    submittedWeeks[weekKey.value] = true;
+    snackMsg.value   = 'Availability submitted for review!';
+    snackColor.value = 'success';
+  } catch (err) {
+    console.error('Error submitting availability:', err);
+    snackMsg.value   = 'Failed to submit availability';
+    snackColor.value = 'error';
+  } finally {
+    submitting.value = false;
+    snackbar.value   = true;
+  }
 };
 
 // ── USER ──────────────────────────────────────────────────────────────────
