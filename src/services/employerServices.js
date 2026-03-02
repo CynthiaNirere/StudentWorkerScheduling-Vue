@@ -82,6 +82,14 @@ export default {
     return apiClient.put(`/shift-swap-requests/${id}/reject`);
   },
 
+  getAllShiftSwapRequests() {
+    return apiClient.get("/shift-swap-requests");
+  },
+
+  updateShiftSwapRequest(id, data) {
+    return apiClient.put(`/shift-swap-requests/${id}`, data);
+  },
+
   // TIME OFF REQUESTS
 
   getAllTimeOffRequests() {
