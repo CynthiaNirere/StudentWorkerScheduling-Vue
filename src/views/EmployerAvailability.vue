@@ -28,12 +28,16 @@ const availabilityGrid = computed(() => {
   return filteredEmployees.map((employee) => {
     const empId = employee.user_id || employee.userId;
     const employeeAvailability = availability.value.filter(
-      (a) => (a.user_id || a.userId) === empId && a.is_active
+      (a) => (a.user_id || a.userId) === empId && (a.is_active || a.isActive)
     );
 
     const weekSchedule = {};
     daysOfWeek.forEach((day, index) => {
-      const dayAvail = employeeAvailability.filter((a) => (a.day_of_week || a.dayOfWeek) === index);
+      const storedDay = index === 0 ? 6 : index - 1;
+      const dayAvail = employeeAvailability.filter((a) => {
+        const d = a.day_of_week ?? a.dayOfWeek;
+        return d === index || d === storedDay;
+      });
       weekSchedule[day] = dayAvail.map((a) => ({
         start: formatTime(a.start_time || a.startTime),
         end: formatTime(a.end_time || a.endTime),
@@ -57,6 +61,7 @@ const loadAvailability = async () => {
   loading.value = true;
   try {
     const res = await EmployerService.getAllAvailability();
+    console.log("DEBUG availability raw response:", res.data);
     availability.value = Array.isArray(res.data) ? res.data : [];
   } catch (err) {
     console.error("Error loading availability:", err);
