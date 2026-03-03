@@ -3,6 +3,13 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import Utils from '../config/utils.js';
 
+const props = defineProps({
+  isGuest: {
+    type: Boolean,
+    default: false
+  }
+});
+
 const router = useRouter();
 const user = ref(null);
 const businessArea = ref('');
@@ -10,23 +17,32 @@ const rail = ref(true);
 
 onMounted(async () => {
   user.value = Utils.getStore('user');
-  if (user.value?.work_location) {
+  
+  // Set business area based on guest or real user
+  if (props.isGuest) {
+    businessArea.value = 'Demo Campus Gym';
+  } else if (user.value?.work_location) {
     businessArea.value = 'The Brew';
   }
 });
 
 const userInitials = computed(() => {
-  if (!user.value) return 'E';
+  if (!user.value) return 'G';  // G for Guest
   const firstName = user.value.fName || user.value.first_name || '';
   const lastName = user.value.lName || user.value.last_name || '';
   return (firstName[0] || '') + (lastName[0] || '');
 });
 
 const userFullName = computed(() => {
-  if (!user.value) return 'Employer';
+  if (!user.value) return 'Guest User';
   const firstName = user.value.fName || user.value.first_name || '';
   const lastName = user.value.lName || user.value.last_name || '';
   return `${firstName} ${lastName}`.trim() || 'Employer';
+});
+
+const userEmail = computed(() => {
+  if (props.isGuest) return 'demo@shiftboard.com';
+  return user.value?.email || '';
 });
 
 const handleMouseEnter = () => {
@@ -38,8 +54,14 @@ const handleMouseLeave = () => {
 };
 
 const logout = () => {
-  Utils.setStore('user', null);
-  router.push('/login');
+  if (props.isGuest) {
+    localStorage.removeItem('isGuest');
+    localStorage.removeItem('user');
+    router.push({ name: 'landing' });
+  } else {
+    Utils.setStore('user', null);
+    router.push('/login');
+  }
 };
 </script>
 
@@ -56,10 +78,21 @@ const logout = () => {
       <div class="sidebar-header pa-4">
         <div v-show="!rail">
           <h2 class="text-h6 font-weight-bold text-white">ShiftBoard</h2>
-          <p class="text-caption text-white-80 mt-1 mb-0">{{ businessArea || '...' }}</p>
+          <p class="text-caption text-white-80 mt-1 mb-0">
+            {{ businessArea || '...' }}
+          </p>
+          <!-- Guest Badge -->
+          <v-chip v-if="isGuest" size="x-small" color="info" variant="tonal" class="mt-2">
+            <v-icon start size="x-small">mdi-eye-outline</v-icon>
+            Guest Mode
+          </v-chip>
         </div>
         <div v-show="rail" class="text-center">
           <v-icon color="white" size="32">mdi-calendar-clock</v-icon>
+          <!-- Guest indicator when collapsed -->
+          <v-icon v-if="isGuest" color="info" size="16" class="mt-1">
+            mdi-eye-outline
+          </v-icon>
         </div>
       </div>
 
@@ -69,7 +102,8 @@ const logout = () => {
         <v-list-item
           prepend-icon="mdi-view-dashboard"
           title="Dashboard"
-          :to="{ name: 'employerDashboard' }"
+          :to="isGuest ? undefined : { name: 'employerDashboard' }"
+          :disabled="isGuest"
           color="white"
           class="nav-item"
           rounded="lg"
@@ -77,7 +111,8 @@ const logout = () => {
         <v-list-item
           prepend-icon="mdi-calendar"
           title="Schedule"
-          :to="{ name: 'employerSchedule' }"
+          :to="isGuest ? undefined : { name: 'employerSchedule' }"
+          :disabled="isGuest"
           color="white"
           class="nav-item"
           rounded="lg"
@@ -85,7 +120,8 @@ const logout = () => {
         <v-list-item
           prepend-icon="mdi-account-group"
           title="Employees"
-          :to="{ name: 'employerEmployees' }"
+          :to="isGuest ? undefined : { name: 'employerEmployees' }"
+          :disabled="isGuest"
           color="white"
           class="nav-item"
           rounded="lg"
@@ -93,7 +129,8 @@ const logout = () => {
         <v-list-item
           prepend-icon="mdi-clock-outline"
           title="Availability"
-          :to="{ name: 'employerAvailability' }"
+          :to="isGuest ? undefined : { name: 'employerAvailability' }"
+          :disabled="isGuest"
           color="white"
           class="nav-item"
           rounded="lg"
@@ -101,7 +138,8 @@ const logout = () => {
         <v-list-item
           prepend-icon="mdi-calendar-remove"
           title="Time Off"
-          :to="{ name: 'employerTimeOff' }"
+          :to="isGuest ? undefined : { name: 'employerTimeOff' }"
+          :disabled="isGuest"
           color="white"
           class="nav-item"
           rounded="lg"
@@ -109,7 +147,8 @@ const logout = () => {
         <v-list-item
           prepend-icon="mdi-swap-horizontal"
           title="Swaps"
-          :to="{ name: 'employerSwaps' }"
+          :to="isGuest ? undefined : { name: 'employerSwaps' }"
+          :disabled="isGuest"
           color="white"
           class="nav-item"
           rounded="lg"
@@ -117,7 +156,8 @@ const logout = () => {
         <v-list-item
           prepend-icon="mdi-checkbox-marked-circle-outline"
           title="Tasks"
-          :to="{ name: 'employerTasks' }"
+          :to="isGuest ? undefined : { name: 'employerTasks' }"
+          :disabled="isGuest"
           color="white"
           class="nav-item"
           rounded="lg"
@@ -133,9 +173,9 @@ const logout = () => {
         
         <!-- Account Menu -->
         <v-menu location="bottom end">
-          <template #activator="{ props }">
-            <v-btn v-bind="props" icon variant="text">
-              <v-avatar size="36" color="#12086F">
+          <template #activator="{ props: menuProps }">
+            <v-btn v-bind="menuProps" icon variant="text">
+              <v-avatar size="36" :color="isGuest ? '#4895EF' : '#12086F'">
                 <span class="text-white font-weight-bold text-caption">{{ userInitials }}</span>
               </v-avatar>
             </v-btn>
@@ -144,26 +184,30 @@ const logout = () => {
           <v-card min-width="200">
             <v-card-text class="pa-3">
               <div class="text-center mb-3">
-                <v-avatar size="48" color="#12086F" class="mb-2">
+                <v-avatar size="48" :color="isGuest ? '#4895EF' : '#12086F'" class="mb-2">
                   <span class="text-white font-weight-bold">{{ userInitials }}</span>
                 </v-avatar>
                 <div class="text-body-2 font-weight-bold">{{ userFullName }}</div>
-                <div class="text-caption text-grey">{{ user?.email }}</div>
+                <div class="text-caption text-grey">{{ userEmail }}</div>
+                <v-chip v-if="isGuest" size="x-small" color="info" variant="tonal" class="mt-2">
+                  Guest Mode
+                </v-chip>
               </div>
               
               <v-divider class="my-2" />
               
               <v-list density="compact" class="pa-0">
                 <v-list-item
+                  v-if="!isGuest"
                   prepend-icon="mdi-account"
                   title="Profile"
                   :to="{ name: 'employerProfile' }"
                 />
                 <v-list-item
                   prepend-icon="mdi-logout"
-                  title="Sign Out"
+                  :title="isGuest ? 'Exit Guest Mode' : 'Sign Out'"
                   @click="logout"
-                  class="text-error"
+                  :class="isGuest ? 'text-info' : 'text-error'"
                 />
               </v-list>
             </v-card-text>
@@ -212,8 +256,13 @@ const logout = () => {
   transition: all 0.2s;
 }
 
-.nav-item:hover {
+.nav-item:hover:not(.v-list-item--disabled) {
   background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.nav-item.v-list-item--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .main-content {
