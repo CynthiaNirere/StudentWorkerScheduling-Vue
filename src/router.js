@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from "vue-router";
 import Utils from "./config/utils";
 
 // ─── IMPORTS ──────────────────────────────────────────────────────────────
+import Landing from "./views/Landing.vue";  // ✅ ADDED
+import GuestDashboard from "./views/GuestDashboard.vue";  // ✅ ADDED
 import Login from "./views/Login.vue";
 import SignUp from "./views/SignUp.vue";
 import RoleSelect from "./views/RoleSelect.vue";
@@ -20,13 +22,24 @@ import EmployerProfile from "./views/EmployerProfile.vue";
 import Workplace from "./views/Workplace.vue";  
 import Profile from "./views/Profile.vue";  
 
+// ─── ROUTER ───────────────────────────────────────────────────────────────
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    // ─── LANDING & GUEST ROUTES ────────────────────────────────────────
     {
       path: "/",
-      redirect: "/login",
+      name: "landing",  // ✅ CHANGED from redirect to actual landing page
+      component: Landing,
+      meta: { requiresAuth: false },
     },
+    {
+      path: "/guest",  // ✅ ADDED
+      name: "guestDashboard",
+      component: GuestDashboard,
+      meta: { requiresAuth: false },
+    },
+    // ─── AUTH ROUTES ───────────────────────────────────────────────────
     {
       path: "/signup",
       name: "signup",
@@ -144,14 +157,21 @@ const router = createRouter({
     // ─── CATCH ALL ──────────────────────────────────────────────────────
     {
       path: "/:pathMatch(.*)*",
-      redirect: "/login",
+      redirect: "/",  // ✅ CHANGED to redirect to landing instead of login
     },
   ],
 });
 
 router.beforeEach((to, from, next) => {
   const user = Utils.getStore("user");
+  const isGuest = localStorage.getItem("isGuest");  // ✅ ADDED
   const requiresAuth = to.meta.requiresAuth;
+
+  // Allow guest mode to access guestDashboard  // ✅ ADDED
+  if (to.name === "guestDashboard" && isGuest) {
+    next();
+    return;
+  }
 
   if (requiresAuth && !user) {
     console.log("Not authenticated, redirecting to login");
