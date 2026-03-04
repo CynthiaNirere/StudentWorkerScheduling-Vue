@@ -1,11 +1,9 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
-import { useRouter } from "vue-router";
 import Utils from "../config/utils";
 import EmployerService from "../services/employerServices.js";
 import EmployerLayout from '../components/EmployerLayout.vue';
 
-const router = useRouter();
 const user = ref(null);
 
 const availability = ref([]);
@@ -18,6 +16,30 @@ const snackbarMessage = ref("");
 const snackbarColor = ref("success");
 
 const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+const showAddDialog = ref(false);
+const showEditDialog = ref(false);
+const showDeleteDialog = ref(false);
+const processing = ref(false);
+const itemToDelete = ref(null);
+
+const defaultForm = { userId: null, dayOfWeek: null, startTime: null, endTime: null };
+const addForm = ref({ ...defaultForm });
+const editForm = ref({ ...defaultForm, id: null });
+
+const dayOptions = daysOfWeek.map((label, index) => ({ title: label, value: (index + 6) % 7 }));
+
+const timeOptions = (() => {
+  const opts = [];
+  for (let m = 0; m < 24 * 60; m += 30) {
+    const h = Math.floor(m / 60);
+    const min = m % 60;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const hour = h % 12 || 12;
+    opts.push({ title: `${hour}:${String(min).padStart(2, '0')} ${ampm}`, value: m });
+  }
+  return opts;
+})();
 
 const availabilityGrid = computed(() => {
   const currentUserId = user.value?.user_id || user.value?.userId;
@@ -33,14 +55,19 @@ const availabilityGrid = computed(() => {
 
     const weekSchedule = {};
     daysOfWeek.forEach((day, index) => {
-      const storedDay = index === 0 ? 6 : index - 1;
+      const dbDay = (index + 6) % 7;
       const dayAvail = employeeAvailability.filter((a) => {
         const d = a.day_of_week ?? a.dayOfWeek;
-        return d === index || d === storedDay;
+        return d === dbDay;
       });
       weekSchedule[day] = dayAvail.map((a) => ({
+        id: a.id || a.availability_id,
         start: formatTime(a.start_time || a.startTime),
         end: formatTime(a.end_time || a.endTime),
+        startTime: a.start_time || a.startTime,
+        endTime: a.end_time || a.endTime,
+        dayOfWeek: a.day_of_week ?? a.dayOfWeek,
+        userId: a.user_id || a.userId,
       }));
     });
 
@@ -61,7 +88,6 @@ const loadAvailability = async () => {
   loading.value = true;
   try {
     const res = await EmployerService.getAllAvailability();
-    console.log("DEBUG availability raw response:", res.data);
     availability.value = Array.isArray(res.data) ? res.data : [];
   } catch (err) {
     console.error("Error loading availability:", err);
@@ -100,11 +126,78 @@ const showSnackbar = (message, color = "success") => {
   snackbar.value = true;
 };
 
-const viewEmployeeDetails = (employeeId) => {
-  router.push({
-    name: "employerEmployees",
-    query: { employeeId },
-  });
+const openAddDialog = () => {
+  addForm.value = { ...defaultForm };
+  showAddDialog.value = true;
+};
+
+const handleAdd = async () => {
+  if (!addForm.value.userId || addForm.value.dayOfWeek === null || !addForm.value.startTime || !addForm.value.endTime) {
+    showSnackbar('Please fill in all fields', 'error');
+    return;
+  }
+  processing.value = true;
+  try {
+    await EmployerService.createAvailability(addForm.value);
+    showSnackbar('Availability added successfully');
+    showAddDialog.value = false;
+    await loadAvailability();
+  } catch (err) {
+    console.error('Error adding availability:', err);
+    showSnackbar('Error adding availability', 'error');
+  } finally {
+    processing.value = false;
+  }
+};
+
+const openEditDialog = (slot) => {
+  editForm.value = { id: slot.id, userId: slot.userId, dayOfWeek: slot.dayOfWeek, startTime: slot.startTime, endTime: slot.endTime };
+  showEditDialog.value = true;
+};
+
+const handleEdit = async () => {
+  if (editForm.value.dayOfWeek === null || !editForm.value.startTime || !editForm.value.endTime) {
+    showSnackbar('Please fill in all fields', 'error');
+    return;
+  }
+  processing.value = true;
+  try {
+    await EmployerService.updateAvailability(editForm.value.id, {
+      dayOfWeek: editForm.value.dayOfWeek,
+      startTime: editForm.value.startTime,
+      endTime: editForm.value.endTime,
+    });
+    showSnackbar('Availability updated successfully');
+    showEditDialog.value = false;
+    await loadAvailability();
+  } catch (err) {
+    console.error('Error updating availability:', err);
+    showSnackbar('Error updating availability', 'error');
+  } finally {
+    processing.value = false;
+  }
+};
+
+const openDeleteDialog = (slot) => {
+  itemToDelete.value = slot;
+  showDeleteDialog.value = true;
+};
+
+const handleDelete = async () => {
+  if (!itemToDelete.value) return;
+  processing.value = true;
+  try {
+    await EmployerService.deleteAvailability(itemToDelete.value.id);
+    showSnackbar('Availability deleted successfully');
+    showDeleteDialog.value = false;
+    itemToDelete.value = null;
+    await loadAvailability();
+  } catch (err) {
+    console.error('Error deleting availability:', err);
+    showSnackbar('Error deleting availability', 'error');
+  } finally {
+    processing.value = false;
+  }
 };
 </script>
 
@@ -116,21 +209,24 @@ const viewEmployeeDetails = (employeeId) => {
         <div>
           <h1 class="text-h4 font-weight-bold navy-text">Employee Availability</h1>
           <p class="text-body-2 text-grey">
-            View when employees are available to work
+            Manage when employees are available to work
           </p>
         </div>
-        <v-select
-          v-model="selectedEmployee"
-          :items="employees"
-          :item-title="(e) => `${e.fName || e.first_name || ''} ${e.lName || e.last_name || ''}`"
-          item-value="user_id"
-          label="Filter by employee"
-          variant="outlined"
-          density="compact"
-          style="max-width: 300px"
-          clearable
-          color="#12086F"
-        />
+        <div class="d-flex align-center ga-3">
+          <v-btn color="#12086F" prepend-icon="mdi-plus" size="small" @click="openAddDialog">Add Availability</v-btn>
+          <v-select
+            v-model="selectedEmployee"
+            :items="employees"
+            :item-title="(e) => `${e.fName || e.first_name || ''} ${e.lName || e.last_name || ''}`"
+            item-value="user_id"
+            label="Filter by employee"
+            variant="outlined"
+            density="compact"
+            style="max-width: 250px"
+            clearable
+            color="#12086F"
+          />
+        </div>
       </div>
 
       <!-- Loading -->
@@ -140,7 +236,7 @@ const viewEmployeeDetails = (employeeId) => {
 
       <!-- Availability Grid -->
       <v-card v-else variant="outlined" rounded="lg" class="navy-card">
-        <div class="pa-4">
+        <div class="pa-4 grid-scroll-wrapper">
           <div class="availability-grid-header">
             <div class="employee-column">Employee</div>
             <div v-for="day in daysOfWeek" :key="day" class="day-column">
@@ -155,14 +251,6 @@ const viewEmployeeDetails = (employeeId) => {
           >
             <div class="employee-column">
               <div class="font-weight-medium">{{ row.employeeName }}</div>
-              <v-btn
-                size="x-small"
-                variant="text"
-                color="#4361EE"
-                @click="viewEmployeeDetails(row.employeeId)"
-              >
-                View Details
-              </v-btn>
             </div>
             
             <div v-for="day in daysOfWeek" :key="day" class="day-column">
@@ -175,7 +263,15 @@ const viewEmployeeDetails = (employeeId) => {
                 :key="index"
                 class="available-slot"
               >
-                {{ slot.start }} - {{ slot.end }}
+                <span>{{ slot.start }} - {{ slot.end }}</span>
+                <span class="slot-actions">
+                  <v-btn icon size="x-small" variant="text" color="#2e7d32" density="compact" @click.stop="openEditDialog(slot)">
+                    <v-icon size="12">mdi-pencil</v-icon>
+                  </v-btn>
+                  <v-btn icon size="x-small" variant="text" color="error" density="compact" @click.stop="openDeleteDialog(slot)">
+                    <v-icon size="12">mdi-delete</v-icon>
+                  </v-btn>
+                </span>
               </div>
             </div>
           </div>
@@ -190,9 +286,56 @@ const viewEmployeeDetails = (employeeId) => {
 
       <!-- Info Alert -->
       <v-alert type="info" variant="tonal" class="mt-4" color="#4361EE">
-        <strong>Tip:</strong> Use this view to quickly see who's available when scheduling shifts. 
-        Filter by employee to see their full weekly availability.
+        <strong>Tip:</strong> Click "Add Availability" to set hours for an employee, or use the edit/delete icons on each time slot.
       </v-alert>
+
+      <!-- Add Dialog -->
+      <v-dialog v-model="showAddDialog" max-width="500">
+        <v-card rounded="lg">
+          <v-card-title class="navy-text font-weight-bold">Add Employee Availability</v-card-title>
+          <v-card-text>
+            <v-select v-model="addForm.userId" :items="employees" :item-title="(e) => `${e.fName || e.first_name || ''} ${e.lName || e.last_name || ''}`" :item-value="(e) => e.user_id || e.userId" label="Employee" variant="outlined" density="compact" class="mb-3" color="#12086F" />
+            <v-select v-model="addForm.dayOfWeek" :items="dayOptions" label="Day of Week" variant="outlined" density="compact" class="mb-3" color="#12086F" />
+            <v-select v-model="addForm.startTime" :items="timeOptions" label="Start Time" variant="outlined" density="compact" class="mb-3" color="#12086F" />
+            <v-select v-model="addForm.endTime" :items="timeOptions" label="End Time" variant="outlined" density="compact" color="#12086F" />
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn variant="text" @click="showAddDialog = false">Cancel</v-btn>
+            <v-btn color="#12086F" :loading="processing" @click="handleAdd">Add</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <!-- Edit Dialog -->
+      <v-dialog v-model="showEditDialog" max-width="500">
+        <v-card rounded="lg">
+          <v-card-title class="navy-text font-weight-bold">Edit Availability</v-card-title>
+          <v-card-text>
+            <v-select v-model="editForm.dayOfWeek" :items="dayOptions" label="Day of Week" variant="outlined" density="compact" class="mb-3" color="#12086F" />
+            <v-select v-model="editForm.startTime" :items="timeOptions" label="Start Time" variant="outlined" density="compact" class="mb-3" color="#12086F" />
+            <v-select v-model="editForm.endTime" :items="timeOptions" label="End Time" variant="outlined" density="compact" color="#12086F" />
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn variant="text" @click="showEditDialog = false">Cancel</v-btn>
+            <v-btn color="#12086F" :loading="processing" @click="handleEdit">Save</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <!-- Delete Dialog -->
+      <v-dialog v-model="showDeleteDialog" max-width="400">
+        <v-card rounded="lg">
+          <v-card-title class="text-h6">Delete Availability</v-card-title>
+          <v-card-text>Are you sure you want to delete this availability slot?</v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn variant="text" @click="showDeleteDialog = false">Cancel</v-btn>
+            <v-btn color="error" :loading="processing" @click="handleDelete">Delete</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
     </v-container>
 
     <v-snackbar
@@ -262,15 +405,32 @@ const viewEmployeeDetails = (employeeId) => {
   padding: 0 8px;
 }
 
+.grid-scroll-wrapper {
+  overflow-x: auto;
+  min-width: 0;
+}
+
 .available-slot {
   background: #e8f5e9;
   color: #2e7d32;
-  padding: 4px 8px;
+  padding: 3px 6px;
   border-radius: 4px;
   font-size: 11px;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
   white-space: nowrap;
   border-left: 3px solid #2e7d32;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.available-slot .slot-actions {
+  display: none;
+  margin-left: 2px;
+}
+
+.available-slot:hover .slot-actions {
+  display: inline-flex;
 }
 
 .unavailable {
