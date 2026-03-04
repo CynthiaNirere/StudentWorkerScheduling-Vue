@@ -58,9 +58,9 @@ const employees = computed(() => [
     shifts: ['9AM–5PM', null, '2PM–10PM', '9AM–1PM', '10AM–6PM', null, null],
     bg: '#e8eaf6', border: '#3949ab', text: '#1a237e'
   },
-  { name: 'Alex M.',   shifts: ['2PM–10PM', '9AM–5PM', null, '10AM–6PM', null, '9AM–1PM', null], bg: '#e3f2fd', border: '#1565c0', text: '#0d47a1' },
+  { name: 'Alex M.',   shifts: ['2PM–10PM', '9AM–5PM', null, '10AM–6PM', null, null, null], bg: '#e3f2fd', border: '#1565c0', text: '#0d47a1' },
   { name: 'Jordan L.', shifts: [null, '10AM–6PM', '9AM–5PM', null, '2PM–10PM', null, null],       bg: '#e8f5e9', border: '#2e7d32', text: '#1b5e20' },
-  { name: 'Sam W.',    shifts: ['10AM–6PM', null, null, '9AM–5PM', null, '2PM–10PM', null],        bg: '#fce4ec', border: '#c62828', text: '#b71c1c' },
+  { name: 'Sam W.',    shifts: ['10AM–6PM', null, null, '9AM–5PM', null, null, null],        bg: '#fce4ec', border: '#c62828', text: '#b71c1c' },
 ]);
 
 // Restructure: per day → array of shifts
@@ -245,7 +245,6 @@ onMounted(() => {
                 </div>
               </div>
               <p v-if="dayShifts[di].length === 0" class="no-shifts-text">No shifts</p>
-              <div class="add-shift-btn" @click="showTimeOffDialog = true">+ Add Shift</div>
             </div>
           </div>
         </div>
@@ -415,24 +414,6 @@ onMounted(() => {
   padding: 8px 0;
 }
 
-.add-shift-btn {
-  width: 100%;
-  padding: 6px;
-  border: 1px dashed #4361EE;
-  border-radius: 6px;
-  text-align: center;
-  font-size: 0.75rem;
-  color: #4361EE;
-  cursor: pointer;
-  margin-top: 4px;
-  transition: all 0.15s;
-}
-
-.add-shift-btn:hover {
-  border-color: #12086F;
-  color: #12086F;
-  background: rgba(18, 8, 111, 0.05);
-}
 
 /* Activity feed */
 .activity-card { border: 1px solid #e0e0e0; }
