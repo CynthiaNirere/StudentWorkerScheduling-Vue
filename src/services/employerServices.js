@@ -79,27 +79,23 @@ export default {
   // SHIFT SWAP REQUESTS
 
   getAllShiftSwapRequests() {
-    return apiClient.get("/shift-swap-requests");
-  },
-
-  getAllShiftSwapRequests() {
-    return apiClient.get("/shift-swaps", addDemoHeader());
+    return apiClient.get("/shift-swap-requests", addDemoHeader());
   },
 
   getPendingSwapRequests() {
-    return apiClient.get("/shift-swaps?status=pending", addDemoHeader());
+    return apiClient.get("/shift-swap-requests?status=pending", addDemoHeader());
   },
 
   getSwapRequestById(id) {
-    return apiClient.get(`/shift-swaps/${id}`, addDemoHeader());
+    return apiClient.get(`/shift-swap-requests/${id}`, addDemoHeader());
   },
 
   approveSwapRequest(id) {
-    return apiClient.put(`/shift-swaps/${id}/approve`, {}, addDemoHeader());
+    return apiClient.put(`/shift-swap-requests/${id}/approve`, {}, addDemoHeader());
   },
 
   rejectSwapRequest(id) {
-    return apiClient.put(`/shift-swaps/${id}/reject`, {}, addDemoHeader());
+    return apiClient.put(`/shift-swap-requests/${id}/reject`, {}, addDemoHeader());
   },
 
   // TIME OFF REQUESTS
