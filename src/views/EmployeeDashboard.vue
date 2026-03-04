@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import Utils from '../config/utils.js';
+import { useNotifications } from '../composables/useNotifications.js';
 
 const router = useRouter();
 const rail = ref(true);
@@ -9,7 +10,6 @@ const currentTime = ref('');
 const currentDate = ref('');
 const user = ref(null);
 const showNotifications = ref(false);
-const unreadCount = ref(3);
 const businessArea = ref('The Brew');
 
 // ─── TASKS ────────────────────────────────────────────────────────────────
@@ -63,47 +63,7 @@ const checkOut = (shiftId) => {
 };
 
 // ─── NOTIFICATIONS ────────────────────────────────────────────────────────
-const notifications = ref([
-  {
-    id: 1,
-    type: 'Shift Cover Request',
-    message: 'Alex Martinez needs someone for Tuesday 3PM-7PM',
-    timestamp: '2 hours ago',
-    action: 'Take it',
-    priority: 'high',
-    icon: 'mdi-calendar-check'
-  },
-  {
-    id: 2,
-    type: 'Urgent: Safety Alert',
-    message: 'Manager: Please wear safety gear today - critical equipment malfunction risk',
-    timestamp: '30 minutes ago',
-    priority: 'high',
-    icon: 'mdi-alert-circle'
-  },
-  {
-    id: 3,
-    type: 'Schedule Update',
-    message: 'Your schedule for next week has been sent for approval',
-    timestamp: '1 hour ago',
-    priority: 'normal',
-    icon: 'mdi-calendar-check'
-  }
-]);
-
-const urgentNotifications = computed(() => notifications.value.filter(n => n.priority === 'high'));
-
-const handleNotificationAction = (notificationId) => {
-  const notif = notifications.value.find(n => n.id === notificationId);
-  if (notif?.action) showSnackbar('Shift taken! Pending employer approval.', 'success');
-  notifications.value = notifications.value.filter(n => n.id !== notificationId);
-  unreadCount.value = Math.max(0, unreadCount.value - 1);
-};
-
-const dismissNotification = (notificationId) => {
-  notifications.value = notifications.value.filter(n => n.id !== notificationId);
-  unreadCount.value = Math.max(0, unreadCount.value - 1);
-};
+const { notifications, unreadCount, urgentNotifications, dismissNotification, handleNotificationAction } = useNotifications();
 
 const viewAllNotifications = () => { showNotifications.value = true; };
 
@@ -117,6 +77,40 @@ const showSnackbar  = (msg, color = 'success') => {
   snackbarMsg.value   = msg;
   snackbarColor.value = color;
   snackbar.value      = true;
+};
+
+// ─── ADD SHIFT DIALOG ─────────────────────────────────────────────────────
+const showAddShiftDialog = ref(false);
+const selectedDay        = ref('');
+const newShiftStart      = ref('');
+const newShiftEnd        = ref('');
+
+const openAddShift = (day) => {
+  selectedDay.value   = day;
+  newShiftStart.value = '';
+  newShiftEnd.value   = '';
+  showAddShiftDialog.value = true;
+};
+
+const to12h = (t) => {
+  if (!t) return '';
+  const [h, m] = t.split(':');
+  const hour   = parseInt(h);
+  const ampm   = hour >= 12 ? 'PM' : 'AM';
+  return `${hour % 12 || 12}:${m} ${ampm}`;
+};
+
+const submitShiftRequest = () => {
+  if (!newShiftStart.value || !newShiftEnd.value) return;
+  pendingRequests.value.unshift({
+    id:         Date.now(),
+    type:       'Shift Request',
+    date:       `${selectedDay.value} — ${to12h(newShiftStart.value)}–${to12h(newShiftEnd.value)}`,
+    status:     'pending',
+    submitDate: 'Waiting for review'
+  });
+  showAddShiftDialog.value = false;
+  showSnackbar('Shift request submitted! Waiting for review.');
 };
 
 // ─── SCHEDULE & STATUS ────────────────────────────────────────────────────
@@ -239,23 +233,18 @@ onMounted(() => {
           @click="router.push({ name: 'employeeAvailability' })"
         />
         <v-list-item
-          prepend-icon="mdi-calendar-clock"
-          title="Shift Requests"
+          prepend-icon="mdi-calendar-month"
+          title="Team Schedule"
           rounded="lg"
           class="mb-1"
-        />
-        <v-list-item
-          prepend-icon="mdi-checkbox-marked-circle-outline"
-          title="My Tasks"
-          rounded="lg"
-          class="mb-1"
+          @click="router.push({ name: 'employeeSchedule' })"
         />
         <v-list-item
           prepend-icon="mdi-account-circle-outline"
           title="Profile"
           rounded="lg"
           class="mb-1"
-          @click="router.push({ name: 'employeeProfile' })"
+          @click="router.push({ name: 'profile' })"
         />
       </v-list>
     </v-navigation-drawer>
@@ -333,7 +322,7 @@ onMounted(() => {
             </div>
             <v-divider class="mb-2" />
             <v-list density="compact" class="pa-0">
-              <v-list-item prepend-icon="mdi-account" title="Profile" @click="router.push({ name: 'employeeProfile' })" />
+              <v-list-item prepend-icon="mdi-account" title="Profile" @click="router.push({ name: 'profile' })" />
               <v-list-item
                 prepend-icon="mdi-logout"
                 title="Sign Out"
@@ -519,7 +508,7 @@ onMounted(() => {
                     <v-icon start size="small">{{ scheduleStatus.icon }}</v-icon>
                     {{ scheduleStatus.status === 'approved' ? 'Approved' : 'Pending' }}
                   </v-chip>
-                  <v-btn variant="text" size="small" color="#4361EE" @click="router.push({ name: 'employeeAvailability' })">View Full Schedule</v-btn>
+                  <v-btn variant="text" size="small" color="#4361EE" @click="router.push({ name: 'employeeSchedule' })">View Full Schedule</v-btn>
                 </div>
               </v-card-title>
               <v-divider />
@@ -553,7 +542,7 @@ onMounted(() => {
                             <div class="shift-person">Sam W.</div>
                           </div>
                         </div>
-                        <div class="add-shift-btn">+ Add Shift</div>
+                        <div class="add-shift-btn" @click="openAddShift('Monday')">+ Add Shift</div>
                       </div>
 
                       <!-- TUE -->
@@ -565,7 +554,7 @@ onMounted(() => {
                           </div>
                           <p class="no-shifts-text">No shifts</p>
                         </div>
-                        <div class="add-shift-btn">+ Add Shift</div>
+                        <div class="add-shift-btn" @click="openAddShift('Tuesday')">+ Add Shift</div>
                       </div>
 
                       <!-- WED -->
@@ -581,7 +570,7 @@ onMounted(() => {
                             <div class="shift-status-text">Pending Swap</div>
                           </div>
                         </div>
-                        <div class="add-shift-btn">+ Add Shift</div>
+                        <div class="add-shift-btn" @click="openAddShift('Wednesday')">+ Add Shift</div>
                       </div>
 
                       <!-- THU -->
@@ -595,7 +584,7 @@ onMounted(() => {
                           </div>
                           <p class="no-shifts-text">No shifts</p>
                         </div>
-                        <div class="add-shift-btn">+ Add Shift</div>
+                        <div class="add-shift-btn" @click="openAddShift('Thursday')">+ Add Shift</div>
                       </div>
 
                       <!-- FRI -->
@@ -607,19 +596,19 @@ onMounted(() => {
                           </div>
                           <p class="no-shifts-text">No shifts</p>
                         </div>
-                        <div class="add-shift-btn">+ Add Shift</div>
+                        <div class="add-shift-btn" @click="openAddShift('Friday')">+ Add Shift</div>
                       </div>
 
                       <!-- SAT -->
                       <div class="calendar-day">
                         <p class="no-shifts-text">No shifts</p>
-                        <div class="add-shift-btn">+ Add Shift</div>
+                        <div class="add-shift-btn" @click="openAddShift('Saturday')">+ Add Shift</div>
                       </div>
 
                       <!-- SUN -->
                       <div class="calendar-day">
                         <p class="no-shifts-text">No shifts</p>
-                        <div class="add-shift-btn">+ Add Shift</div>
+                        <div class="add-shift-btn" @click="openAddShift('Sunday')">+ Add Shift</div>
                       </div>
                     </div>
                   </div>
@@ -659,6 +648,53 @@ onMounted(() => {
         </v-row>
       </v-container>
     </v-main>
+    <!-- Add Shift Dialog -->
+    <v-dialog v-model="showAddShiftDialog" max-width="420" persistent>
+      <v-card rounded="lg">
+        <v-card-title class="text-h6 font-weight-bold pa-5 pb-3">
+          Request Shift — {{ selectedDay }}
+        </v-card-title>
+        <v-divider />
+        <v-card-text class="pa-5">
+          <p class="text-body-2 text-grey mb-4">Your request will be sent to your manager for approval.</p>
+          <div class="d-flex gap-3">
+            <div class="flex-grow-1">
+              <label class="text-caption font-weight-medium d-block mb-1">Start Time</label>
+              <v-text-field
+                v-model="newShiftStart"
+                type="time"
+                variant="outlined"
+                density="comfortable"
+                hide-details
+              />
+            </div>
+            <div class="flex-grow-1">
+              <label class="text-caption font-weight-medium d-block mb-1">End Time</label>
+              <v-text-field
+                v-model="newShiftEnd"
+                type="time"
+                variant="outlined"
+                density="comfortable"
+                hide-details
+              />
+            </div>
+          </div>
+        </v-card-text>
+        <v-card-actions class="pa-5 pt-2">
+          <v-spacer />
+          <v-btn variant="text" @click="showAddShiftDialog = false">Cancel</v-btn>
+          <v-btn
+            color="#12086F"
+            variant="flat"
+            :disabled="!newShiftStart || !newShiftEnd"
+            @click="submitShiftRequest"
+          >
+            Submit Request
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-snackbar v-model="snackbar" :color="snackbarColor" timeout="3000" location="bottom right">
       {{ snackbarMsg }}
     </v-snackbar>
@@ -885,6 +921,8 @@ onMounted(() => {
   margin: 4px 0;
   padding: 4px 0;
 }
+
+.gap-3 { gap: 12px; }
 
 .add-shift-btn {
   width: 100%;

@@ -5,6 +5,7 @@ import AuthServices from "../services/authServices";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
+
 const user = ref(null);
 const title = ref("ShiftBoard");
 const initials = ref("");
@@ -89,6 +90,10 @@ onMounted(() => {
               {{ user.role }}
             </v-chip>
             <v-divider class="my-3"></v-divider>
+            <v-btn variant="text" color="primary" block @click="router.push('/profile')">
+              <v-icon start>mdi-account-cog</v-icon>
+              View Profile
+            </v-btn>
             <v-btn variant="text" color="error" block @click="logout">
               <v-icon start>mdi-logout</v-icon>
               Logout

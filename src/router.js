@@ -2,12 +2,15 @@ import { createRouter, createWebHistory } from "vue-router";
 import Utils from "./config/utils";
 
 // ─── IMPORTS ──────────────────────────────────────────────────────────────
+import Landing from "./views/Landing.vue";  // ✅ ADDED
+import GuestDashboard from "./views/GuestDashboard.vue";  // ✅ ADDED
 import Login from "./views/Login.vue";
 import SignUp from "./views/SignUp.vue";
 import RoleSelect from "./views/RoleSelect.vue";
 import AdminViewDashboard from "./views/adminViewDashboard.vue";
 import EmployeeDashboard from "./views/EmployeeDashboard.vue";
 import EmployeeAvailability from "./views/EmployeeAvailabiliy.vue";
+import EmployeeSchedule from "./views/EmployeeSchedule.vue";
 import BusinessAreaSelect from "./views/BusinessAreaSelect.vue";
 import EmployerDashboard from "./views/EmployerDashboard.vue";
 import EmployerSchedule from "./views/EmployerSchedule.vue";
@@ -20,13 +23,24 @@ import EmployerProfile from "./views/EmployerProfile.vue";
 import Workplace from "./views/Workplace.vue";  
 import Profile from "./views/Profile.vue";  
 
+// ─── ROUTER ───────────────────────────────────────────────────────────────
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    // ─── LANDING & GUEST ROUTES ────────────────────────────────────────
     {
       path: "/",
-      redirect: "/login",
+      name: "landing",  // ✅ CHANGED from redirect to actual landing page
+      component: Landing,
+      meta: { requiresAuth: false },
     },
+    {
+      path: "/guest",  // ✅ ADDED
+      name: "guestDashboard",
+      component: GuestDashboard,
+      meta: { requiresAuth: false },
+    },
+    // ─── AUTH ROUTES ───────────────────────────────────────────────────
     {
       path: "/signup",
       name: "signup",
@@ -80,6 +94,12 @@ const router = createRouter({
       path: "/employee/availability",
       name: "employeeAvailability",
       component: EmployeeAvailability,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/employee/schedule",
+      name: "employeeSchedule",
+      component: EmployeeSchedule,
       meta: { requiresAuth: true },
     },
     // ─── EMPLOYER ROUTES ────────────────────────────────────────────────
@@ -144,14 +164,21 @@ const router = createRouter({
     // ─── CATCH ALL ──────────────────────────────────────────────────────
     {
       path: "/:pathMatch(.*)*",
-      redirect: "/login",
+      redirect: "/",  // ✅ CHANGED to redirect to landing instead of login
     },
   ],
 });
 
 router.beforeEach((to, from, next) => {
   const user = Utils.getStore("user");
+  const isGuest = localStorage.getItem("isGuest");  // ✅ ADDED
   const requiresAuth = to.meta.requiresAuth;
+
+  // Allow guest mode to access guestDashboard  // ✅ ADDED
+  if (to.name === "guestDashboard" && isGuest) {
+    next();
+    return;
+  }
 
   if (requiresAuth && !user) {
     console.log("Not authenticated, redirecting to login");
