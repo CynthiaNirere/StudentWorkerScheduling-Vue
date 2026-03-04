@@ -78,6 +78,9 @@ export default {
  
   // SHIFT SWAP REQUESTS
 
+  getAllShiftSwapRequests() {
+    return apiClient.get("/shift-swap-requests");
+  },
 
   getAllShiftSwapRequests() {
     return apiClient.get("/shift-swaps", addDemoHeader());
@@ -240,6 +243,18 @@ export default {
     return apiClient.get(`/business-areas/${id}`, addDemoHeader());
   },
 
+  createLocation(location) {
+    return apiClient.post("/business-areas", location);
+  },
+
+  updateLocation(id, location) {
+    return apiClient.put(`/business-areas/${id}`, location);
+  },
+
+  deleteLocation(id) {
+    return apiClient.delete(`/business-areas/${id}`);
+  },
+
   // JOB ROLES
 
   getAllJobRoles() {
@@ -248,6 +263,18 @@ export default {
 
   getJobRoleById(id) {
     return apiClient.get(`/job-roles/${id}`, addDemoHeader());
+  },
+
+  createJobRole(jobRole) {
+    return apiClient.post("/job-roles", jobRole);
+  },
+
+  updateJobRole(id, jobRole) {
+    return apiClient.put(`/job-roles/${id}`, jobRole);
+  },
+
+  deleteJobRole(id) {
+    return apiClient.delete(`/job-roles/${id}`);
   },
 
   // CLOCK IN/OUT

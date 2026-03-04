@@ -30,7 +30,7 @@ const newEmployee = ref({
   last_name: "",
   email: "",
   phone_number: "",
-  role: "employee",
+  job_role: "", // NEW: Job role as text field
 });
 
 const editForm = ref({
@@ -38,14 +38,14 @@ const editForm = ref({
   last_name: "",
   email: "",
   phone_number: "",
-  role: "employee",
+  job_role: "", // NEW: Job role as text field
 });
 
 const headers = [
   { title: "Name", key: "name", sortable: true },
   { title: "Email", key: "email", sortable: true },
   { title: "Phone", key: "phone_number", sortable: true },
-  { title: "Role", key: "role", sortable: true },
+  { title: "Job Role", key: "job_role", sortable: true }, // CHANGED: From "Role" to "Job Role"
   { title: "Actions", key: "actions", sortable: false },
 ];
 
@@ -54,11 +54,12 @@ const employeesWithName = computed(() => {
   return employees.value
     .filter(e => {
       const empId = e.user_id || e.userId;
-      return empId !== currentUserId;
+      return empId !== currentUserId && e.role === 'employee'; // Only show employees
     })
     .map((e) => ({
       ...e,
       name: `${e.fName || e.first_name || ''} ${e.lName || e.last_name || ''}`.trim() || 'Unnamed',
+      job_role: e.job_role || 'Not assigned', // Display job role
     }));
 });
 
@@ -89,7 +90,10 @@ const handleAddEmployee = async () => {
 
   saving.value = true;
   try {
-    await EmployerService.createEmployee(newEmployee.value);
+    await EmployerService.createEmployee({
+      ...newEmployee.value,
+      role: 'employee', // Always create as employee
+    });
     showSnackbar("Employee added successfully!", "success");
     showAddDialog.value = false;
     newEmployee.value = {
@@ -97,7 +101,7 @@ const handleAddEmployee = async () => {
       last_name: "",
       email: "",
       phone_number: "",
-      role: "employee",
+      job_role: "",
     };
     await loadEmployees();
   } catch (err) {
@@ -115,7 +119,7 @@ const openEditDialog = (employee) => {
     last_name: employee.lName || employee.last_name || "",
     email: employee.email || "",
     phone_number: employee.phone_number || "",
-    role: employee.role || "employee",
+    job_role: employee.job_role || "", // Load job role
   };
   showEditDialog.value = true;
 };
@@ -190,7 +194,7 @@ const showSnackbar = (message, color = "success") => {
         <div>
           <h1 class="text-h4 font-weight-bold navy-text">Employee Management</h1>
           <p class="text-body-2 text-grey">
-            Manage your team members
+            Manage your team members and their job roles
           </p>
         </div>
         <v-btn
@@ -229,13 +233,13 @@ const showSnackbar = (message, color = "success") => {
               </div>
             </template>
 
-            <template #item.role="{ item }">
+            <template #item.job_role="{ item }">
               <v-chip
-                :color="item.role === 'employer' ? '#12086F' : '#4361EE'"
+                :color="item.job_role === 'Not assigned' ? '#9e9e9e' : '#4361EE'"
                 size="small"
                 variant="tonal"
               >
-                {{ item.role }}
+                {{ item.job_role }}
               </v-chip>
             </template>
 
@@ -319,12 +323,15 @@ const showSnackbar = (message, color = "success") => {
             class="mb-3"
             color="#12086F"
           />
-          <v-select
-            v-model="newEmployee.role"
-            :items="['employee', 'employer']"
-            label="Role"
+          <!-- NEW: Job Role as text field -->
+          <v-text-field
+            v-model="newEmployee.job_role"
+            label="Job Role"
             variant="outlined"
             density="compact"
+            placeholder="e.g., Barista, Front Desk, Advocate"
+            hint="Enter the job role for this employee"
+            persistent-hint
             color="#12086F"
           />
         </v-card-text>
@@ -389,14 +396,20 @@ const showSnackbar = (message, color = "success") => {
             class="mb-3"
             color="#12086F"
           />
-          <v-select
-            v-model="editForm.role"
-            :items="['employee', 'employer']"
-            label="Role"
+          <!-- NEW: Job Role as text field (not dropdown) -->
+          <v-text-field
+            v-model="editForm.job_role"
+            label="Job Role"
             variant="outlined"
             density="compact"
+            placeholder="e.g., Barista, Front Desk, Advocate"
+            hint="Enter the job role for this employee"
+            persistent-hint
             color="#12086F"
           />
+          <v-alert type="info" variant="tonal" density="compact" color="#4361EE" class="mt-3">
+            System roles (employee/employer) cannot be changed here.
+          </v-alert>
         </v-card-text>
         <v-divider />
         <v-card-actions class="pa-4">
@@ -467,9 +480,9 @@ const showSnackbar = (message, color = "success") => {
             <div class="text-body-1">{{ selectedEmployee.phone_number || "N/A" }}</div>
           </div>
           <div class="mb-3">
-            <div class="text-caption text-grey">Role</div>
-            <v-chip :color="selectedEmployee.role === 'employer' ? '#12086F' : '#4361EE'" size="small" variant="tonal">
-              {{ selectedEmployee.role }}
+            <div class="text-caption text-grey">Job Role</div>
+            <v-chip :color="selectedEmployee.job_role ? '#4361EE' : '#9e9e9e'" size="small" variant="tonal">
+              {{ selectedEmployee.job_role || "Not assigned" }}
             </v-chip>
           </div>
           <div class="mb-3">
