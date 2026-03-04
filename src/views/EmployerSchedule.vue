@@ -252,9 +252,9 @@ const handleCreateShift = async () => {
       }
     }
     
-    // CRITICAL TIMEZONE FIX: Set to noon local time
-    const shiftDate = new Date(newShift.value.date);
-    shiftDate.setHours(12, 0, 0, 0);
+    // CRITICAL TIMEZONE FIX: Parse as local date, not UTC
+    const [year, month, day] = newShift.value.date.split('-').map(Number);
+    const shiftDate = new Date(year, month - 1, day, 12, 0, 0, 0);
     const shiftTime = shiftDate.getTime();
     
     console.log("Creating shift:", {
