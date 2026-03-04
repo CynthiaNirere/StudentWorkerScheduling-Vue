@@ -10,11 +10,12 @@ const user = ref(null);
 
 const shifts = ref([]);
 const employees = ref([]);
-const locations = ref([]);
+const availability = ref([]);
 const jobRoles = ref([]);
-const selectedLocation = ref(null);
 const selectedWeek = ref(new Date());
+const selectedDay = ref(null);
 const loadingShifts = ref(false);
+const loadingAvailability = ref(false);
 
 const showCreateShiftDialog = ref(false);
 const showDeleteDialog = ref(false);
@@ -28,34 +29,49 @@ const snackbar = ref(false);
 const snackbarMessage = ref("");
 const snackbarColor = ref("success");
 
+// NEW: Separate hour/minute/ampm for better UX
 const newShift = ref({
   date: "",
-  startTime: "",
-  endTime: "",
+  startHour: "9",
+  startMinute: "00",
+  startAmPm: "AM",
+  endHour: "5",
+  endMinute: "00",
+  endAmPm: "PM",
   userId: "",
-  jobRoleId: "",
+  jobRole: "",
   notes: "",
 });
 
 onMounted(async () => {
   user.value = Utils.getStore("user");
-  await Promise.all([loadEmployees(), loadLocations(), loadJobRoles()]);
+  await Promise.all([loadEmployees(), loadJobRoles(), loadAllAvailability()]);
   await loadShifts();
 });
 
 const weekDays = computed(() => {
   const labels = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  const monday = getMonday(selectedWeek.value);
+  const sunday = getMonday(selectedWeek.value);
 
   return labels.map((label, i) => {
-    const date = new Date(monday);
-    date.setDate(monday.getDate() + i);
+    const date = new Date(sunday);
+    date.setDate(sunday.getDate() + i);
+    
+    // Get shifts for this day
     const dayShifts = shifts.value.filter((s) => {
       const shiftTime = s.shiftTime || s.shift_time;
       const d = new Date(Number(shiftTime));
       return d.toDateString() === date.toDateString();
     });
-    return { label, dateNum: date.getDate(), fullDate: date, shifts: dayShifts };
+    
+    // SORT SHIFTS BY START TIME (earliest to latest)
+    const sortedShifts = dayShifts.sort((a, b) => {
+      const aStart = a.start_time || a.startTime;
+      const bStart = b.start_time || b.startTime;
+      return aStart - bStart;
+    });
+    
+    return { label, dateNum: date.getDate(), fullDate: date, dayOfWeek: i, shifts: sortedShifts };
   });
 });
 
@@ -70,6 +86,74 @@ const schedulePublished = computed(() =>
   shifts.value.some((s) => s.status === "published")
 );
 
+// Convert 12-hour time to minutes
+const convertToMinutes = (hour, minute, ampm) => {
+  let h = parseInt(hour);
+  const m = parseInt(minute);
+  
+  if (ampm === "PM" && h !== 12) h += 12;
+  if (ampm === "AM" && h === 12) h = 0;
+  
+  return h * 60 + m;
+};
+
+// Get computed start/end times for availability filtering
+const shiftStartMinutes = computed(() => 
+  convertToMinutes(newShift.value.startHour, newShift.value.startMinute, newShift.value.startAmPm)
+);
+
+const shiftEndMinutes = computed(() => 
+  convertToMinutes(newShift.value.endHour, newShift.value.endMinute, newShift.value.endAmPm)
+);
+
+// SMART FILTERING with time-based availability
+const availableEmployees = computed(() => {
+  if (!selectedDay.value) return employees.value;
+  
+  const dayOfWeek = selectedDay.value.dayOfWeek;
+  const shiftStart = shiftStartMinutes.value;
+  const shiftEnd = shiftEndMinutes.value;
+  
+  const hasTime = shiftStart > 0 || shiftEnd > 0;
+  
+  return employees.value.filter(emp => {
+    const empId = emp.user_id || emp.userId;
+    const empAvailability = availability.value.filter(a => 
+      (a.userId || a.user_id) === empId && 
+      (a.dayOfWeek || a.day_of_week) === dayOfWeek &&
+      (a.isActive || a.is_active) === 1
+    );
+    
+    if (empAvailability.length === 0) return false;
+    
+    if (hasTime && shiftStart > 0 && shiftEnd > 0 && shiftEnd > shiftStart) {
+      const buffer = 30;
+      const shiftStartWithBuffer = shiftStart - buffer;
+      const shiftEndWithBuffer = shiftEnd + buffer;
+      
+      const hasOverlap = empAvailability.some(slot => {
+        const availStart = slot.startTime || slot.start_time;
+        const availEnd = slot.endTime || slot.end_time;
+        return availStart <= shiftStartWithBuffer && availEnd >= shiftEndWithBuffer;
+      });
+      
+      return hasOverlap;
+    }
+    
+    return true;
+  }).map(emp => {
+    const empId = emp.user_id || emp.userId;
+    const empAvailability = availability.value.filter(a => 
+      (a.userId || a.user_id) === empId && 
+      (a.dayOfWeek || a.day_of_week) === dayOfWeek
+    );
+    return {
+      ...emp,
+      availabilitySlots: empAvailability
+    };
+  });
+});
+
 const loadShifts = async () => {
   loadingShifts.value = true;
   try {
@@ -77,12 +161,8 @@ const loadShifts = async () => {
     const startDate = monday.getTime();
     const endDate = startDate + 7 * 24 * 60 * 60 * 1000;
 
-    const res = selectedLocation.value
-      ? await EmployerService.getShiftsByLocation(selectedLocation.value)
-      : await EmployerService.getShiftsByWeek(startDate, endDate);
-
+    const res = await EmployerService.getShiftsByWeek(startDate, endDate);
     shifts.value = Array.isArray(res.data) ? res.data : [];
-    console.log('Shifts loaded:', shifts.value);
   } catch (err) {
     console.error("Error loading shifts:", err);
     shifts.value = [];
@@ -95,18 +175,26 @@ const loadEmployees = async () => {
   try {
     const res = await EmployerService.getAllEmployees();
     const all = Array.isArray(res.data) ? res.data : [];
-    employees.value = all.filter((u) => u.role === "employee");
+    const currentUserId = user.value?.user_id || user.value?.userId;
+    employees.value = all.filter((u) => {
+      const empId = u.user_id || u.userId;
+      return u.role === "employee" && empId !== currentUserId;
+    });
   } catch (err) {
     console.error("Error loading employees:", err);
   }
 };
 
-const loadLocations = async () => {
+const loadAllAvailability = async () => {
+  loadingAvailability.value = true;
   try {
-    const res = await EmployerService.getAllLocations();
-    locations.value = Array.isArray(res.data) ? res.data : [];
+    const res = await EmployerService.getAllAvailability();
+    availability.value = Array.isArray(res.data) ? res.data : [];
   } catch (err) {
-    console.error("Error loading locations:", err);
+    console.error("Error loading availability:", err);
+    availability.value = [];
+  } finally {
+    loadingAvailability.value = false;
   }
 };
 
@@ -119,35 +207,90 @@ const loadJobRoles = async () => {
   }
 };
 
+const openCreateShiftForDay = (day) => {
+  selectedDay.value = day;
+  newShift.value.date = day.fullDate.toISOString().split('T')[0];
+  showCreateShiftDialog.value = true;
+};
+
 const handleCreateShift = async () => {
-  if (!newShift.value.date || !newShift.value.startTime || !newShift.value.endTime) {
-    showSnackbar("Please fill in date, start time, and end time", "error");
+  if (!newShift.value.date) {
+    showSnackbar("Please select a date", "error");
     return;
   }
   
-  if (!newShift.value.jobRoleId) {
-    showSnackbar("Please select a job role", "error");
+  const startMinutes = shiftStartMinutes.value;
+  const endMinutes = shiftEndMinutes.value;
+  
+  if (endMinutes <= startMinutes) {
+    showSnackbar("End time must be after start time", "error");
+    return;
+  }
+  
+  if (!newShift.value.jobRole || newShift.value.jobRole.trim() === '') {
+    showSnackbar("Please enter a job role", "error");
     return;
   }
   
   creatingShift.value = true;
   try {
-    const shiftTime = new Date(newShift.value.date).getTime();
+    let jobRoleId = null;
+    const trimmedRole = newShift.value.jobRole.trim();
+    
+    const existingRole = jobRoles.value.find(r => 
+      r.title.toLowerCase() === trimmedRole.toLowerCase()
+    );
+    
+    if (existingRole) {
+      jobRoleId = existingRole.job_role_id;
+    } else {
+      if (jobRoles.value.length > 0) {
+        jobRoleId = jobRoles.value[0].job_role_id;
+        console.warn(`Job role "${trimmedRole}" not found, using default role`);
+      } else {
+        jobRoleId = 1;
+      }
+    }
+    
+    // CRITICAL TIMEZONE FIX: Set to noon local time
+    const shiftDate = new Date(newShift.value.date);
+    shiftDate.setHours(12, 0, 0, 0);
+    const shiftTime = shiftDate.getTime();
+    
+    console.log("Creating shift:", {
+      date: newShift.value.date,
+      shiftTime: shiftTime,
+      dateCheck: new Date(shiftTime).toLocaleDateString()
+    });
+    
     await EmployerService.createShift({
       shiftTime,
-      startTime: timeToMinutes(newShift.value.startTime),
-      endTime: timeToMinutes(newShift.value.endTime),
+      startTime: startMinutes,
+      endTime: endMinutes,
       userId: newShift.value.userId || null,
       notes: newShift.value.notes || null,
-      locationId: selectedLocation.value || user.value?.work_location || 1,
-      jobRoleId: newShift.value.jobRoleId,
+      locationId: user.value?.work_location || 1,
+      jobRoleId: jobRoleId,
       status: "draft",
       createdBy: user.value?.user_id || user.value?.userId || 'system',
       createdAt: Date.now(),
     });
+    
     showSnackbar("Shift created successfully!", "success");
     showCreateShiftDialog.value = false;
-    newShift.value = { date: "", startTime: "", endTime: "", userId: "", jobRoleId: "", notes: "" };
+    selectedDay.value = null;
+    newShift.value = {
+      date: "",
+      startHour: "9",
+      startMinute: "00",
+      startAmPm: "AM",
+      endHour: "5",
+      endMinute: "00",
+      endAmPm: "PM",
+      userId: "",
+      jobRole: "",
+      notes: "",
+    };
     await loadShifts();
   } catch (err) {
     console.error('Create shift error:', err);
@@ -221,12 +364,6 @@ const nextWeek = () => {
   loadShifts();
 };
 
-const timeToMinutes = (timeStr) => {
-  if (!timeStr) return 0;
-  const [h, m] = timeStr.split(":").map(Number);
-  return h * 60 + m;
-};
-
 const formatShiftTime = (minutes) => {
   if (minutes === undefined || minutes === null) return "";
   const h = Math.floor(minutes / 60);
@@ -256,11 +393,26 @@ const getEmployeeName = (shift) => {
   return shift.employee_name || shift.employeeName || "Unassigned";
 };
 
+const formatAvailabilitySlots = (employee) => {
+  if (!employee.availabilitySlots || employee.availabilitySlots.length === 0) {
+    return "No availability";
+  }
+  return employee.availabilitySlots.map(slot => {
+    const start = formatShiftTime(slot.startTime || slot.start_time);
+    const end = formatShiftTime(slot.endTime || slot.end_time);
+    return `${start}-${end}`;
+  }).join(", ");
+};
+
 const showSnackbar = (message, color = "success") => {
   snackbarMessage.value = message;
   snackbarColor.value = color;
   snackbar.value = true;
 };
+
+const hours = Array.from({length: 12}, (_, i) => (i + 1).toString());
+const minutes = ["00", "15", "30", "45"];
+const ampmOptions = ["AM", "PM"];
 </script>
 
 <template>
@@ -275,19 +427,6 @@ const showSnackbar = (message, color = "success") => {
           </p>
         </div>
         <div class="d-flex ga-3 align-center">
-          <v-select
-            v-model="selectedLocation"
-            :items="locations"
-            item-title="name"
-            item-value="location_id"
-            label="Location"
-            variant="outlined"
-            density="compact"
-            style="min-width: 200px"
-            clearable
-            color="#12086F"
-            @update:model-value="loadShifts"
-          />
           <v-chip
             :color="schedulePublished ? '#2e7d32' : '#f57c00'"
             variant="tonal"
@@ -352,7 +491,7 @@ const showSnackbar = (message, color = "success") => {
               <div class="text-caption text-white-80">{{ day.dateNum }}</div>
             </div>
 
-            <!-- Shifts -->
+            <!-- Shifts (SORTED BY TIME) -->
             <div class="schedule-day-body">
               <div
                 v-for="shift in day.shifts"
@@ -401,7 +540,7 @@ const showSnackbar = (message, color = "success") => {
               <!-- Add shift button -->
               <div
                 class="add-shift-btn"
-                @click="newShift.date = day.fullDate.toISOString().split('T')[0]; showCreateShiftDialog = true"
+                @click="openCreateShiftForDay(day)"
               >
                 + Add Shift
               </div>
@@ -412,10 +551,13 @@ const showSnackbar = (message, color = "success") => {
     </v-container>
 
     <!-- Create Shift Dialog -->
-    <v-dialog v-model="showCreateShiftDialog" max-width="500">
+    <v-dialog v-model="showCreateShiftDialog" max-width="600">
       <v-card rounded="lg">
         <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4 navy-text">
           Create New Shift
+          <span v-if="selectedDay" class="text-body-2 text-grey ml-2">
+            - {{ selectedDay.label }}, {{ selectedDay.fullDate.toLocaleDateString() }}
+          </span>
         </v-card-title>
         <v-divider />
         <v-card-text class="pa-5">
@@ -428,43 +570,93 @@ const showSnackbar = (message, color = "success") => {
             class="mb-3"
             color="#12086F"
           />
-          <v-row dense>
-            <v-col cols="6">
-              <v-text-field
-                v-model="newShift.startTime"
-                label="Start Time *"
-                type="time"
+          
+          <!-- Better Time Inputs with AM/PM -->
+          <div class="text-caption text-grey mb-1">Start Time *</div>
+          <v-row dense class="mb-3">
+            <v-col cols="4">
+              <v-select
+                v-model="newShift.startHour"
+                :items="hours"
+                label="Hour"
                 variant="outlined"
                 density="compact"
                 color="#12086F"
               />
             </v-col>
-            <v-col cols="6">
-              <v-text-field
-                v-model="newShift.endTime"
-                label="End Time *"
-                type="time"
+            <v-col cols="4">
+              <v-select
+                v-model="newShift.startMinute"
+                :items="minutes"
+                label="Min"
+                variant="outlined"
+                density="compact"
+                color="#12086F"
+              />
+            </v-col>
+            <v-col cols="4">
+              <v-select
+                v-model="newShift.startAmPm"
+                :items="ampmOptions"
                 variant="outlined"
                 density="compact"
                 color="#12086F"
               />
             </v-col>
           </v-row>
-          <v-select
-            v-model="newShift.jobRoleId"
-            :items="jobRoles"
-            item-title="title"
-            item-value="job_role_id"
+          
+          <div class="text-caption text-grey mb-1">End Time *</div>
+          <v-row dense class="mb-3">
+            <v-col cols="4">
+              <v-select
+                v-model="newShift.endHour"
+                :items="hours"
+                label="Hour"
+                variant="outlined"
+                density="compact"
+                color="#12086F"
+              />
+            </v-col>
+            <v-col cols="4">
+              <v-select
+                v-model="newShift.endMinute"
+                :items="minutes"
+                label="Min"
+                variant="outlined"
+                density="compact"
+                color="#12086F"
+              />
+            </v-col>
+            <v-col cols="4">
+              <v-select
+                v-model="newShift.endAmPm"
+                :items="ampmOptions"
+                variant="outlined"
+                density="compact"
+                color="#12086F"
+              />
+            </v-col>
+          </v-row>
+          
+          <v-text-field
+            v-model="newShift.jobRole"
             label="Job Role *"
             variant="outlined"
             density="compact"
             class="mb-3"
             color="#12086F"
+            placeholder="e.g., Barista, Front Desk, Server"
           />
+          
+          <!-- Smart employee selector -->
           <v-select
             v-model="newShift.userId"
-            :items="employees"
-            :item-title="(e) => `${e.fName || e.first_name || ''} ${e.lName || e.last_name || ''}`"
+            :items="selectedDay ? availableEmployees : employees"
+            :item-title="(e) => {
+              const name = `${e.fName || e.first_name || ''} ${e.lName || e.last_name || ''}`;
+              const avail = selectedDay && e.availabilitySlots ? ` (${formatAvailabilitySlots(e)})` : '';
+              return name + avail;
+            }"
             item-value="user_id"
             label="Assign Employee (optional)"
             variant="outlined"
@@ -472,7 +664,18 @@ const showSnackbar = (message, color = "success") => {
             clearable
             class="mb-3"
             color="#12086F"
-          />
+          >
+            <template #prepend-item v-if="selectedDay && availableEmployees.length > 0">
+              <v-list-item>
+                <v-list-item-title class="text-caption text-grey">
+                  <v-icon size="small" class="mr-1">mdi-information</v-icon>
+                  {{ availableEmployees.length }} employee(s) available for this time
+                </v-list-item-title>
+              </v-list-item>
+              <v-divider class="my-2"></v-divider>
+            </template>
+          </v-select>
+
           <v-textarea
             v-model="newShift.notes"
             label="Notes (optional)"
@@ -485,7 +688,7 @@ const showSnackbar = (message, color = "success") => {
         <v-divider />
         <v-card-actions class="pa-4">
           <v-spacer />
-          <v-btn variant="text" @click="showCreateShiftDialog = false">Cancel</v-btn>
+          <v-btn variant="text" @click="showCreateShiftDialog = false; selectedDay = null">Cancel</v-btn>
           <v-btn
             color="#12086F"
             variant="flat"
@@ -498,7 +701,7 @@ const showSnackbar = (message, color = "success") => {
       </v-card>
     </v-dialog>
 
-    <!-- Delete Confirmation Dialog -->
+    <!-- Delete Dialog -->
     <v-dialog v-model="showDeleteDialog" max-width="400">
       <v-card rounded="lg">
         <v-card-title class="text-h6 pa-5 pb-4">Confirm Delete</v-card-title>
@@ -513,14 +716,11 @@ const showSnackbar = (message, color = "success") => {
             {{ formatShiftTime(shiftToDelete.end_time || shiftToDelete.endTime) }}<br>
             {{ getEmployeeName(shiftToDelete) }}
           </p>
-          <p class="text-body-2 text-grey">
-            This action cannot be undone.
-          </p>
         </v-card-text>
         <v-divider />
         <v-card-actions class="pa-4">
           <v-spacer />
-          <v-btn variant="text" @click="showDeleteDialog = false" :disabled="deleting">Cancel</v-btn>
+          <v-btn variant="text" @click="showDeleteDialog = false">Cancel</v-btn>
           <v-btn
             color="error"
             variant="flat"
