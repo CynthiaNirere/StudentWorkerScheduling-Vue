@@ -3,11 +3,14 @@ import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import Utils from '../config/utils.js';
 import EmployerService from '../services/employerServices.js';
+import { useNotifications } from '../composables/useNotifications.js';
 
 const router       = useRouter();
 const user         = ref(null);
 const rail         = ref(true);
 const businessArea = ref('The Brew');
+const showNotifications = ref(false);
+const { notifications, unreadCount, dismissNotification, handleNotificationAction } = useNotifications();
 
 // ── WEEK NAVIGATION ───────────────────────────────────────────────────────
 const currentWeekStart = ref(getMonday(new Date()));
@@ -310,14 +313,55 @@ onUnmounted(() => {
         <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" rounded="lg" class="mb-1"
           @click="router.push({ name: 'employeeDashboard' })" />
         <v-list-item prepend-icon="mdi-clock-outline" title="My Availability" active rounded="lg" class="mb-1" />
-        <v-list-item prepend-icon="mdi-calendar-clock" title="Shift Requests" rounded="lg" class="mb-1" />
-        <v-list-item prepend-icon="mdi-checkbox-marked-circle-outline" title="My Tasks" rounded="lg" class="mb-1" />
+        <v-list-item prepend-icon="mdi-calendar-month" title="Team Schedule" rounded="lg" class="mb-1"
+          @click="router.push({ name: 'employeeSchedule' })" />
+        <v-list-item prepend-icon="mdi-account-circle-outline" title="Profile" rounded="lg" class="mb-1"
+          @click="router.push({ name: 'profile' })" />
       </v-list>
     </v-navigation-drawer>
 
     <!-- ── App Bar ───────────────────────────────────────────────────────── -->
     <v-app-bar color="white" elevation="0" style="border-bottom:1px solid #e0e0e0" density="compact">
       <v-spacer />
+
+      <!-- Notification Bell -->
+      <v-menu location="bottom" v-model="showNotifications">
+        <template v-slot:activator="{ props }">
+          <v-btn v-bind="props" icon class="mr-1">
+            <v-badge :content="unreadCount" :model-value="unreadCount > 0" color="error">
+              <v-icon>mdi-bell</v-icon>
+            </v-badge>
+          </v-btn>
+        </template>
+        <v-card min-width="400" max-width="500" style="max-height:500px;overflow-y:auto">
+          <v-card-title class="text-h6 font-weight-bold pa-4">Notifications</v-card-title>
+          <v-divider />
+          <div v-if="notifications.length === 0" class="text-center pa-6">
+            <p class="text-grey">No notifications</p>
+          </div>
+          <div v-else>
+            <div v-for="n in notifications" :key="n.id" class="pa-4" style="border-bottom:1px solid #f0f0f0">
+              <div class="d-flex ga-3">
+                <v-icon color="primary" size="large">{{ n.icon }}</v-icon>
+                <div class="flex-grow-1">
+                  <div class="d-flex justify-space-between align-start mb-1">
+                    <p class="text-body-2 font-weight-bold mb-0">{{ n.type }}</p>
+                    <v-btn icon size="x-small" variant="text" @click="dismissNotification(n.id)">
+                      <v-icon size="small">mdi-close</v-icon>
+                    </v-btn>
+                  </div>
+                  <p class="text-body-2 mb-1">{{ n.message }}</p>
+                  <p class="text-caption text-grey mb-2">{{ n.timestamp }}</p>
+                  <v-btn v-if="n.action" size="small" color="primary" variant="flat" @click="handleNotificationAction(n.id)">
+                    {{ n.action }}
+                  </v-btn>
+                </div>
+              </div>
+            </div>
+          </div>
+        </v-card>
+      </v-menu>
+
       <v-menu location="bottom end">
         <template v-slot:activator="{ props }">
           <v-btn v-bind="props" icon size="small" class="mr-2">
@@ -335,7 +379,7 @@ onUnmounted(() => {
             </div>
             <v-divider class="mb-2" />
             <v-list density="compact" class="pa-0">
-              <v-list-item prepend-icon="mdi-account" title="Profile" @click="() => {}" />
+              <v-list-item prepend-icon="mdi-account" title="Profile" @click="router.push({ name: 'profile' })" />
               <v-list-item prepend-icon="mdi-logout" title="Sign Out" class="text-error" @click="logout" />
             </v-list>
           </v-card-text>

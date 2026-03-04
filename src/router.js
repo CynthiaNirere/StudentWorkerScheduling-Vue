@@ -10,6 +10,7 @@ import RoleSelect from "./views/RoleSelect.vue";
 import AdminViewDashboard from "./views/adminViewDashboard.vue";
 import EmployeeDashboard from "./views/EmployeeDashboard.vue";
 import EmployeeAvailability from "./views/EmployeeAvailabiliy.vue";
+import EmployeeSchedule from "./views/EmployeeSchedule.vue";
 import BusinessAreaSelect from "./views/BusinessAreaSelect.vue";
 import EmployerDashboard from "./views/EmployerDashboard.vue";
 import EmployerSchedule from "./views/EmployerSchedule.vue";
@@ -93,6 +94,12 @@ const router = createRouter({
       path: "/employee/availability",
       name: "employeeAvailability",
       component: EmployeeAvailability,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/employee/schedule",
+      name: "employeeSchedule",
+      component: EmployeeSchedule,
       meta: { requiresAuth: true },
     },
     // ─── EMPLOYER ROUTES ────────────────────────────────────────────────
