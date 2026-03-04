@@ -95,10 +95,10 @@ const confirmAction = async () => {
     const reqId = requestToAction.value.request_id || requestToAction.value.id;
     
     if (requestToAction.value.actionType === 'deny') {
-      await EmployerService.updateTimeOffRequest(reqId, { status: 'denied' });
+      await EmployerService.denyTimeOffRequest(reqId);
       showSnackbar("Time off request denied", "success");
     } else {
-      await EmployerService.updateTimeOffRequest(reqId, { status: 'approved' });
+      await EmployerService.approveTimeOffRequest(reqId);
       showSnackbar("Time off request approved!", "success");
     }
     
