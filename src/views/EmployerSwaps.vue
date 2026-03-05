@@ -126,6 +126,7 @@ const confirmAction = async () => {
     }
     
     await loadSwapRequests();
+    window.dispatchEvent(new Event('notifications-updated'));
   } catch (err) {
     console.error('Action error:', err);
     showSnackbar(`Error ${swapToAction.value.actionType}ing swap`, "error");

@@ -9,7 +9,6 @@ const router = useRouter();
 const user = ref(null);
 const loading = ref(true);
 
-const alerts = ref([]);
 const weeklySchedule = ref([]);
 const schedulePublished = ref(false);
 
@@ -66,45 +65,11 @@ onMounted(async () => {
 const loadDashboardData = async () => {
   loading.value = true;
   try {
-    await Promise.all([loadAlerts(), loadWeeklySchedule()]);
+    await loadWeeklySchedule();
   } catch (err) {
     console.error('Dashboard load error:', err);
   } finally {
     loading.value = false;
-  }
-};
-
-const loadAlerts = async () => {
-  try {
-    const userId = user.value?.userId || user.value?.user_id;
-    if (!userId) return;
-    
-    const [swapRes, timeOffRes] = await Promise.all([
-      EmployerService.getAllShiftSwapRequests().catch(() => ({ data: [] })),
-      EmployerService.getAllTimeOffRequests().catch(() => ({ data: [] })),
-    ]);
-    
-    const swaps = Array.isArray(swapRes.data) ? swapRes.data : [];
-    const timeOffs = Array.isArray(timeOffRes.data) ? timeOffRes.data : [];
-    
-    alerts.value = [
-      ...swaps.filter(s => s.status === 'pending').slice(0, 2).map(s => ({
-        id: `swap-${s.swap_id}`,
-        type: 'Shift Cover Request',
-        message: `Employee needs someone for ${formatShiftDate(s.shift_time)}`,
-        time: timeAgo(s.created_at),
-        actions: ['Approve', 'Deny'],
-      })),
-      ...timeOffs.filter(t => t.status === 'pending').slice(0, 1).map(t => ({
-        id: `timeoff-${t.request_id}`,
-        type: 'Time Off Request',
-        message: `Employee requested time off for ${formatDate(t.start_date)} - ${formatDate(t.end_date)}`,
-        time: timeAgo(t.created_at),
-        actions: ['Approve', 'Deny'],
-      })),
-    ];
-  } catch (err) {
-    console.error('Error loading alerts:', err);
   }
 };
 
@@ -121,11 +86,6 @@ weeklySchedule.value = allShifts.filter(s => s.status === 'published');
   } catch (err) {
     console.error('Error loading schedule:', err);
   }
-};
-
-const handleAction = async (alertId, action) => {
-  console.log('Action:', action, 'for alert:', alertId);
-  alerts.value = alerts.value.filter(a => a.id !== alertId);
 };
 
 const createSchedule = () => router.push({ name: 'employerSchedule' });
@@ -150,35 +110,6 @@ const formatShiftTime = (minutes) => {
   return `${hour}:${String(m).padStart(2, '0')}${ampm}`;
 };
 
-const formatShiftDate = (timestamp) => {
-  if (!timestamp) return '';
-  return new Date(Number(timestamp)).toLocaleDateString('en-US', {
-    weekday: 'short', month: 'short', day: 'numeric'
-  });
-};
-
-const formatDate = (timestamp) => {
-  if (!timestamp) return '';
-  return new Date(Number(timestamp)).toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric'
-  });
-};
-
-const timeAgo = (timestamp) => {
-  if (!timestamp) return '';
-  const diff = Date.now() - Number(timestamp);
-  const hours = Math.floor(diff / 3600000);
-  if (hours < 1) return 'Just now';
-  if (hours < 24) return `${hours} hours ago`;
-  const days = Math.floor(hours / 24);
-  return `${days} days ago`;
-};
-
-const getActionColor = (action) => {
-  if (action === 'Approve') return '#2e7d32';
-  if (action === 'Deny') return '#d32f2f';
-  return '#12086F';
-};
 </script>
 
 <template>
@@ -210,61 +141,6 @@ const getActionColor = (action) => {
           </v-btn>
         </v-col>
       </v-row>
-
-      <!-- Alerts & Notifications -->
-      <v-card class="mb-6 navy-card" variant="outlined" rounded="lg">
-        <v-card-title class="d-flex justify-space-between align-center pa-4">
-          <div class="d-flex align-center">
-            <v-icon color="#12086F" class="mr-2">mdi-bell-outline</v-icon>
-            <span class="text-h6 font-weight-bold">Alerts & Notifications</span>
-          </div>
-          <v-btn variant="text" size="small" color="#4361EE">View All</v-btn>
-        </v-card-title>
-        <v-divider />
-        <v-card-text class="pa-0">
-          <div v-if="loading" class="text-center py-8">
-            <v-progress-circular indeterminate color="#12086F" />
-          </div>
-          
-          <div v-else-if="alerts.length === 0" class="text-center py-8">
-            <v-icon color="#2e7d32" size="56">mdi-check-circle-outline</v-icon>
-            <p class="text-body-1 text-grey mt-3 mb-0">All caught up!</p>
-            <p class="text-caption text-grey">No pending alerts at the moment</p>
-          </div>
-          
-          <div v-else>
-            <div v-for="(alert, idx) in alerts" :key="alert.id" class="pa-4 alert-item"
-              :class="{ 'bg-grey-lighten-5': idx % 2 === 0 }">
-              <div class="d-flex justify-space-between align-start mb-2">
-                <div class="flex-grow-1">
-                  <v-chip size="small" color="#12086F" variant="tonal" class="mb-2">
-                    {{ alert.type }}
-                  </v-chip>
-                  <p class="text-body-1 mb-1">{{ alert.message }}</p>
-                  <p class="text-caption text-grey">
-                    <v-icon size="x-small" class="mr-1">mdi-clock-outline</v-icon>
-                    {{ alert.time }}
-                  </p>
-                </div>
-                <v-btn icon="mdi-close" size="small" variant="text" color="grey"
-                  @click="alerts.splice(idx, 1)" />
-              </div>
-              
-              <div class="d-flex gap-2 mt-3">
-                <v-btn v-for="action in alert.actions" :key="action"
-                  :color="getActionColor(action)"
-                  :variant="action === 'Approve' ? 'flat' : 'outlined'"
-                  size="small" @click="handleAction(alert.id, action)">
-                  <v-icon start size="small">
-                    {{ action === 'Approve' ? 'mdi-check' : 'mdi-close' }}
-                  </v-icon>
-                  {{ action }}
-                </v-btn>
-              </div>
-            </div>
-          </div>
-        </v-card-text>
-      </v-card>
 
       <!-- Schedule Preview -->
       <v-card class="navy-card" variant="outlined" rounded="lg">
@@ -398,14 +274,6 @@ const getActionColor = (action) => {
 .shift-item:hover {
   transform: scale(1.02);
   box-shadow: 0 2px 4px rgba(67, 97, 238, 0.2);
-}
-
-.alert-item {
-  transition: background-color 0.2s;
-}
-
-.alert-item:hover {
-  background-color: #f5f5f5 !important;
 }
 
 .gap-2 { gap: 8px; }

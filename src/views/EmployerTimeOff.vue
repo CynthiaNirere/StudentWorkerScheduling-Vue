@@ -103,6 +103,7 @@ const confirmAction = async () => {
     }
     
     await loadTimeOffRequests();
+    window.dispatchEvent(new Event('notifications-updated'));
   } catch (err) {
     console.error('Action error:', err);
     showSnackbar(`Error ${requestToAction.value.actionType === 'deny' ? 'denying' : 'approving'} request`, "error");
