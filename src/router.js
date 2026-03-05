@@ -36,12 +36,12 @@ const router = createRouter({
     // ─── LANDING & GUEST ROUTES ────────────────────────────────────────
     {
       path: "/",
-      name: "landing",
+      name: "landing",  //  CHANGED from redirect to actual landing page
       component: Landing,
       meta: { requiresAuth: false },
     },
     {
-      path: "/guest",
+      path: "/guest",  //  ADDED
       name: "guestDashboard",
       component: GuestDashboard,
       meta: { requiresAuth: false },
@@ -207,16 +207,17 @@ const router = createRouter({
     // ─── CATCH ALL ──────────────────────────────────────────────────────
     {
       path: "/:pathMatch(.*)*",
-      redirect: "/",
+      redirect: "/",  //  CHANGED to redirect to landing instead of login
     },
   ],
 });
 
 router.beforeEach((to, from, next) => {
   const user = Utils.getStore("user");
-  const isGuest = localStorage.getItem("isGuest");
+  const isGuest = localStorage.getItem("isGuest");  // 
   const requiresAuth = to.meta.requiresAuth;
 
+  // Allow guest mode to access guestDashboard  // 
   if (to.name === "guestDashboard" && isGuest) {
     next();
     return;
