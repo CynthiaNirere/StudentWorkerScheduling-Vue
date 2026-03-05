@@ -77,6 +77,36 @@ const router = createRouter({
       component: GuestSwaps,
       meta: { requiresAuth: false, isGuest: true },
     },
+    {
+      path: "/guest/schedule",
+      name: "guestSchedule",
+      component: GuestSchedule,
+      meta: { requiresAuth: false },
+    },
+    {
+      path: "/guest/employees",
+      name: "guestEmployees",
+      component: GuestEmployees,
+      meta: { requiresAuth: false },
+    },
+    {
+      path: "/guest/availability",
+      name: "guestAvailability",
+      component: GuestAvailability,
+      meta: { requiresAuth: false },
+    },
+    {
+      path: "/guest/time-off",
+      name: "guestTimeOff",
+      component: GuestTimeOff,
+      meta: { requiresAuth: false },
+    },
+    {
+      path: "/guest/swaps",
+      name: "guestSwaps",
+      component: GuestSwaps,
+      meta: { requiresAuth: false },
+    },
     // ─── AUTH ROUTES ───────────────────────────────────────────────────
     {
       path: "/signup",
@@ -199,6 +229,35 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+  path: "/guest/schedule",
+  name: "guestSchedule",
+  component: GuestSchedule,
+  meta: { requiresAuth: false },
+    },
+    {
+  path: "/guest/employees",
+  name: "guestEmployees",
+  component: GuestEmployees,
+  meta: { requiresAuth: false },
+},
+{
+  path: "/guest/availability",
+  name: "guestAvailability",
+  component: GuestAvailability,
+  meta: { requiresAuth: false },
+},
+{
+  path: "/guest/time-off",
+  name: "guestTimeOff",
+  component: GuestTimeOff,
+  meta: { requiresAuth: false },
+},
+{
+  path: "/guest/swaps",
+  name: "guestSwaps",
+  component: GuestSwaps,
+  meta: { requiresAuth: false },
+},
       path: "/employer/templates",
       name: "employerTemplates",
       component: TemplateManagement,
@@ -215,10 +274,13 @@ const router = createRouter({
 // ✅ FIXED: Better guest mode handling
 router.beforeEach((to, from, next) => {
   const user = Utils.getStore("user");
+  const isGuest = localStorage.getItem("isGuest");
   const isGuestMode = localStorage.getItem("isGuest") === "true";
   const requiresAuth = to.meta.requiresAuth;
   const isGuestRoute = to.meta.isGuest;
 
+  // ✅ FIXED: Allow guest mode to access ALL guest pages
+  if (to.name?.startsWith("guest") && isGuest) {
   console.log('Router Guard:', {
     to: to.name,
     requiresAuth,
