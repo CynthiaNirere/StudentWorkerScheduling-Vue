@@ -308,7 +308,6 @@ const submitAvailability = async () => {
       await EmployerService.deleteAvailability(avail.availability_id || avail.id);
     }
 
-    // ✅ Create new availability records
     for (let dayIndex = 0; dayIndex < weekData.length; dayIndex++) {
       for (const slot of weekData[dayIndex]) {
         const payload = {
@@ -328,7 +327,6 @@ const submitAvailability = async () => {
     snackMsg.value   = 'Availability submitted for review!';
     snackColor.value = 'success';
     
-    // ✅ Reload to confirm it was saved
     await loadAvailabilityForWeek();
     
   } catch (err) {

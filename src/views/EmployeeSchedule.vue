@@ -32,7 +32,6 @@ const weekDays = computed(() => {
       const shiftTimestamp = Number(shift.shiftTime || shift.shift_time);
       const shiftDate = new Date(shiftTimestamp);
       
-      // ✅ FIX: Compare using local date strings, not UTC
       const year = shiftDate.getFullYear();
       const month = String(shiftDate.getMonth() + 1).padStart(2, '0');
       const date = String(shiftDate.getDate()).padStart(2, '0');
