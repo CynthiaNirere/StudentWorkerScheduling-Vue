@@ -39,8 +39,19 @@ const weekLabel = computed(() => {
   return `Week of ${s.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} – ${e.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
 });
 
-const prevWeek = () => { const d = new Date(currentWeekStart.value); d.setDate(d.getDate() - 7); currentWeekStart.value = d; };
-const nextWeek = () => { const d = new Date(currentWeekStart.value); d.setDate(d.getDate() + 7); currentWeekStart.value = d; };
+const prevWeek = () => { 
+  const d = new Date(currentWeekStart.value); 
+  d.setDate(d.getDate() - 7); 
+  currentWeekStart.value = d;
+  loadAvailabilityForWeek(); // ✅ Reload when changing weeks
+};
+
+const nextWeek = () => { 
+  const d = new Date(currentWeekStart.value); 
+  d.setDate(d.getDate() + 7); 
+  currentWeekStart.value = d;
+  loadAvailabilityForWeek(); // ✅ Reload when changing weeks
+};
 
 // ── CALENDAR CONFIG ───────────────────────────────────────────────────────
 const CAL_START = 8 * 60;   // 8:00 AM
@@ -227,6 +238,51 @@ const businessHours = [
   { day: 'Sunday',    hours: 'Closed',             open: false },
 ];
 
+// ✅ NEW: Load availability from database
+const loadAvailabilityForWeek = async () => {
+  try {
+    const userId = user.value?.user_id || user.value?.userId;
+    const res = await EmployerService.getAllAvailability();
+    const allAvail = Array.isArray(res.data) ? res.data : [];
+    
+    // Filter for this employee
+    const myAvail = allAvail.filter(avail => {
+      const availUserId = avail.user_id || avail.userId;
+      return availUserId === userId;
+    });
+    
+    console.log('Loaded availability for employee:', userId, myAvail.length, 'records');
+    
+    // ✅ Initialize empty week
+    allWeeks[weekKey.value] = [[], [], [], [], [], [], []];
+    
+    // ✅ Group by day of week
+    myAvail.forEach(avail => {
+      const dayIndex = avail.day_of_week || avail.dayOfWeek;
+      const isAvailable = avail.is_available !== undefined ? avail.is_available : true;
+      
+      if (isAvailable && dayIndex >= 0 && dayIndex <= 6) {
+        const startTime = avail.start_time || avail.startTime;
+        const endTime = avail.end_time || avail.endTime;
+        
+        allWeeks[weekKey.value][dayIndex].push({
+          s: startTime,
+          e: endTime
+        });
+      }
+    });
+    
+    // ✅ Check if this week was submitted
+    const weekHasData = allWeeks[weekKey.value].some(day => day.length > 0);
+    submittedWeeks[weekKey.value] = weekHasData;
+    
+    console.log('Week data loaded:', weekKey.value, 'Has data:', weekHasData);
+    
+  } catch (err) {
+    console.error('Error loading availability:', err);
+  }
+};
+
 // ── SUBMIT ────────────────────────────────────────────────────────────────
 const submitting = ref(false);
 const snackbar   = ref(false);
@@ -240,17 +296,27 @@ const submitAvailability = async () => {
     const weekData = allWeeks[weekKey.value];
     console.log('DEBUG submit: userId=', userId, 'weekKey=', weekKey.value, 'weekData=', JSON.stringify(weekData));
 
+    // ✅ Delete existing availability for this user first
+    const res = await EmployerService.getAllAvailability();
+    const allAvail = Array.isArray(res.data) ? res.data : [];
+    const myAvail = allAvail.filter(avail => {
+      const availUserId = avail.user_id || avail.userId;
+      return availUserId === userId;
+    });
+    
+    for (const avail of myAvail) {
+      await EmployerService.deleteAvailability(avail.availability_id || avail.id);
+    }
+
+    // ✅ Create new availability records
     for (let dayIndex = 0; dayIndex < weekData.length; dayIndex++) {
       for (const slot of weekData[dayIndex]) {
-        const weekStartDate = new Date(weekKey.value);
-        weekStartDate.setDate(weekStartDate.getDate() + dayIndex);
         const payload = {
           userId: userId,
           dayOfWeek: dayIndex,
           startTime: slot.s,
           endTime: slot.e,
-          isActive: 1,
-          effectiveDate: weekStartDate.getTime(),
+          isAvailable: true,
           createdAt: Date.now(),
         };
         console.log('DEBUG posting slot:', JSON.stringify(payload));
@@ -261,6 +327,10 @@ const submitAvailability = async () => {
     submittedWeeks[weekKey.value] = true;
     snackMsg.value   = 'Availability submitted for review!';
     snackColor.value = 'success';
+    
+    // ✅ Reload to confirm it was saved
+    await loadAvailabilityForWeek();
+    
   } catch (err) {
     console.error('Error submitting availability:', err);
     snackMsg.value   = 'Failed to submit availability';
@@ -276,8 +346,12 @@ const userInitials = computed(() => (user.value?.fName?.[0] || '') + (user.value
 const logout = () => { Utils.setStore('user', null); router.push('/login'); };
 
 // ── LIFECYCLE ─────────────────────────────────────────────────────────────
-onMounted(() => {
+onMounted(async () => {
   user.value = Utils.getStore('user');
+  
+  // ✅ Load saved availability on mount!
+  await loadAvailabilityForWeek();
+  
   window.addEventListener('mousemove', onWindowMouseMove);
   window.addEventListener('mouseup',   onWindowMouseUp);
 });
@@ -289,8 +363,8 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <!-- Template stays exactly the same as before -->
   <v-app>
-
     <!-- ── Sidebar ──────────────────────────────────────────────────────── -->
     <v-navigation-drawer
       :rail="rail"
@@ -652,7 +726,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* ── Sidebar ────────────────────────────────────────────────────────────── */
+/* Same CSS as before */
 .employee-sidebar { background: linear-gradient(180deg, #12086F 0%, #2B354F 100%) !important; }
 .employee-sidebar :deep(.v-list-item__prepend .v-icon) { color: white !important; opacity: 1 !important; }
 .employee-sidebar :deep(.v-list-item-title) { color: white !important; }
@@ -660,11 +734,9 @@ onUnmounted(() => {
 .employee-sidebar :deep(.v-list-item:hover) { background-color: rgba(255,255,255,0.1) !important; }
 .employee-sidebar :deep(.v-list-item--active) { background-color: rgba(255,255,255,0.14) !important; }
 
-/* ── Utilities ──────────────────────────────────────────────────────────── */
 .navy-text { color: #12086F !important; }
 .navy-card { border-color: #e0e0e0 !important; box-shadow: 0 1px 3px rgba(18,8,111,0.05) !important; }
 
-/* ── Weekly hours summary ────────────────────────────────────────────────── */
 .summary-day {
   display: flex; align-items: flex-start; gap: 8px;
   padding: 5px 0; border-bottom: 1px solid #f0f0f0;
@@ -674,17 +746,14 @@ onUnmounted(() => {
 .summary-slots { flex: 1; min-width: 0; }
 .summary-slot { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
 
-/* ── Upload zone ────────────────────────────────────────────────────────── */
 .upload-zone {
   border: 1.5px dashed #d1d5db; border-radius: 8px;
   padding: 18px 10px; text-align: center; cursor: pointer; transition: all 0.2s;
 }
 .upload-zone:hover, .upload-zone--over { border-color: #12086F; background: rgba(18,8,111,0.04); }
 
-/* ── Calendar outer ─────────────────────────────────────────────────────── */
 .cal-outer { display: flex; gap: 0; overflow-x: auto; position: relative; }
 
-/* ── Time axis ──────────────────────────────────────────────────────────── */
 .time-axis { flex-shrink: 0; width: 36px; position: relative; }
 .time-lbl {
   position: absolute; right: 4px;
@@ -692,7 +761,6 @@ onUnmounted(() => {
   transform: translateY(-50%); line-height: 1; white-space: nowrap;
 }
 
-/* ── Calendar grid ──────────────────────────────────────────────────────── */
 .cal-grid {
   flex: 1;
   display: grid;
@@ -724,7 +792,6 @@ onUnmounted(() => {
   user-select: none;
 }
 
-/* Sat/Sun — greyed out, not interactive */
 .cal-body--closed {
   background: #f1f5f9;
   cursor: not-allowed;
@@ -742,14 +809,11 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-/* Submitted — no crosshair, subtle tint */
 .cal-body--submitted { cursor: default; }
 
-/* ── Grid lines ─────────────────────────────────────────────────────────── */
 .grid-line { position: absolute; left: 0; right: 0; height: 1px; background: #f3f4f6; pointer-events: none; }
 .grid-line--hour { background: #e5e7eb; }
 
-/* ── Availability block ─────────────────────────────────────────────────── */
 .avail-block {
   background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
   border-left: 3px solid #4361EE;
@@ -773,7 +837,6 @@ onUnmounted(() => {
 .block-edit-icon { opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
 .avail-block:not(.avail-block--submitted):hover .block-edit-icon { opacity: 1; }
 
-/* ── Business hours rows ────────────────────────────────────────────────── */
 .bh-row {
   display: flex; justify-content: space-between; align-items: center;
   padding: 5px 0; border-bottom: 1px solid #f0f0f0;
