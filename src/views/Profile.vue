@@ -123,58 +123,61 @@
 
           <!-- Editable fields -->
           <v-card-text class="pa-6">
-            <v-form @submit.prevent="saveProfile">
-              <!-- Bio -->
-              <div class="mb-6">
-                <label class="text-subtitle-1 font-weight-medium mb-2 d-block">Bio</label>
-                <v-textarea
-                  v-model="profile.bio"
+            <!-- Bio -->
+            <div class="mb-6">
+              <div class="d-flex align-center justify-space-between mb-2">
+                <label class="text-subtitle-1 font-weight-medium">Bio</label>
+                <v-btn v-if="!editingBio" size="small" variant="tonal" color="primary" prepend-icon="mdi-pencil" @click="editingBio = true">Edit</v-btn>
+                <div v-else class="d-flex gap-2">
+                  <v-btn size="small" color="primary" variant="flat" @click="saveBio">Save</v-btn>
+                  <v-btn size="small" variant="outlined" @click="cancelBio">Cancel</v-btn>
+                </div>
+              </div>
+              <div v-if="!editingBio" class="bio-display pa-3 rounded">
+                <p class="text-body-2 mb-0" style="white-space: pre-wrap;">{{ profile.bio }}</p>
+              </div>
+              <v-textarea
+                v-else
+                v-model="profile.bio"
+                variant="outlined"
+                density="comfortable"
+                rows="4"
+                autofocus
+              ></v-textarea>
+            </div>
+
+            <!-- Skills & Certificates -->
+            <div class="mb-4">
+              <label class="text-subtitle-1 font-weight-medium mb-2 d-block">Skills & Certificates</label>
+              <div class="d-flex flex-wrap gap-2 mb-3">
+                <v-chip
+                  v-for="(skill, i) in profile.skills"
+                  :key="i"
+                  closable
+                  color="primary"
+                  variant="tonal"
+                  @click:close="removeSkill(i)"
+                >
+                  {{ skill }}
+                </v-chip>
+              </div>
+              <div class="d-flex gap-2">
+                <v-text-field
+                  v-model="newSkill"
                   variant="outlined"
-                  placeholder="Tell us about yourself..."
+                  placeholder="Add a skill or certificate..."
                   density="comfortable"
-                  rows="4"
-                ></v-textarea>
+                  hide-details
+                  @keydown.enter.prevent="addSkill"
+                ></v-text-field>
+                <v-btn color="primary" variant="tonal" height="48" @click="addSkill">Add</v-btn>
               </div>
-
-              <!-- Skills & Certificates -->
-              <div class="mb-6">
-                <label class="text-subtitle-1 font-weight-medium mb-2 d-block">Skills & Certificates</label>
-                <div v-if="profile.skills.length" class="d-flex flex-wrap gap-2 mb-3">
-                  <v-chip
-                    v-for="(skill, i) in profile.skills"
-                    :key="i"
-                    closable
-                    color="primary"
-                    variant="tonal"
-                    @click:close="removeSkill(i)"
-                  >
-                    {{ skill }}
-                  </v-chip>
-                </div>
-                <div class="d-flex gap-2">
-                  <v-text-field
-                    v-model="newSkill"
-                    variant="outlined"
-                    placeholder="Add a skill or certificate..."
-                    density="comfortable"
-                    hide-details
-                    @keydown.enter.prevent="addSkill"
-                  ></v-text-field>
-                  <v-btn color="primary" variant="tonal" height="48" @click="addSkill">Add</v-btn>
-                </div>
-              </div>
-
-              <!-- Action Buttons -->
-              <div class="d-flex gap-3">
-                <v-btn type="submit" color="primary" size="large" min-width="120">Save</v-btn>
-                <v-btn variant="outlined" size="large" min-width="120" @click="resetForm">Cancel</v-btn>
-              </div>
-            </v-form>
+            </div>
           </v-card-text>
 
           <v-divider></v-divider>
           <div class="text-center text-caption text-grey py-3">
-            Last Updated: {{ lastUpdated }}
+            Last updated: {{ lastUpdated }}
           </div>
         </v-card>
       </v-container>
@@ -206,6 +209,7 @@ const showSuccess = ref(false);
 const showError = ref(false);
 const errorMessage = ref('');
 const newSkill = ref('');
+const editingBio = ref(false);
 
 const profile = ref({
   firstName: '',
@@ -294,6 +298,16 @@ const handleLogout = async () => {
   }
 };
 
+const saveBio = async () => {
+  await saveProfile();
+  editingBio.value = false;
+};
+
+const cancelBio = () => {
+  profile.value.bio = originalProfile.value.bio;
+  editingBio.value = false;
+};
+
 const saveProfile = async () => {
   try {
     const updateData = {
@@ -331,9 +345,9 @@ onMounted(() => {
     firstName: user.value.fName || user.value.first_name || '',
     lastName: user.value.lName || user.value.last_name || '',
     email: user.value.email || '',
-    bio: user.value.bio || '',
+    bio: user.value.bio || 'Hi! I\'m a student worker at The Brew. I enjoy working with people and keeping things running smoothly during busy shifts.',
     role: getRoleDisplay(user.value.role),
-    skills: user.value.skills || []
+    skills: user.value.skills?.length ? user.value.skills : ['Customer Service', 'Cash Handling', 'Food Safety Certificate']
   };
 
   originalProfile.value = { ...profile.value, skills: [...profile.value.skills] };
@@ -369,4 +383,9 @@ onMounted(() => {
 .gap-2 { gap: 8px; }
 .gap-3 { gap: 12px; }
 label { color: rgba(0, 0, 0, 0.87); }
+.bio-display {
+  background: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  min-height: 80px;
+}
 </style>
