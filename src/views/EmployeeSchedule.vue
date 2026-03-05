@@ -1,303 +1,329 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import Utils from '../config/utils.js';
-import { useNotifications } from '../composables/useNotifications.js';
+import { ref, computed, onMounted, watch } from "vue";
+import { useRouter } from "vue-router";
+import Utils from "../config/utils";
+import EmployerService from "../services/employerServices.js";
+import EmployeeLayout from '../components/EmployeeLayout.vue';
 
 const router = useRouter();
-const rail = ref(true);
 const user = ref(null);
-const businessArea = ref('The Brew');
-const showNotifications = ref(false);
 
-const { notifications, unreadCount, dismissNotification, handleNotificationAction } = useNotifications();
+const shifts = ref([]);
+const selectedWeek = ref(new Date());
+const loadingShifts = ref(false);
 
-const userInitials = computed(() =>
-  (user.value?.fName?.[0] || '') + (user.value?.lName?.[0] || '') || 'E'
-);
-
-// ── WEEK NAVIGATION ────────────────────────────────────────────────────────
-const currentWeekStart = ref(getMonday(new Date()));
-
-function getMonday(d) {
-  const date = new Date(d);
-  const day = date.getDay();
-  date.setDate(date.getDate() - day + (day === 0 ? -6 : 1));
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
+// ✅ FIXED: Watch selectedWeek and reload shifts when it changes
+watch(selectedWeek, () => {
+  loadShifts();
+});
 
 const weekDays = computed(() => {
-  const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  return labels.map((label, i) => {
-    const date = new Date(currentWeekStart.value);
-    date.setDate(currentWeekStart.value.getDate() + i);
+  const sunday = new Date(selectedWeek.value);
+  sunday.setDate(sunday.getDate() - sunday.getDay());
+  
+  return Array.from({ length: 7 }, (_, i) => {
+    const day = new Date(sunday);
+    day.setDate(sunday.getDate() + i);
+    
+    // ✅ FIX: Use local date string to avoid timezone issues
+    const dayDateString = day.toISOString().split('T')[0];
+    
+    const dayShifts = shifts.value.filter(shift => {
+      const shiftTimestamp = Number(shift.shiftTime || shift.shift_time);
+      const shiftDate = new Date(shiftTimestamp);
+      
+      const year = shiftDate.getFullYear();
+      const month = String(shiftDate.getMonth() + 1).padStart(2, '0');
+      const date = String(shiftDate.getDate()).padStart(2, '0');
+      const shiftDateString = `${year}-${month}-${date}`;
+      
+      return shiftDateString === dayDateString;
+    }).sort((a, b) => {
+      const timeA = a.start_time || a.startTime;
+      const timeB = b.start_time || b.startTime;
+      return timeA - timeB;
+    });
+    
     return {
-      label,
-      dateNum: date.getDate(),
-      month: date.toLocaleDateString('en-US', { month: 'short' })
+      date: day,
+      dateString: dayDateString,
+      dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][i],
+      dayShort: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][i],
+      dayOfMonth: day.getDate(),
+      month: day.toLocaleDateString('en-US', { month: 'short' }),
+      isToday: dayDateString === new Date().toISOString().split('T')[0],
+      shifts: dayShifts
     };
   });
 });
 
-const weekLabel = computed(() => {
-  const s = currentWeekStart.value;
-  const e = new Date(s);
-  e.setDate(s.getDate() + 6);
-  return `${s.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} – ${e.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+const currentWeekLabel = computed(() => {
+  const start = weekDays.value[0];
+  const end = weekDays.value[6];
+  
+  if (start.month === end.month) {
+    return `${start.month} ${start.dayOfMonth} - ${end.dayOfMonth}, ${start.date.getFullYear()}`;
+  }
+  return `${start.month} ${start.dayOfMonth} - ${end.month} ${end.dayOfMonth}, ${start.date.getFullYear()}`;
 });
 
-const prevWeek = () => {
-  const d = new Date(currentWeekStart.value);
-  d.setDate(d.getDate() - 7);
-  currentWeekStart.value = d;
+onMounted(async () => {
+  user.value = Utils.getStore("user");
+  await loadShifts();
+});
+
+const loadShifts = async () => {
+  loadingShifts.value = true;
+  try {
+    const res = await EmployerService.getAllShifts();
+    const allShifts = Array.isArray(res.data) ? res.data : [];
+    
+    // ✅ FIXED: Filter only shifts assigned to this employee
+    const currentUserId = user.value?.user_id || user.value?.userId;
+    shifts.value = allShifts.filter(shift => {
+      const shiftUserId = shift.user_id || shift.userId;
+      return shiftUserId === currentUserId;
+    });
+    
+    console.log('Loaded shifts for employee:', currentUserId, shifts.value.length);
+  } catch (err) {
+    console.error("Error loading shifts:", err);
+  } finally {
+    loadingShifts.value = false;
+  }
 };
+
+const previousWeek = () => {
+  const newDate = new Date(selectedWeek.value);
+  newDate.setDate(newDate.getDate() - 7);
+  selectedWeek.value = newDate;
+};
+
 const nextWeek = () => {
-  const d = new Date(currentWeekStart.value);
-  d.setDate(d.getDate() + 7);
-  currentWeekStart.value = d;
+  const newDate = new Date(selectedWeek.value);
+  newDate.setDate(newDate.getDate() + 7);
+  selectedWeek.value = newDate;
 };
 
-// ── TEAM SCHEDULE DATA ─────────────────────────────────────────────────────
-// Mon Tue Wed Thu Fri Sat Sun
-const teamSchedule = computed(() => [
-  {
-    name: user.value ? `${user.value.fName} ${user.value.lName}` : 'You',
-    initials: userInitials.value,
-    color: '#12086F',
-    shifts: ['9AM–5PM', null, '2PM–10PM', '9AM–1PM', '10AM–6PM', null, null],
-    isMe: true
-  },
-  { name: 'Alex M.',   initials: 'AM', color: '#4361EE', shifts: ['2PM–10PM', '9AM–5PM', null, '10AM–6PM', null, '9AM–1PM', null] },
-  { name: 'Jordan L.', initials: 'JL', color: '#7209B7', shifts: [null, '10AM–6PM', '9AM–5PM', null, '2PM–10PM', null, null] },
-  { name: 'Sam W.',    initials: 'SW', color: '#F72585', shifts: ['10AM–6PM', null, null, '9AM–5PM', null, '2PM–10PM', null] },
-]);
-
-const logout = () => {
-  Utils.setStore('user', null);
-  router.push('/login');
+const formatTime = (minutes) => {
+  const hour24 = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  
+  let hour12 = hour24 % 12;
+  if (hour12 === 0) hour12 = 12;
+  
+  const ampm = hour24 >= 12 ? 'PM' : 'AM';
+  
+  return `${hour12}:${minute.toString().padStart(2, '0')}${ampm}`;
 };
 
-onMounted(() => {
-  user.value = Utils.getStore('user');
-});
+const getShiftColor = (shift) => {
+  const roleId = shift.job_role_id || shift.jobRoleId || 0;
+  const colors = ['#E3F2FD', '#E8F5E9', '#FFF9C4', '#FFE0B2', '#F3E5F5', '#FCE4EC'];
+  return colors[roleId % colors.length];
+};
+
+const getShiftBorderColor = (shift) => {
+  const roleId = shift.job_role_id || shift.jobRoleId || 0;
+  const colors = ['#1976D2', '#2e7d32', '#f57c00', '#ff6f00', '#7b1fa2', '#c2185b'];
+  return colors[roleId % colors.length];
+};
 </script>
 
 <template>
-  <v-app>
-    <!-- Sidebar -->
-    <v-navigation-drawer
-      :rail="rail"
-      @mouseenter="rail = false"
-      @mouseleave="rail = true"
-      permanent
-      width="280"
-      class="employee-sidebar"
-    >
-      <div class="sidebar-header d-flex align-center pa-4" style="min-height:64px;background:rgba(0,0,0,0.15)">
-        <template v-if="!rail">
-          <div>
-            <h2 class="text-h6 font-weight-bold text-white mb-0">ShiftBoard</h2>
-            <p class="text-caption text-white mb-0" style="opacity:0.8">{{ businessArea }}</p>
-          </div>
-        </template>
-        <v-icon v-else size="32" color="white">mdi-calendar-clock</v-icon>
+  <EmployeeLayout>
+    <v-container fluid class="pa-6">
+      <!-- Header -->
+      <div class="d-flex align-center justify-space-between mb-5">
+        <div>
+          <h1 class="text-h4 font-weight-bold navy-text">My Schedule</h1>
+          <p class="text-body-2 text-grey">{{ currentWeekLabel }}</p>
+        </div>
       </div>
 
-      <v-divider style="border-color:rgba(255,255,255,0.2)" />
+      <!-- Week Navigation -->
+      <v-card variant="outlined" rounded="lg" class="mb-4 navy-card">
+        <div class="pa-3 d-flex align-center justify-space-between">
+          <v-btn icon="mdi-chevron-left" variant="text" color="#12086F" size="small" @click="previousWeek" />
+          <span class="text-subtitle-1 font-weight-bold navy-text">{{ currentWeekLabel }}</span>
+          <v-btn icon="mdi-chevron-right" variant="text" color="#12086F" size="small" @click="nextWeek" />
+        </div>
+      </v-card>
 
-      <v-list nav class="px-2 mt-2">
-        <v-list-item prepend-icon="mdi-view-dashboard"          title="Dashboard"       rounded="lg" class="mb-1" @click="router.push({ name: 'employeeDashboard' })" />
-        <v-list-item prepend-icon="mdi-clock-outline"           title="My Availability" rounded="lg" class="mb-1" @click="router.push({ name: 'employeeAvailability' })" />
-        <v-list-item prepend-icon="mdi-calendar-month"          title="Team Schedule"   rounded="lg" class="mb-1" active />
-        <v-list-item prepend-icon="mdi-account-circle-outline"  title="Profile"         rounded="lg" class="mb-1" @click="router.push({ name: 'profile' })" />
-      </v-list>
-    </v-navigation-drawer>
-
-    <!-- App Bar -->
-    <v-app-bar color="white" elevation="0" style="border-bottom:1px solid #e0e0e0" density="compact">
-      <v-spacer />
-
-      <!-- Notification Bell -->
-      <v-menu location="bottom" v-model="showNotifications">
-        <template v-slot:activator="{ props }">
-          <v-btn v-bind="props" icon class="mr-1">
-            <v-badge :content="unreadCount" :model-value="unreadCount > 0" color="error">
-              <v-icon>mdi-bell</v-icon>
-            </v-badge>
-          </v-btn>
-        </template>
-        <v-card min-width="400" max-width="500" style="max-height:500px;overflow-y:auto">
-          <v-card-title class="text-h6 font-weight-bold pa-4">Notifications</v-card-title>
-          <v-divider />
-          <div v-if="notifications.length === 0" class="text-center pa-6">
-            <p class="text-grey">No notifications</p>
+      <!-- Calendar Grid -->
+      <v-card variant="outlined" rounded="lg" class="navy-card">
+        <v-progress-linear v-if="loadingShifts" indeterminate color="#12086F" />
+        
+        <div class="calendar-grid">
+          <!-- Calendar Headers -->
+          <div
+            v-for="day in weekDays"
+            :key="'header-' + day.dateString"
+            class="calendar-header"
+            :class="{ 'today-header': day.isToday }"
+          >
+            <div class="day-name">{{ day.dayName }}</div>
+            <div class="day-date">
+              <span class="date-number">{{ day.dayOfMonth }}</span>
+              <span class="date-month">{{ day.month }}</span>
+            </div>
           </div>
-          <div v-else>
-            <div v-for="n in notifications" :key="n.id" class="pa-4" style="border-bottom:1px solid #f0f0f0">
-              <div class="d-flex ga-3">
-                <v-icon color="primary" size="large">{{ n.icon }}</v-icon>
-                <div class="flex-grow-1">
-                  <div class="d-flex justify-space-between align-start mb-1">
-                    <p class="text-body-2 font-weight-bold mb-0">{{ n.type }}</p>
-                    <v-btn icon size="x-small" variant="text" @click="dismissNotification(n.id)">
-                      <v-icon size="small">mdi-close</v-icon>
-                    </v-btn>
-                  </div>
-                  <p class="text-body-2 mb-1">{{ n.message }}</p>
-                  <p class="text-caption text-grey mb-2">{{ n.timestamp }}</p>
-                  <v-btn v-if="n.action" size="small" color="primary" variant="flat" @click="handleNotificationAction(n.id)">
-                    {{ n.action }}
-                  </v-btn>
+
+          <!-- Calendar Day Cells -->
+          <div
+            v-for="day in weekDays"
+            :key="'day-' + day.dateString"
+            class="calendar-day"
+            :class="{ 'today-cell': day.isToday }"
+          >
+            <div class="shifts-container">
+              <div
+                v-for="shift in day.shifts"
+                :key="shift.shift_id || shift.id"
+                class="shift-card"
+                :style="{
+                  backgroundColor: getShiftColor(shift),
+                  borderLeftColor: getShiftBorderColor(shift)
+                }"
+              >
+                <div class="shift-time">
+                  {{ formatTime(shift.start_time || shift.startTime) }} - {{ formatTime(shift.end_time || shift.endTime) }}
+                </div>
+                <div class="shift-role" v-if="shift.role_name">
+                  {{ shift.role_name }}
+                </div>
+                <div class="shift-notes" v-if="shift.notes">
+                  {{ shift.notes }}
                 </div>
               </div>
+
+              <div v-if="day.shifts.length === 0" class="no-shifts">
+                <v-icon size="small" color="grey">mdi-calendar-blank</v-icon>
+                <span class="text-caption text-grey">No shifts</span>
+              </div>
             </div>
-          </div>
-        </v-card>
-      </v-menu>
-
-      <!-- Profile Dropdown -->
-      <v-menu location="bottom end">
-        <template v-slot:activator="{ props }">
-          <v-btn v-bind="props" icon size="small" class="mr-2">
-            <v-avatar size="36" color="#12086F" class="text-caption font-weight-bold text-white">
-              {{ userInitials }}
-            </v-avatar>
-          </v-btn>
-        </template>
-        <v-card min-width="200">
-          <v-card-text class="pa-4">
-            <div class="text-center mb-3">
-              <v-avatar size="48" color="#12086F" class="text-caption font-weight-bold text-white mb-2">{{ userInitials }}</v-avatar>
-              <p class="text-body-2 font-weight-bold mb-0">{{ user?.fName }} {{ user?.lName }}</p>
-              <p class="text-caption text-grey">{{ user?.email }}</p>
-            </div>
-            <v-divider class="mb-2" />
-            <v-list density="compact" class="pa-0">
-              <v-list-item prepend-icon="mdi-account" title="Profile" @click="router.push({ name: 'profile' })" />
-              <v-list-item prepend-icon="mdi-logout" title="Sign Out" class="text-error" @click="logout" />
-            </v-list>
-          </v-card-text>
-        </v-card>
-      </v-menu>
-    </v-app-bar>
-
-    <!-- Main Content -->
-    <v-main style="background:#f5f5f5">
-      <v-container fluid class="pa-6">
-
-        <!-- Header -->
-        <div class="d-flex justify-space-between align-center mb-6">
-          <div>
-            <h1 class="text-h4 font-weight-bold navy-text mb-1">Team Schedule</h1>
-            <p class="text-body-2 text-grey">{{ businessArea }}</p>
-          </div>
-          <div class="d-flex align-center ga-2">
-            <v-btn icon variant="text" density="compact" @click="prevWeek">
-              <v-icon>mdi-chevron-left</v-icon>
-            </v-btn>
-            <span class="text-body-2 font-weight-medium px-2">{{ weekLabel }}</span>
-            <v-btn icon variant="text" density="compact" @click="nextWeek">
-              <v-icon>mdi-chevron-right</v-icon>
-            </v-btn>
           </div>
         </div>
-
-        <!-- Schedule Table -->
-        <v-card rounded="lg" elevation="0" style="border:1px solid #e0e0e0;overflow:hidden">
-          <!-- Day Headers -->
-          <div class="schedule-header">
-            <div class="name-col"></div>
-            <div v-for="(day, i) in weekDays" :key="i" class="day-header-col">
-              <div class="text-caption font-weight-bold text-grey-darken-1">{{ day.label }}</div>
-              <div class="text-h6 font-weight-bold navy-text">{{ day.dateNum }}</div>
-              <div class="text-caption text-grey">{{ day.month }}</div>
-            </div>
-          </div>
-
-          <v-divider />
-
-          <!-- Employee Rows -->
-          <div
-            v-for="(emp, ei) in teamSchedule"
-            :key="emp.name"
-            :class="['employee-row', { 'my-row': emp.isMe }]"
-          >
-            <!-- Name -->
-            <div class="name-col d-flex align-center ga-2 pa-3">
-              <v-avatar size="32" :color="emp.color">
-                <span class="text-white text-caption font-weight-bold">{{ emp.initials }}</span>
-              </v-avatar>
-              <span class="text-body-2 font-weight-medium">{{ emp.name }}</span>
-            </div>
-
-            <!-- Shift cells -->
-            <div v-for="(shift, di) in emp.shifts" :key="di" class="shift-col">
-              <div v-if="shift" class="shift-pill" :style="{ background: emp.color + '22', borderLeft: `3px solid ${emp.color}` }">
-                <span class="text-caption font-weight-bold" :style="{ color: emp.color }">{{ shift }}</span>
-              </div>
-              <span v-else class="text-caption text-grey">—</span>
-            </div>
-          </div>
-        </v-card>
-
-      </v-container>
-    </v-main>
-  </v-app>
+      </v-card>
+    </v-container>
+  </EmployeeLayout>
 </template>
 
 <style scoped>
-.employee-sidebar {
-  background: linear-gradient(180deg, #12086F 0%, #2B354F 100%) !important;
+.navy-text {
+  color: #12086F !important;
 }
-.employee-sidebar :deep(.v-list-item__prepend .v-icon) { color: white !important; opacity: 1 !important; }
-.employee-sidebar :deep(.v-list-item-title) { color: white !important; }
-.employee-sidebar :deep(.v-list-item--active) { background: rgba(255,255,255,0.15) !important; }
 
-.navy-text { color: #12086F; }
+.navy-card {
+  border-color: #e0e0e0;
+  box-shadow: 0 1px 3px rgba(18, 8, 111, 0.05);
+}
 
-/* Schedule grid */
-.schedule-header {
+.calendar-grid {
   display: grid;
-  grid-template-columns: 180px repeat(7, 1fr);
-  background: #fafafa;
-  padding: 12px 0;
+  grid-template-columns: repeat(7, 1fr);
 }
 
-.day-header-col {
+.calendar-header {
+  background: linear-gradient(135deg, #12086F 0%, #2B354F 100%);
+  color: white;
+  padding: 12px 8px;
   text-align: center;
-  padding: 4px 8px;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 2px solid #12086F;
 }
 
-.name-col {
-  width: 180px;
-  min-width: 180px;
-  padding: 0 16px;
-  border-right: 1px solid #e0e0e0;
+.calendar-header:last-child {
+  border-right: none;
 }
 
-.employee-row {
-  display: grid;
-  grid-template-columns: 180px repeat(7, 1fr);
-  border-top: 1px solid #f0f0f0;
-  min-height: 56px;
-  align-items: center;
+.today-header {
+  background: linear-gradient(135deg, #4361EE 0%, #5B73F0 100%);
 }
 
-.employee-row.my-row {
-  background: rgba(18, 8, 111, 0.03);
+.day-name {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.9;
+  margin-bottom: 4px;
 }
 
-.shift-col {
+.day-date {
   display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+}
+
+.date-number {
+  font-size: 20px;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.date-month {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.calendar-day {
+  border-right: 1px solid #e0e0e0;
+  border-bottom: 1px solid #e0e0e0;
+  background: #fafafa;
+  transition: background-color 0.2s;
+}
+
+.calendar-day:nth-child(7n) {
+  border-right: none;
+}
+
+.today-cell {
+  background: #f0f4ff;
+}
+
+.shifts-container {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 120px;
+}
+
+.shift-card {
+  background: white;
+  border-left: 3px solid #4361EE;
+  border-radius: 6px;
+  padding: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.shift-time {
+  font-size: 12px;
+  font-weight: bold;
+  color: #12086F;
+  margin-bottom: 3px;
+}
+
+.shift-role {
+  font-size: 11px;
+  color: #666;
+  margin-bottom: 2px;
+}
+
+.shift-notes {
+  font-size: 10px;
+  color: #999;
+  font-style: italic;
+}
+
+.no-shifts {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 8px 4px;
-}
-
-.shift-pill {
-  padding: 4px 8px;
-  border-radius: 6px;
-  white-space: nowrap;
+  gap: 4px;
+  padding: 20px 8px;
 }
 </style>

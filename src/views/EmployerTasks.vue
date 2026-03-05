@@ -37,6 +37,7 @@ const newItem = ref({
   title: "",
   description: "",
   assignedTo: "",
+  status: "pending", // NEW: Default status
 });
 
 onMounted(async () => {
@@ -121,12 +122,11 @@ const handleAddItem = async () => {
     await EmployerService.createTaskItem({
       tasklistId: selectedList.value.tasklist_id || selectedList.value.id,
       ...newItem.value,
-      status: 'pending',
       createdAt: Date.now(),
     });
     showSnackbar("Task item added!", "success");
     showAddItemDialog.value = false;
-    newItem.value = { title: "", description: "", assignedTo: "" };
+    newItem.value = { title: "", description: "", assignedTo: "", status: "pending" };
     await loadTaskItems(selectedList.value.tasklist_id || selectedList.value.id);
   } catch (err) {
     console.error('Add item error:', err);
@@ -136,16 +136,32 @@ const handleAddItem = async () => {
   }
 };
 
-const handleCompleteItem = async (item) => {
+// NEW: Update task status with three states
+const handleUpdateTaskStatus = async (item, newStatus) => {
   try {
-    const newStatus = item.status === 'completed' ? 'pending' : 'completed';
     await EmployerService.updateTaskItem(item.item_id || item.id, { status: newStatus });
-    showSnackbar(newStatus === 'completed' ? "Task marked as complete!" : "Task marked as pending", "success");
+    showSnackbar(`Task marked as ${newStatus}`, "success");
     await loadTaskItems(selectedList.value.tasklist_id || selectedList.value.id);
   } catch (err) {
-    console.error('Complete item error:', err);
+    console.error('Update item error:', err);
     showSnackbar("Error updating task", "error");
   }
+};
+
+// NEW: Cycle through statuses on checkbox click
+const handleCompleteItem = async (item) => {
+  const currentStatus = item.status || 'pending';
+  let newStatus;
+  
+  if (currentStatus === 'pending') {
+    newStatus = 'in_progress';
+  } else if (currentStatus === 'in_progress') {
+    newStatus = 'completed';
+  } else {
+    newStatus = 'pending';
+  }
+  
+  await handleUpdateTaskStatus(item, newStatus);
 };
 
 const openDeleteDialog = (list) => {
@@ -197,6 +213,44 @@ const getStatusColor = (status) => {
     archived: '#9e9e9e',
   };
   return colors[status] || '#9e9e9e';
+};
+
+// NEW: Get task item status color
+const getTaskStatusColor = (status) => {
+  const colors = {
+    pending: '#9e9e9e',
+    in_progress: '#4361EE',
+    completed: '#2e7d32',
+  };
+  return colors[status] || '#9e9e9e';
+};
+
+// NEW: Get task status icon
+const getTaskStatusIcon = (status) => {
+  const icons = {
+    pending: 'mdi-checkbox-blank-circle-outline',
+    in_progress: 'mdi-progress-clock',
+    completed: 'mdi-check-circle',
+  };
+  return icons[status] || 'mdi-checkbox-blank-circle-outline';
+};
+
+// NEW: Format status for display
+const formatStatus = (status) => {
+  const formatted = {
+    pending: 'Not Started',
+    in_progress: 'In Progress',
+    completed: 'Completed',
+  };
+  return formatted[status] || status;
+};
+
+// NEW: Get employee name from ID
+const getEmployeeName = (employeeId) => {
+  if (!employeeId) return null;
+  const emp = employees.value.find(e => (e.user_id || e.userId) === employeeId);
+  if (!emp) return employeeId;
+  return `${emp.fName || emp.first_name || ''} ${emp.lName || emp.last_name || ''}`.trim();
 };
 
 const showSnackbar = (message, color = "success") => {
@@ -317,22 +371,75 @@ const showSnackbar = (message, color = "success") => {
                     :key="item.item_id || item.id"
                   >
                     <template #prepend>
-                      <v-checkbox-btn
-                        :model-value="item.status === 'completed'"
-                        @update:model-value="handleCompleteItem(item)"
-                        color="#12086F"
+                      <v-icon
+                        :icon="getTaskStatusIcon(item.status)"
+                        :color="getTaskStatusColor(item.status)"
+                        size="24"
+                        class="cursor-pointer"
+                        @click="handleCompleteItem(item)"
                       />
                     </template>
                     
-                    <v-list-item-title :class="item.status === 'completed' ? 'text-decoration-line-through text-grey' : ''">
+                    <v-list-item-title 
+                      :class="item.status === 'completed' ? 'text-decoration-line-through text-grey' : ''"
+                    >
                       {{ item.title }}
                     </v-list-item-title>
-                    <v-list-item-subtitle v-if="item.description" class="text-caption">
-                      {{ item.description }}
+                    
+                    <v-list-item-subtitle class="text-caption">
+                      <div v-if="item.description" class="mb-1">{{ item.description }}</div>
+                      <div class="d-flex ga-2 align-center flex-wrap">
+                        <v-chip
+                          :color="getTaskStatusColor(item.status)"
+                          size="x-small"
+                          variant="tonal"
+                        >
+                          {{ formatStatus(item.status) }}
+                        </v-chip>
+                        <v-chip
+                          v-if="item.assigned_to || item.assignedTo"
+                          color="#4361EE"
+                          size="x-small"
+                          variant="tonal"
+                          prepend-icon="mdi-account"
+                        >
+                          {{ getEmployeeName(item.assigned_to || item.assignedTo) }}
+                        </v-chip>
+                      </div>
                     </v-list-item-subtitle>
-                    <v-list-item-subtitle v-if="item.assigned_to || item.assignedTo" class="text-caption">
-                      Assigned to: {{ item.assigned_to || item.assignedTo }}
-                    </v-list-item-subtitle>
+
+                    <template #append>
+                      <v-menu>
+                        <template #activator="{ props }">
+                          <v-btn
+                            icon="mdi-dots-vertical"
+                            size="small"
+                            variant="plain"
+                            v-bind="props"
+                          />
+                        </template>
+                        <v-list density="compact">
+                          <v-list-item @click="handleUpdateTaskStatus(item, 'pending')">
+                            <v-list-item-title>
+                              <v-icon size="small" class="mr-2">mdi-checkbox-blank-circle-outline</v-icon>
+                              Mark as Not Started
+                            </v-list-item-title>
+                          </v-list-item>
+                          <v-list-item @click="handleUpdateTaskStatus(item, 'in_progress')">
+                            <v-list-item-title>
+                              <v-icon size="small" class="mr-2">mdi-progress-clock</v-icon>
+                              Mark as In Progress
+                            </v-list-item-title>
+                          </v-list-item>
+                          <v-list-item @click="handleUpdateTaskStatus(item, 'completed')">
+                            <v-list-item-title>
+                              <v-icon size="small" class="mr-2">mdi-check-circle</v-icon>
+                              Mark as Completed
+                            </v-list-item-title>
+                          </v-list-item>
+                        </v-list>
+                      </v-menu>
+                    </template>
                   </v-list-item>
                 </v-list>
 
@@ -437,6 +544,19 @@ const showSnackbar = (message, color = "success") => {
             variant="outlined"
             density="compact"
             clearable
+            class="mb-3"
+            color="#12086F"
+          />
+          <v-select
+            v-model="newItem.status"
+            :items="[
+              { title: 'Not Started', value: 'pending' },
+              { title: 'In Progress', value: 'in_progress' },
+              { title: 'Completed', value: 'completed' }
+            ]"
+            label="Status"
+            variant="outlined"
+            density="compact"
             color="#12086F"
           />
         </v-card-text>
@@ -490,7 +610,7 @@ const showSnackbar = (message, color = "success") => {
       :color="snackbarColor"
       timeout="3000"
       location="bottom right"
-    >
+     >
       {{ snackbarMessage }}
     </v-snackbar>
   </EmployerLayout>

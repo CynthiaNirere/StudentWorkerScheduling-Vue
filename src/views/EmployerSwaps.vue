@@ -43,19 +43,18 @@ const filteredSwaps = computed(() => {
 
 const swapsWithDetails = computed(() => {
   return filteredSwaps.value.map((swap) => {
-    const shiftId = swap.original_shift_id || swap.originalShiftId;
-    const shift = shifts.value.find((s) => (s.shift_id || s.id) === shiftId);
-    const shiftDate = shift ? new Date(Number(shift.shiftTime || shift.shift_time)).toLocaleDateString() : "N/A";
+    const shift = swap.shift;
+    const shiftDate = shift ? new Date(Number(shift.shiftTime)).toLocaleDateString() : "N/A";
     const shiftTime = shift
-      ? `${formatShiftTime(shift.startTime || shift.start_time)} - ${formatShiftTime(shift.endTime || shift.end_time)}`
+      ? `${formatShiftTime(shift.startTime)} - ${formatShiftTime(shift.endTime)}`
       : "N/A";
 
     return {
       ...swap,
       shiftDate,
       shiftTime,
-      requestingEmployee: swap.requesting_user_name || swap.requestingUserName || "Unknown",
-      acceptingEmployee: swap.accepting_user_name || swap.acceptingUserName || "Pending",
+      requestingEmployee: swap.requestingUserName || "Unknown",
+      acceptingEmployee: swap.acceptingUserName || "Pending",
     };
   });
 });
@@ -119,14 +118,15 @@ const confirmAction = async () => {
     const swapId = swapToAction.value.swap_id || swapToAction.value.id;
     
     if (swapToAction.value.actionType === 'reject') {
-      await EmployerService.updateShiftSwapRequest(swapId, { status: 'rejected' });
+      await EmployerService.rejectSwapRequest(swapId);
       showSnackbar("Shift swap rejected", "success");
     } else {
-      await EmployerService.updateShiftSwapRequest(swapId, { status: 'approved' });
+      await EmployerService.approveSwapRequest(swapId);
       showSnackbar("Shift swap approved!", "success");
     }
     
     await loadSwapRequests();
+    window.dispatchEvent(new Event('notifications-updated'));
   } catch (err) {
     console.error('Action error:', err);
     showSnackbar(`Error ${swapToAction.value.actionType}ing swap`, "error");
