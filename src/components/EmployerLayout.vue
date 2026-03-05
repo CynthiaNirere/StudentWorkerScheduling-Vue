@@ -115,6 +115,16 @@ const logout = () => {
           class="nav-item"
           rounded="lg"
         />
+        <!-- ✅ NEW: Templates Link -->
+        <v-list-item
+          prepend-icon="mdi-content-save"
+          title="Templates"
+          :to="isGuest ? undefined : { name: 'employerTemplates' }"
+          :disabled="isGuest"
+          color="white"
+          class="nav-item"
+          rounded="lg"
+        />
         <v-list-item
           prepend-icon="mdi-account-group"
           title="Employees"

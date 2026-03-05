@@ -25,6 +25,7 @@ import EmployerTimeOff from "./views/EmployerTimeOff.vue";
 import EmployerTasks from "./views/EmployerTasks.vue";
 import EmployerSwaps from "./views/EmployerSwaps.vue";
 import EmployerProfile from "./views/EmployerProfile.vue";
+import TemplateManagement from "./views/TemplateManagement.vue";  
 import Workplace from "./views/Workplace.vue";  
 import Profile from "./views/Profile.vue";  
 
@@ -164,6 +165,13 @@ const router = createRouter({
       path: "/employer/profile",
       name: "employerProfile",
       component: EmployerProfile,
+      meta: { requiresAuth: true },
+    },
+    // ✅ NEW: Template Management Route
+    {
+      path: "/employer/templates",
+      name: "employerTemplates",
+      component: TemplateManagement,
       meta: { requiresAuth: true },
     },
     {
