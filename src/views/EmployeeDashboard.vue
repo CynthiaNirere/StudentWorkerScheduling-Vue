@@ -67,7 +67,6 @@ const { notifications, unreadCount, urgentNotifications, takenShifts, dismissNot
 
 const viewAllNotifications = () => { showNotifications.value = true; };
 
-const claimShift = () => showSnackbar('Shift claimed! Pending employer approval.', 'success');
 
 // ─── SNACKBAR ─────────────────────────────────────────────────────────────
 const snackbar      = ref(false);
@@ -514,10 +513,6 @@ onMounted(() => {
                       <!-- TUE -->
                       <div class="calendar-day">
                         <div class="shifts-container">
-                          <div class="shift-box shift-off">
-                            <div class="shift-person">You</div>
-                            <div class="shift-status-text">Day Off</div>
-                          </div>
                           <div
                             v-for="(s, i) in takenShifts.filter(s => s.day === 'TUE')"
                             :key="'taken-tue-' + i"
@@ -526,7 +521,10 @@ onMounted(() => {
                             <div class="shift-time">{{ s.time }}</div>
                             <div class="shift-person">You (cover)</div>
                           </div>
-                          <p v-if="takenShifts.filter(s => s.day === 'TUE').length === 0" class="no-shifts-text">No shifts</p>
+                          <div v-if="takenShifts.filter(s => s.day === 'TUE').length === 0" class="shift-box shift-off">
+                            <div class="shift-person">You</div>
+                            <div class="shift-status-text">Day Off</div>
+                          </div>
                         </div>
                       </div>
 
@@ -552,12 +550,8 @@ onMounted(() => {
                           <div class="shift-box">
                             <div class="shift-time">9AM–1PM</div>
                             <div class="shift-person">You</div>
-                            <div class="shift-status-text">Available</div>
-                            <v-btn size="x-small" color="#12086F" variant="flat" class="claim-btn mt-1" @click="claimShift">CLAIM</v-btn>
                           </div>
-                          <p class="no-shifts-text">No shifts</p>
                         </div>
-
                       </div>
 
                       <!-- FRI -->
@@ -567,9 +561,7 @@ onMounted(() => {
                             <div class="shift-time">10AM–6PM</div>
                             <div class="shift-person">You</div>
                           </div>
-                          <p class="no-shifts-text">No shifts</p>
                         </div>
-
                       </div>
 
                       <!-- SAT -->
@@ -851,10 +843,4 @@ onMounted(() => {
 .gap-3 { gap: 12px; }
 
 
-.claim-btn {
-  font-size: 0.6rem;
-  height: 20px;
-  min-width: unset;
-  padding: 0 6px;
-}
 </style>
