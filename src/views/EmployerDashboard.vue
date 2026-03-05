@@ -115,7 +115,8 @@ const loadWeeklySchedule = async () => {
     const endDate = startDate + 7 * 24 * 60 * 60 * 1000;
     
     const res = await EmployerService.getShiftsByWeek(startDate, endDate);
-    weeklySchedule.value = Array.isArray(res.data) ? res.data : [];
+const allShifts = Array.isArray(res.data) ? res.data : [];
+weeklySchedule.value = allShifts.filter(s => s.status === 'published');
     schedulePublished.value = weeklySchedule.value.some(s => s.status === 'published');
   } catch (err) {
     console.error('Error loading schedule:', err);

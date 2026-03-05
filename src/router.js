@@ -2,8 +2,8 @@ import { createRouter, createWebHistory } from "vue-router";
 import Utils from "./config/utils";
 
 // ─── IMPORTS ──────────────────────────────────────────────────────────────
-import Landing from "./views/Landing.vue";  // ✅ ADDED
-import GuestDashboard from "./views/GuestDashboard.vue";  // ✅ ADDED
+import Landing from "./views/Landing.vue";
+import GuestDashboard from "./views/GuestDashboard.vue";
 import Login from "./views/Login.vue";
 import SignUp from "./views/SignUp.vue";
 import RoleSelect from "./views/RoleSelect.vue";
@@ -20,6 +20,7 @@ import EmployerTimeOff from "./views/EmployerTimeOff.vue";
 import EmployerTasks from "./views/EmployerTasks.vue";
 import EmployerSwaps from "./views/EmployerSwaps.vue";
 import EmployerProfile from "./views/EmployerProfile.vue";
+import TemplateManagement from "./views/TemplateManagement.vue";  
 import Workplace from "./views/Workplace.vue";  
 import Profile from "./views/Profile.vue";  
 
@@ -30,12 +31,12 @@ const router = createRouter({
     // ─── LANDING & GUEST ROUTES ────────────────────────────────────────
     {
       path: "/",
-      name: "landing",  // ✅ CHANGED from redirect to actual landing page
+      name: "landing",
       component: Landing,
       meta: { requiresAuth: false },
     },
     {
-      path: "/guest",  // ✅ ADDED
+      path: "/guest",
       name: "guestDashboard",
       component: GuestDashboard,
       meta: { requiresAuth: false },
@@ -161,20 +162,26 @@ const router = createRouter({
       component: EmployerProfile,
       meta: { requiresAuth: true },
     },
+    // ✅ NEW: Template Management Route
+    {
+      path: "/employer/templates",
+      name: "employerTemplates",
+      component: TemplateManagement,
+      meta: { requiresAuth: true },
+    },
     // ─── CATCH ALL ──────────────────────────────────────────────────────
     {
       path: "/:pathMatch(.*)*",
-      redirect: "/",  // ✅ CHANGED to redirect to landing instead of login
+      redirect: "/",
     },
   ],
 });
 
 router.beforeEach((to, from, next) => {
   const user = Utils.getStore("user");
-  const isGuest = localStorage.getItem("isGuest");  // ✅ ADDED
+  const isGuest = localStorage.getItem("isGuest");
   const requiresAuth = to.meta.requiresAuth;
 
-  // Allow guest mode to access guestDashboard  // ✅ ADDED
   if (to.name === "guestDashboard" && isGuest) {
     next();
     return;

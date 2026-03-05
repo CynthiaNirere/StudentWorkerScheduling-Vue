@@ -9,7 +9,9 @@ const router = useRouter();
 const user = ref(null);
 
 const employees = ref([]);
+const jobRoles = ref([]);  // ✅ NEW: Store job roles from backend
 const loading = ref(false);
+const loadingRoles = ref(false);
 const search = ref("");
 
 const showAddDialog = ref(false);
@@ -30,7 +32,7 @@ const newEmployee = ref({
   last_name: "",
   email: "",
   phone_number: "",
-  job_role: "", // NEW: Job role as text field
+  job_role: "",
 });
 
 const editForm = ref({
@@ -38,34 +40,50 @@ const editForm = ref({
   last_name: "",
   email: "",
   phone_number: "",
-  job_role: "", // NEW: Job role as text field
+  job_role: "",
 });
 
 const headers = [
   { title: "Name", key: "name", sortable: true },
   { title: "Email", key: "email", sortable: true },
   { title: "Phone", key: "phone_number", sortable: true },
-  { title: "Job Role", key: "job_role", sortable: true }, // CHANGED: From "Role" to "Job Role"
+  { title: "Job Role", key: "job_role", sortable: true },
   { title: "Actions", key: "actions", sortable: false },
 ];
+
+// ✅ NEW: Get job role suggestions (from backend + manual entry)
+const jobRoleSuggestions = computed(() => {
+  // Get unique roles from backend
+  const backendRoles = jobRoles.value.map(r => r.title);
+  
+  // Get unique roles from existing employees
+  const employeeRoles = employees.value
+    .map(e => e.job_role)
+    .filter(r => r && r !== 'Not assigned');
+  
+  // Combine and deduplicate
+  const allRoles = [...new Set([...backendRoles, ...employeeRoles])];
+  
+  return allRoles.sort();
+});
 
 const employeesWithName = computed(() => {
   const currentUserId = user.value?.user_id || user.value?.userId;
   return employees.value
     .filter(e => {
       const empId = e.user_id || e.userId;
-      return empId !== currentUserId && e.role === 'employee'; // Only show employees
+      return empId !== currentUserId && e.role === 'employee';
     })
     .map((e) => ({
       ...e,
       name: `${e.fName || e.first_name || ''} ${e.lName || e.last_name || ''}`.trim() || 'Unnamed',
-      job_role: e.job_role || 'Not assigned', // Display job role
+      job_role: e.job_role || 'Not assigned',
     }));
 });
 
 onMounted(async () => {
   user.value = Utils.getStore("user");
-  await loadEmployees();
+  await Promise.all([loadEmployees(), loadJobRoles()]);
 });
 
 const loadEmployees = async () => {
@@ -82,6 +100,22 @@ const loadEmployees = async () => {
   }
 };
 
+// ✅ NEW: Load job roles from backend
+const loadJobRoles = async () => {
+  loadingRoles.value = true;
+  try {
+    const res = await EmployerService.getAllJobRoles();
+    jobRoles.value = Array.isArray(res.data) ? res.data : [];
+    console.log(`Loaded ${jobRoles.value.length} job roles from backend`);
+  } catch (err) {
+    console.error("Error loading job roles:", err);
+    // Don't show error to user - job roles are optional
+    jobRoles.value = [];
+  } finally {
+    loadingRoles.value = false;
+  }
+};
+
 const handleAddEmployee = async () => {
   if (!newEmployee.value.first_name || !newEmployee.value.email) {
     showSnackbar("First name and email are required", "error");
@@ -92,7 +126,7 @@ const handleAddEmployee = async () => {
   try {
     await EmployerService.createEmployee({
       ...newEmployee.value,
-      role: 'employee', // Always create as employee
+      role: 'employee',
     });
     showSnackbar("Employee added successfully!", "success");
     showAddDialog.value = false;
@@ -119,7 +153,7 @@ const openEditDialog = (employee) => {
     last_name: employee.lName || employee.last_name || "",
     email: employee.email || "",
     phone_number: employee.phone_number || "",
-    job_role: employee.job_role || "", // Load job role
+    job_role: employee.job_role || "",
   };
   showEditDialog.value = true;
 };
@@ -259,13 +293,6 @@ const showSnackbar = (message, color = "success") => {
                 @click="openEditDialog(item)"
               />
               <v-btn
-                icon="mdi-calendar"
-                size="small"
-                variant="plain"
-                color="#4361EE"
-                @click="viewEmployeeSchedule(item)"
-              />
-              <v-btn
                 icon="mdi-delete"
                 size="small"
                 variant="plain"
@@ -323,17 +350,37 @@ const showSnackbar = (message, color = "success") => {
             class="mb-3"
             color="#12086F"
           />
-          <!-- NEW: Job Role as text field -->
-          <v-text-field
+          <!-- ✅ UPDATED: Autocomplete with suggestions -->
+          <v-autocomplete
             v-model="newEmployee.job_role"
+            :items="jobRoleSuggestions"
             label="Job Role"
             variant="outlined"
             density="compact"
-            placeholder="e.g., Barista, Front Desk, Advocate"
-            hint="Enter the job role for this employee"
+            placeholder="Type or select a role"
+            hint="Select from existing roles or type a new one"
             persistent-hint
             color="#12086F"
-          />
+            clearable
+            :loading="loadingRoles"
+          >
+            <template #prepend-item>
+              <v-list-item v-if="jobRoleSuggestions.length > 0">
+                <v-list-item-title class="text-caption text-grey">
+                  <v-icon size="small" class="mr-1">mdi-information</v-icon>
+                  Select existing or type new role
+                </v-list-item-title>
+              </v-list-item>
+              <v-divider class="my-2"></v-divider>
+            </template>
+            <template #no-data>
+              <v-list-item>
+                <v-list-item-title class="text-caption text-grey">
+                  Type to add a new job role
+                </v-list-item-title>
+              </v-list-item>
+            </template>
+          </v-autocomplete>
         </v-card-text>
         <v-divider />
         <v-card-actions class="pa-4">
@@ -396,17 +443,37 @@ const showSnackbar = (message, color = "success") => {
             class="mb-3"
             color="#12086F"
           />
-          <!-- NEW: Job Role as text field (not dropdown) -->
-          <v-text-field
+          <!-- ✅ UPDATED: Autocomplete with suggestions -->
+          <v-autocomplete
             v-model="editForm.job_role"
+            :items="jobRoleSuggestions"
             label="Job Role"
             variant="outlined"
             density="compact"
-            placeholder="e.g., Barista, Front Desk, Advocate"
-            hint="Enter the job role for this employee"
+            placeholder="Type or select a role"
+            hint="Select from existing roles or type a new one"
             persistent-hint
             color="#12086F"
-          />
+            clearable
+            :loading="loadingRoles"
+          >
+            <template #prepend-item>
+              <v-list-item v-if="jobRoleSuggestions.length > 0">
+                <v-list-item-title class="text-caption text-grey">
+                  <v-icon size="small" class="mr-1">mdi-information</v-icon>
+                  Select existing or type new role
+                </v-list-item-title>
+              </v-list-item>
+              <v-divider class="my-2"></v-divider>
+            </template>
+            <template #no-data>
+              <v-list-item>
+                <v-list-item-title class="text-caption text-grey">
+                  Type to add a new job role
+                </v-list-item-title>
+              </v-list-item>
+            </template>
+          </v-autocomplete>
           <v-alert type="info" variant="tonal" density="compact" color="#4361EE" class="mt-3">
             System roles (employee/employer) cannot be changed here.
           </v-alert>
