@@ -40,42 +40,11 @@ const router = createRouter({
       component: Landing,
       meta: { requiresAuth: false },
     },
-    // ✅ GUEST ROUTES - All guest pages
     {
       path: "/guest",
       name: "guestDashboard",
       component: GuestDashboard,
-      meta: { requiresAuth: false, isGuest: true },
-    },
-    {
-      path: "/guest/schedule",
-      name: "guestSchedule",
-      component: GuestSchedule,
-      meta: { requiresAuth: false, isGuest: true },
-    },
-    {
-      path: "/guest/employees",
-      name: "guestEmployees",
-      component: GuestEmployees,
-      meta: { requiresAuth: false, isGuest: true },
-    },
-    {
-      path: "/guest/availability",
-      name: "guestAvailability",
-      component: GuestAvailability,
-      meta: { requiresAuth: false, isGuest: true },
-    },
-    {
-      path: "/guest/time-off",
-      name: "guestTimeOff",
-      component: GuestTimeOff,
-      meta: { requiresAuth: false, isGuest: true },
-    },
-    {
-      path: "/guest/swaps",
-      name: "guestSwaps",
-      component: GuestSwaps,
-      meta: { requiresAuth: false, isGuest: true },
+      meta: { requiresAuth: false },
     },
     {
       path: "/guest/schedule",
@@ -229,35 +198,6 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
-  path: "/guest/schedule",
-  name: "guestSchedule",
-  component: GuestSchedule,
-  meta: { requiresAuth: false },
-    },
-    {
-  path: "/guest/employees",
-  name: "guestEmployees",
-  component: GuestEmployees,
-  meta: { requiresAuth: false },
-},
-{
-  path: "/guest/availability",
-  name: "guestAvailability",
-  component: GuestAvailability,
-  meta: { requiresAuth: false },
-},
-{
-  path: "/guest/time-off",
-  name: "guestTimeOff",
-  component: GuestTimeOff,
-  meta: { requiresAuth: false },
-},
-{
-  path: "/guest/swaps",
-  name: "guestSwaps",
-  component: GuestSwaps,
-  meta: { requiresAuth: false },
-},
       path: "/employer/templates",
       name: "employerTemplates",
       component: TemplateManagement,
@@ -271,47 +211,23 @@ const router = createRouter({
   ],
 });
 
-// ✅ FIXED: Better guest mode handling
 router.beforeEach((to, from, next) => {
   const user = Utils.getStore("user");
-  const isGuest = localStorage.getItem("isGuest");
-  const isGuestMode = localStorage.getItem("isGuest") === "true";
+  const isGuest = localStorage.getItem("isGuest") === "true";
   const requiresAuth = to.meta.requiresAuth;
-  const isGuestRoute = to.meta.isGuest;
 
-  // ✅ FIXED: Allow guest mode to access ALL guest pages
+  // Allow ALL guest routes when in guest mode
   if (to.name?.startsWith("guest") && isGuest) {
-  console.log('Router Guard:', {
-    to: to.name,
-    requiresAuth,
-    isGuestRoute,
-    isGuestMode,
-    hasUser: !!user
-  });
-
-  // ✅ Allow guest routes when in guest mode
-  if (isGuestRoute && isGuestMode) {
-    console.log('✅ Allowing guest route');
     next();
     return;
   }
 
-  // ✅ Block guest from accessing authenticated routes
-  if (requiresAuth && isGuestMode) {
-    console.log('❌ Guest trying to access auth route, redirecting to guest dashboard');
-    next({ name: "guestDashboard" });
-    return;
-  }
-
-  // ✅ Require authentication for protected routes
+  // Require authentication for protected routes
   if (requiresAuth && !user) {
-    console.log('❌ Not authenticated, redirecting to login');
     next({ name: "login" });
     return;
   }
 
-  // ✅ Allow all other navigation
-  console.log('✅ Allowing navigation');
   next();
 });
 
