@@ -2,8 +2,13 @@ import { createRouter, createWebHistory } from "vue-router";
 import Utils from "./config/utils";
 
 // ─── IMPORTS ──────────────────────────────────────────────────────────────
-import Landing from "./views/Landing.vue";
-import GuestDashboard from "./views/GuestDashboard.vue";
+import Landing from "./views/Landing.vue"; 
+import GuestDashboard from "./views/GuestDashboard.vue";  
+import GuestSchedule from "./views/GuestSchedule.vue";  
+import GuestEmployees from './views/GuestEmployees.vue';
+import GuestAvailability from './views/GuestAvailability.vue';
+import GuestTimeOff from './views/GuestTimeOff.vue';
+import GuestSwaps from './views/GuestSwaps.vue';
 import Login from "./views/Login.vue";
 import SignUp from "./views/SignUp.vue";
 import RoleSelect from "./views/RoleSelect.vue";
@@ -169,6 +174,36 @@ const router = createRouter({
       component: TemplateManagement,
       meta: { requiresAuth: true },
     },
+    {
+  path: "/guest/schedule",
+  name: "guestSchedule",
+  component: GuestSchedule,
+  meta: { requiresAuth: false },
+    },
+    {
+  path: "/guest/employees",
+  name: "guestEmployees",
+  component: GuestEmployees,
+  meta: { requiresAuth: false },
+},
+{
+  path: "/guest/availability",
+  name: "guestAvailability",
+  component: GuestAvailability,
+  meta: { requiresAuth: false },
+},
+{
+  path: "/guest/time-off",
+  name: "guestTimeOff",
+  component: GuestTimeOff,
+  meta: { requiresAuth: false },
+},
+{
+  path: "/guest/swaps",
+  name: "guestSwaps",
+  component: GuestSwaps,
+  meta: { requiresAuth: false },
+},
     // ─── CATCH ALL ──────────────────────────────────────────────────────
     {
       path: "/:pathMatch(.*)*",

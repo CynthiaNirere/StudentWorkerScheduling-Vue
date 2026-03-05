@@ -102,8 +102,7 @@ const logout = () => {
         <v-list-item
           prepend-icon="mdi-view-dashboard"
           title="Dashboard"
-          :to="isGuest ? undefined : { name: 'employerDashboard' }"
-          :disabled="isGuest"
+          :to="isGuest ? { name: 'guestDashboard' } : { name: 'employerDashboard' }"
           color="white"
           class="nav-item"
           rounded="lg"
@@ -111,8 +110,7 @@ const logout = () => {
         <v-list-item
           prepend-icon="mdi-calendar"
           title="Schedule"
-          :to="isGuest ? undefined : { name: 'employerSchedule' }"
-          :disabled="isGuest"
+          :to="isGuest ? { name: 'guestSchedule' } : { name: 'employerSchedule' }"
           color="white"
           class="nav-item"
           rounded="lg"
@@ -130,8 +128,7 @@ const logout = () => {
         <v-list-item
           prepend-icon="mdi-account-group"
           title="Employees"
-          :to="isGuest ? undefined : { name: 'employerEmployees' }"
-          :disabled="isGuest"
+          :to="isGuest ? { name: 'guestEmployees' } : { name: 'employerEmployees' }"
           color="white"
           class="nav-item"
           rounded="lg"
@@ -139,8 +136,7 @@ const logout = () => {
         <v-list-item
           prepend-icon="mdi-clock-outline"
           title="Availability"
-          :to="isGuest ? undefined : { name: 'employerAvailability' }"
-          :disabled="isGuest"
+          :to="isGuest ? { name: 'guestAvailability' } : { name: 'employerAvailability' }"
           color="white"
           class="nav-item"
           rounded="lg"
@@ -148,17 +144,15 @@ const logout = () => {
         <v-list-item
           prepend-icon="mdi-calendar-remove"
           title="Time Off"
-          :to="isGuest ? undefined : { name: 'employerTimeOff' }"
-          :disabled="isGuest"
+          :to="isGuest ? { name: 'guestTimeOff' } : { name: 'employerTimeOff' }"
           color="white"
           class="nav-item"
           rounded="lg"
         />
-        <v-list-item
+       <v-list-item
           prepend-icon="mdi-swap-horizontal"
           title="Swaps"
-          :to="isGuest ? undefined : { name: 'employerSwaps' }"
-          :disabled="isGuest"
+          :to="isGuest ? { name: 'guestSwaps' } : { name: 'employerSwaps' }"
           color="white"
           class="nav-item"
           rounded="lg"
