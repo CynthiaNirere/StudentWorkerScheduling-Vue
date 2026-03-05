@@ -76,8 +76,8 @@ const handleSignUp = async () => {
         <v-card elevation="3" class="signup-card pa-8">
           <!-- Header -->
           <div class="text-center mb-6">
-            <h1 class="text-h4 font-weight-bold mb-2">TalonTime</h1>
-            <p class="text-subtitle-1 text-grey">"Talons Up, Scheduled Right"</p>
+            <h1 class="text-h4 font-weight-bold mb-2">ShiftBoard</h1>
+            <p class="text-subtitle-1 text-grey">Smart scheduling for student workers</p>
           </div>
 
           <div class="text-center mb-6">

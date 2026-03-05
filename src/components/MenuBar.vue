@@ -5,8 +5,9 @@ import AuthServices from "../services/authServices";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
+
 const user = ref(null);
-const title = ref("TalonTime");
+const title = ref("ShiftBoard");
 const initials = ref("");
 const name = ref("");
 
@@ -36,9 +37,14 @@ onMounted(() => {
 </script>
 
 <template>
-  <!-- Only show app bar if user is logged in AND NOT on login/signup/roleSelect pages -->
+  <!-- Hide app bar on admin, employer, employee dashboards and workplace -->
   <v-app-bar 
-    v-if="user && $route.name !== 'employeeDashboard' && $route.name !== 'login' && $route.name !== 'signup' && $route.name !== 'roleSelect'" 
+    v-if="user && 
+          !$route.path.startsWith('/employer') && 
+          !$route.path.startsWith('/admin') && 
+          !$route.path.startsWith('/workplace') &&
+          !$route.path.startsWith('/profile') &&
+          $route.name !== 'employeeDashboard'" 
     color="primary" 
     elevation="2"
   >
@@ -84,6 +90,10 @@ onMounted(() => {
               {{ user.role }}
             </v-chip>
             <v-divider class="my-3"></v-divider>
+            <v-btn variant="text" color="primary" block @click="router.push('/profile')">
+              <v-icon start>mdi-account-cog</v-icon>
+              View Profile
+            </v-btn>
             <v-btn variant="text" color="error" block @click="logout">
               <v-icon start>mdi-logout</v-icon>
               Logout

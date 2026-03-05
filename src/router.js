@@ -2,11 +2,20 @@ import { createRouter, createWebHistory } from "vue-router";
 import Utils from "./config/utils";
 
 // ─── IMPORTS ──────────────────────────────────────────────────────────────
+import Landing from "./views/Landing.vue"; 
+import GuestDashboard from "./views/GuestDashboard.vue";  
+import GuestSchedule from "./views/GuestSchedule.vue";  
+import GuestEmployees from './views/GuestEmployees.vue';
+import GuestAvailability from './views/GuestAvailability.vue';
+import GuestTimeOff from './views/GuestTimeOff.vue';
+import GuestSwaps from './views/GuestSwaps.vue';
 import Login from "./views/Login.vue";
 import SignUp from "./views/SignUp.vue";
 import RoleSelect from "./views/RoleSelect.vue";
 import AdminViewDashboard from "./views/adminViewDashboard.vue";
 import EmployeeDashboard from "./views/EmployeeDashboard.vue";
+import EmployeeAvailability from "./views/EmployeeAvailabiliy.vue";
+import EmployeeSchedule from "./views/EmployeeSchedule.vue";
 import BusinessAreaSelect from "./views/BusinessAreaSelect.vue";
 import EmployerDashboard from "./views/EmployerDashboard.vue";
 import EmployerSchedule from "./views/EmployerSchedule.vue";
@@ -16,15 +25,58 @@ import EmployerTimeOff from "./views/EmployerTimeOff.vue";
 import EmployerTasks from "./views/EmployerTasks.vue";
 import EmployerSwaps from "./views/EmployerSwaps.vue";
 import EmployerProfile from "./views/EmployerProfile.vue";
+import TemplateManagement from "./views/TemplateManagement.vue";  
+import Workplace from "./views/Workplace.vue";  
+import Profile from "./views/Profile.vue";  
 
 // ─── ROUTER ───────────────────────────────────────────────────────────────
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    // ─── LANDING & GUEST ROUTES ────────────────────────────────────────
     {
       path: "/",
-      redirect: "/login",
+      name: "landing",
+      component: Landing,
+      meta: { requiresAuth: false },
     },
+    {
+      path: "/guest",
+      name: "guestDashboard",
+      component: GuestDashboard,
+      meta: { requiresAuth: false },
+    },
+    {
+      path: "/guest/schedule",
+      name: "guestSchedule",
+      component: GuestSchedule,
+      meta: { requiresAuth: false },
+    },
+    {
+      path: "/guest/employees",
+      name: "guestEmployees",
+      component: GuestEmployees,
+      meta: { requiresAuth: false },
+    },
+    {
+      path: "/guest/availability",
+      name: "guestAvailability",
+      component: GuestAvailability,
+      meta: { requiresAuth: false },
+    },
+    {
+      path: "/guest/time-off",
+      name: "guestTimeOff",
+      component: GuestTimeOff,
+      meta: { requiresAuth: false },
+    },
+    {
+      path: "/guest/swaps",
+      name: "guestSwaps",
+      component: GuestSwaps,
+      meta: { requiresAuth: false },
+    },
+    // ─── AUTH ROUTES ───────────────────────────────────────────────────
     {
       path: "/signup",
       name: "signup",
@@ -43,6 +95,20 @@ const router = createRouter({
       component: RoleSelect,
       meta: { requiresAuth: true },
     },
+    // ─── SHARED ROUTES (All Authenticated Users) ───────────────────────
+    {
+      path: "/workplace",  
+      name: "workplace",
+      component: Workplace,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/profile",  
+      name: "profile",
+      component: Profile,
+      meta: { requiresAuth: true },
+    },
+    // ─── ADMIN ROUTES ──────────────────────────────────────────────────
     {
       path: "/admin",
       name: "adminViewDashboard",
@@ -60,8 +126,21 @@ const router = createRouter({
       component: EmployeeDashboard,
       meta: { requiresAuth: true },
     },
+    {
+      path: "/employee/availability",
+      name: "employeeAvailability",
+      component: EmployeeAvailability,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/employee/schedule",
+      name: "employeeSchedule",
+      component: EmployeeSchedule,
+      meta: { requiresAuth: true },
+    },
     // ─── EMPLOYER ROUTES ────────────────────────────────────────────────
-    { path: "/business-area-select",
+    {
+      path: "/business-area-select",
       name: "businessAreaSelect",
       component: BusinessAreaSelect,
       meta: { requiresAuth: true },
@@ -118,20 +197,33 @@ const router = createRouter({
       component: EmployerProfile,
       meta: { requiresAuth: true },
     },
+    {
+      path: "/employer/templates",
+      name: "employerTemplates",
+      component: TemplateManagement,
+      meta: { requiresAuth: true },
+    },
     // ─── CATCH ALL ──────────────────────────────────────────────────────
     {
       path: "/:pathMatch(.*)*",
-      redirect: "/login",
+      redirect: "/",
     },
   ],
 });
 
 router.beforeEach((to, from, next) => {
   const user = Utils.getStore("user");
+  const isGuest = localStorage.getItem("isGuest") === "true";
   const requiresAuth = to.meta.requiresAuth;
 
+  // Allow ALL guest routes when in guest mode
+  if (to.name?.startsWith("guest") && isGuest) {
+    next();
+    return;
+  }
+
+  // Require authentication for protected routes
   if (requiresAuth && !user) {
-    console.log("Not authenticated, redirecting to login");
     next({ name: "login" });
     return;
   }
