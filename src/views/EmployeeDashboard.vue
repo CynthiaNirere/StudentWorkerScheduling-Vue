@@ -23,8 +23,7 @@ const allTasksCompleted = computed(() => {
 });
 
 const submitTasks = () => {
-  console.log('Tasks submitted:', todaysTasks.value);
-  alert('Tasks submitted!');
+  showSnackbar('Tasks submitted successfully!', 'success');
 };
 
 const toggleTask = (taskId) => {
