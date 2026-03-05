@@ -63,7 +63,7 @@ const checkOut = (shiftId) => {
 };
 
 // ─── NOTIFICATIONS ────────────────────────────────────────────────────────
-const { notifications, unreadCount, urgentNotifications, dismissNotification, handleNotificationAction } = useNotifications();
+const { notifications, unreadCount, urgentNotifications, takenShifts, dismissNotification, handleNotificationAction } = useNotifications();
 
 const viewAllNotifications = () => { showNotifications.value = true; };
 
@@ -77,40 +77,6 @@ const showSnackbar  = (msg, color = 'success') => {
   snackbarMsg.value   = msg;
   snackbarColor.value = color;
   snackbar.value      = true;
-};
-
-// ─── ADD SHIFT DIALOG ─────────────────────────────────────────────────────
-const showAddShiftDialog = ref(false);
-const selectedDay        = ref('');
-const newShiftStart      = ref('');
-const newShiftEnd        = ref('');
-
-const openAddShift = (day) => {
-  selectedDay.value   = day;
-  newShiftStart.value = '';
-  newShiftEnd.value   = '';
-  showAddShiftDialog.value = true;
-};
-
-const to12h = (t) => {
-  if (!t) return '';
-  const [h, m] = t.split(':');
-  const hour   = parseInt(h);
-  const ampm   = hour >= 12 ? 'PM' : 'AM';
-  return `${hour % 12 || 12}:${m} ${ampm}`;
-};
-
-const submitShiftRequest = () => {
-  if (!newShiftStart.value || !newShiftEnd.value) return;
-  pendingRequests.value.unshift({
-    id:         Date.now(),
-    type:       'Shift Request',
-    date:       `${selectedDay.value} — ${to12h(newShiftStart.value)}–${to12h(newShiftEnd.value)}`,
-    status:     'pending',
-    submitDate: 'Waiting for review'
-  });
-  showAddShiftDialog.value = false;
-  showSnackbar('Shift request submitted! Waiting for review.');
 };
 
 // ─── SCHEDULE & STATUS ────────────────────────────────────────────────────
@@ -542,7 +508,7 @@ onMounted(() => {
                             <div class="shift-person">Sam W.</div>
                           </div>
                         </div>
-                        <div class="add-shift-btn" @click="openAddShift('Monday')">+ Add Shift</div>
+
                       </div>
 
                       <!-- TUE -->
@@ -552,9 +518,16 @@ onMounted(() => {
                             <div class="shift-person">You</div>
                             <div class="shift-status-text">Day Off</div>
                           </div>
-                          <p class="no-shifts-text">No shifts</p>
+                          <div
+                            v-for="(s, i) in takenShifts.filter(s => s.day === 'TUE')"
+                            :key="'taken-tue-' + i"
+                            class="shift-box"
+                          >
+                            <div class="shift-time">{{ s.time }}</div>
+                            <div class="shift-person">You (cover)</div>
+                          </div>
+                          <p v-if="takenShifts.filter(s => s.day === 'TUE').length === 0" class="no-shifts-text">No shifts</p>
                         </div>
-                        <div class="add-shift-btn" @click="openAddShift('Tuesday')">+ Add Shift</div>
                       </div>
 
                       <!-- WED -->
@@ -570,7 +543,7 @@ onMounted(() => {
                             <div class="shift-status-text">Pending Swap</div>
                           </div>
                         </div>
-                        <div class="add-shift-btn" @click="openAddShift('Wednesday')">+ Add Shift</div>
+
                       </div>
 
                       <!-- THU -->
@@ -584,7 +557,7 @@ onMounted(() => {
                           </div>
                           <p class="no-shifts-text">No shifts</p>
                         </div>
-                        <div class="add-shift-btn" @click="openAddShift('Thursday')">+ Add Shift</div>
+
                       </div>
 
                       <!-- FRI -->
@@ -596,19 +569,19 @@ onMounted(() => {
                           </div>
                           <p class="no-shifts-text">No shifts</p>
                         </div>
-                        <div class="add-shift-btn" @click="openAddShift('Friday')">+ Add Shift</div>
+
                       </div>
 
                       <!-- SAT -->
                       <div class="calendar-day">
                         <p class="no-shifts-text">No shifts</p>
-                        <div class="add-shift-btn" @click="openAddShift('Saturday')">+ Add Shift</div>
+
                       </div>
 
                       <!-- SUN -->
                       <div class="calendar-day">
                         <p class="no-shifts-text">No shifts</p>
-                        <div class="add-shift-btn" @click="openAddShift('Sunday')">+ Add Shift</div>
+
                       </div>
                     </div>
                   </div>
@@ -648,53 +621,6 @@ onMounted(() => {
         </v-row>
       </v-container>
     </v-main>
-    <!-- Add Shift Dialog -->
-    <v-dialog v-model="showAddShiftDialog" max-width="420" persistent>
-      <v-card rounded="lg">
-        <v-card-title class="text-h6 font-weight-bold pa-5 pb-3">
-          Request Shift — {{ selectedDay }}
-        </v-card-title>
-        <v-divider />
-        <v-card-text class="pa-5">
-          <p class="text-body-2 text-grey mb-4">Your request will be sent to your manager for approval.</p>
-          <div class="d-flex gap-3">
-            <div class="flex-grow-1">
-              <label class="text-caption font-weight-medium d-block mb-1">Start Time</label>
-              <v-text-field
-                v-model="newShiftStart"
-                type="time"
-                variant="outlined"
-                density="comfortable"
-                hide-details
-              />
-            </div>
-            <div class="flex-grow-1">
-              <label class="text-caption font-weight-medium d-block mb-1">End Time</label>
-              <v-text-field
-                v-model="newShiftEnd"
-                type="time"
-                variant="outlined"
-                density="comfortable"
-                hide-details
-              />
-            </div>
-          </div>
-        </v-card-text>
-        <v-card-actions class="pa-5 pt-2">
-          <v-spacer />
-          <v-btn variant="text" @click="showAddShiftDialog = false">Cancel</v-btn>
-          <v-btn
-            color="#12086F"
-            variant="flat"
-            :disabled="!newShiftStart || !newShiftEnd"
-            @click="submitShiftRequest"
-          >
-            Submit Request
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
     <v-snackbar v-model="snackbar" :color="snackbarColor" timeout="3000" location="bottom right">
       {{ snackbarMsg }}
     </v-snackbar>
@@ -924,25 +850,6 @@ onMounted(() => {
 
 .gap-3 { gap: 12px; }
 
-.add-shift-btn {
-  width: 100%;
-  padding: 6px;
-  border: 1px dashed #4361EE;
-  background: none;
-  border-radius: 5px;
-  font-size: 12px;
-  color: #4361EE;
-  cursor: pointer;
-  text-align: center;
-  margin-top: 6px;
-  transition: all 0.15s;
-}
-
-.add-shift-btn:hover {
-  border-color: #12086F;
-  color: #12086F;
-  background: rgba(18, 8, 111, 0.05);
-}
 
 .claim-btn {
   font-size: 0.6rem;
