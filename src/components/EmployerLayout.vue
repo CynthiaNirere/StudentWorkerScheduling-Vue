@@ -1,7 +1,8 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import Utils from '../config/utils.js';
+import EmployerService from '../services/employerServices.js';
 
 const props = defineProps({
   isGuest: {
@@ -11,19 +12,103 @@ const props = defineProps({
 });
 
 const router = useRouter();
+const route = useRoute();
+let refreshInterval = null;
 const user = ref(null);
 const businessArea = ref('');
 const rail = ref(true);
 
+const showNotifications = ref(false);
+const pendingSwaps = ref([]);
+const pendingTimeOff = ref([]);
+
+const notifications = computed(() => {
+  const items = [];
+
+  pendingSwaps.value.forEach(swap => {
+    const name = swap.requestingUserName || 'Unknown';
+    const shift = swap.shift;
+    let shiftInfo = '';
+    if (shift) {
+      const d = new Date(Number(shift.shiftTime));
+      shiftInfo = ` for ${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`;
+    }
+    items.push({
+      id: `swap-${swap.swap_id || swap.id}`,
+      rawId: swap.swap_id || swap.id,
+      type: 'swap',
+      label: 'Shift Cover Request',
+      message: `${name} needs someone${shiftInfo}`,
+      icon: 'mdi-swap-horizontal',
+      color: '#f57c00',
+    });
+  });
+
+  pendingTimeOff.value.forEach(req => {
+    const name = req.employeeName || 'Unknown';
+    const start = new Date(Number(req.start_date || req.startDate)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const end = new Date(Number(req.end_date || req.endDate)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    items.push({
+      id: `timeoff-${req.request_id || req.id}`,
+      rawId: req.request_id || req.id,
+      type: 'timeoff',
+      label: 'Time Off Request',
+      message: `${name} requested time off ${start} - ${end}`,
+      icon: 'mdi-calendar-remove',
+      color: '#4361EE',
+    });
+  });
+
+  return items;
+});
+
+const unreadCount = computed(() => notifications.value.length);
+
+const loadPendingRequests = async () => {
+  if (props.isGuest) return;
+  try {
+    const [swapRes, timeOffRes] = await Promise.all([
+      EmployerService.getAllShiftSwapRequests(),
+      EmployerService.getAllTimeOffRequests(),
+    ]);
+    const swaps = Array.isArray(swapRes.data) ? swapRes.data : [];
+    const timeOffs = Array.isArray(timeOffRes.data) ? timeOffRes.data : [];
+    pendingSwaps.value = swaps.filter(s => s.status === 'pending' || s.status === 'accepted');
+    pendingTimeOff.value = timeOffs.filter(t => t.status === 'pending');
+  } catch (err) {
+    console.error('Error loading pending requests:', err);
+  }
+};
+
+const goToPage = (type) => {
+  if (type === 'swap') {
+    router.push({ name: 'employerSwaps' });
+  } else {
+    router.push({ name: 'employerTimeOff' });
+  }
+};
+
 onMounted(async () => {
   user.value = Utils.getStore('user');
   
-  // Set business area based on guest or real user
   if (props.isGuest) {
     businessArea.value = 'Demo Campus Gym';
   } else if (user.value?.work_location) {
     businessArea.value = 'The Brew';
   }
+
+  await loadPendingRequests();
+  refreshInterval = setInterval(loadPendingRequests, 30000);
+  window.addEventListener('notifications-updated', loadPendingRequests);
+});
+
+onUnmounted(() => {
+  if (refreshInterval) clearInterval(refreshInterval);
+  window.removeEventListener('notifications-updated', loadPendingRequests);
+});
+
+watch(() => route.path, () => {
+  loadPendingRequests();
 });
 
 const userInitials = computed(() => {
@@ -174,6 +259,41 @@ const logout = () => {
       <!-- Top Navigation Bar -->
       <v-app-bar elevation="0" color="white" density="compact" class="top-bar">
         <v-spacer />
+
+        <!-- Notification Bell -->
+        <v-menu location="bottom end" v-model="showNotifications">
+          <template #activator="{ props: bellProps }">
+            <v-btn v-bind="bellProps" icon variant="text" class="mr-1">
+              <v-badge :content="unreadCount" :model-value="unreadCount > 0" color="error">
+                <v-icon>mdi-bell</v-icon>
+              </v-badge>
+            </v-btn>
+          </template>
+          <v-card min-width="420" max-width="500" style="max-height: 500px; overflow-y: auto;">
+            <v-card-title class="text-h6 font-weight-bold pa-4">Notifications</v-card-title>
+            <v-divider />
+            <div v-if="notifications.length === 0" class="text-center pa-6">
+              <v-icon size="40" color="grey-lighten-1" class="mb-2">mdi-bell-check-outline</v-icon>
+              <p class="text-grey">No pending requests</p>
+            </div>
+            <div v-else>
+              <div
+                v-for="notif in notifications"
+                :key="notif.id"
+                class="pa-4"
+                style="border-bottom: 1px solid #f0f0f0;"
+              >
+                <div class="d-flex ga-3 align-start">
+                  <v-icon :color="notif.color" size="large">{{ notif.icon }}</v-icon>
+                  <div class="flex-grow-1" style="cursor: pointer;" @click="goToPage(notif.type); showNotifications = false">
+                    <v-chip :color="notif.color" size="x-small" variant="tonal" class="mb-1">{{ notif.label }}</v-chip>
+                    <p class="text-body-2 mb-0">{{ notif.message }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </v-card>
+        </v-menu>
         
         <!-- Account Menu -->
         <v-menu location="bottom end">
@@ -224,6 +344,7 @@ const logout = () => {
         <slot />
       </div>
     </div>
+
   </div>
 </template>
 
@@ -284,4 +405,5 @@ const logout = () => {
   flex: 1;
   overflow-y: auto;
 }
+
 </style>
