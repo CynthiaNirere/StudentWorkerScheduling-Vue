@@ -63,7 +63,7 @@ const checkOut = (shiftId) => {
 };
 
 // ─── NOTIFICATIONS ────────────────────────────────────────────────────────
-const { notifications, unreadCount, urgentNotifications, dismissNotification, handleNotificationAction } = useNotifications();
+const { notifications, unreadCount, urgentNotifications, takenShifts, dismissNotification, handleNotificationAction } = useNotifications();
 
 const viewAllNotifications = () => { showNotifications.value = true; };
 
@@ -518,9 +518,16 @@ onMounted(() => {
                             <div class="shift-person">You</div>
                             <div class="shift-status-text">Day Off</div>
                           </div>
-                          <p class="no-shifts-text">No shifts</p>
+                          <div
+                            v-for="(s, i) in takenShifts.filter(s => s.day === 'TUE')"
+                            :key="'taken-tue-' + i"
+                            class="shift-box"
+                          >
+                            <div class="shift-time">{{ s.time }}</div>
+                            <div class="shift-person">You (cover)</div>
+                          </div>
+                          <p v-if="takenShifts.filter(s => s.day === 'TUE').length === 0" class="no-shifts-text">No shifts</p>
                         </div>
-
                       </div>
 
                       <!-- WED -->
