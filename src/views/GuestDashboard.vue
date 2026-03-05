@@ -50,7 +50,7 @@ const loadAlerts = async () => {
   try {
     // ✅ FIXED: Changed from getAllShiftSwapRequests to getAllSwapRequests
     const [swapRes, timeOffRes] = await Promise.all([
-      EmployerService.getAllSwapRequests().catch(() => ({ data: [] })),
+        EmployerService.getAllShiftSwapRequests().catch(() => ({ data: [] })),
       EmployerService.getAllTimeOffRequests().catch(() => ({ data: [] })),
     ]);
     
