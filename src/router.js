@@ -36,14 +36,44 @@ const router = createRouter({
     // ─── LANDING & GUEST ROUTES ────────────────────────────────────────
     {
       path: "/",
-      name: "landing",  //  CHANGED from redirect to actual landing page
+      name: "landing",
       component: Landing,
       meta: { requiresAuth: false },
     },
     {
-      path: "/guest",  //  ADDED
+      path: "/guest",
       name: "guestDashboard",
       component: GuestDashboard,
+      meta: { requiresAuth: false },
+    },
+    {
+      path: "/guest/schedule",
+      name: "guestSchedule",
+      component: GuestSchedule,
+      meta: { requiresAuth: false },
+    },
+    {
+      path: "/guest/employees",
+      name: "guestEmployees",
+      component: GuestEmployees,
+      meta: { requiresAuth: false },
+    },
+    {
+      path: "/guest/availability",
+      name: "guestAvailability",
+      component: GuestAvailability,
+      meta: { requiresAuth: false },
+    },
+    {
+      path: "/guest/time-off",
+      name: "guestTimeOff",
+      component: GuestTimeOff,
+      meta: { requiresAuth: false },
+    },
+    {
+      path: "/guest/swaps",
+      name: "guestSwaps",
+      component: GuestSwaps,
       meta: { requiresAuth: false },
     },
     // ─── AUTH ROUTES ───────────────────────────────────────────────────
@@ -167,13 +197,6 @@ const router = createRouter({
       component: EmployerProfile,
       meta: { requiresAuth: true },
     },
-    // ✅ NEW: Template Management Route
-    {
-      path: "/employer/templates",
-      name: "employerTemplates",
-      component: TemplateManagement,
-      meta: { requiresAuth: true },
-    },
     {
   path: "/guest/schedule",
   name: "guestSchedule",
@@ -207,18 +230,18 @@ const router = createRouter({
     // ─── CATCH ALL ──────────────────────────────────────────────────────
     {
       path: "/:pathMatch(.*)*",
-      redirect: "/",  //  CHANGED to redirect to landing instead of login
+      redirect: "/",
     },
   ],
 });
 
 router.beforeEach((to, from, next) => {
   const user = Utils.getStore("user");
-  const isGuest = localStorage.getItem("isGuest");  // 
+  const isGuest = localStorage.getItem("isGuest");
   const requiresAuth = to.meta.requiresAuth;
 
-  // Allow guest mode to access guestDashboard  // 
-  if (to.name === "guestDashboard" && isGuest) {
+  // ✅ FIXED: Allow guest mode to access ALL guest pages
+  if (to.name?.startsWith("guest") && isGuest) {
     next();
     return;
   }
