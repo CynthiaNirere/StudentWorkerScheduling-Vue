@@ -281,8 +281,8 @@ const handleCreateShift = async () => {
 
   creatingShift.value = true;
   try {
-    const shiftDate = new Date(newShift.value.date);
-    shiftDate.setHours(12, 0, 0, 0);
+    const [year, month, day] = newShift.value.date.split('-').map(Number);
+    const shiftDate = new Date(year, month - 1, day, 12, 0, 0, 0);
     
     await EmployerService.createShift({
       shiftTime: shiftDate.getTime(),
@@ -360,8 +360,8 @@ const handleUpdateShift = async () => {
 
   creatingShift.value = true;
   try {
-    const shiftDate = new Date(editShift.value.date);
-    shiftDate.setHours(12, 0, 0, 0);
+    const [year, month, day] = editShift.value.date.split('-').map(Number);
+    const shiftDate = new Date(year, month - 1, day, 12, 0, 0, 0);
     
     await EmployerService.updateShift(selectedShift.value.shift_id || selectedShift.value.id, {
       shiftTime: shiftDate.getTime(),
