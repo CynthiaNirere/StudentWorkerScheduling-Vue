@@ -9,7 +9,7 @@ const router = useRouter();
 const user = ref(null);
 
 const employees = ref([]);
-const jobRoles = ref([]);  // ✅ NEW: Store job roles from backend
+const jobRoles = ref([]);
 const loading = ref(false);
 const loadingRoles = ref(false);
 const search = ref("");
@@ -18,10 +18,17 @@ const showAddDialog = ref(false);
 const showEditDialog = ref(false);
 const showDetailsDialog = ref(false);
 const showDeleteDialog = ref(false);
+const showManageRolesDialog = ref(false); // ✅ NEW
 const selectedEmployee = ref(null);
 const employeeToDelete = ref(null);
 const saving = ref(false);
 const deleting = ref(false);
+
+// ✅ NEW: For managing roles
+const employeeRoles = ref([]);
+const selectedNewRole = ref(null);
+const makePrimary = ref(false);
+const addingRole = ref(false);
 
 const snackbar = ref(false);
 const snackbarMessage = ref("");
@@ -43,30 +50,25 @@ const editForm = ref({
   job_role: "",
 });
 
+// ✅ UPDATED: Headers with Roles column
 const headers = [
   { title: "Name", key: "name", sortable: true },
   { title: "Email", key: "email", sortable: true },
   { title: "Phone", key: "phone_number", sortable: true },
-  { title: "Job Role", key: "job_role", sortable: true },
-  { title: "Actions", key: "actions", sortable: false },
+  { title: "Job Roles", key: "roles", sortable: false }, // ✅ NEW
+  { title: "Actions", key: "actions", sortable: false, align: "end" },
 ];
 
-// ✅ NEW: Get job role suggestions (from backend + manual entry)
 const jobRoleSuggestions = computed(() => {
-  // Get unique roles from backend
   const backendRoles = jobRoles.value.map(r => r.title);
-  
-  // Get unique roles from existing employees
   const employeeRoles = employees.value
     .map(e => e.job_role)
     .filter(r => r && r !== 'Not assigned');
-  
-  // Combine and deduplicate
   const allRoles = [...new Set([...backendRoles, ...employeeRoles])];
-  
   return allRoles.sort();
 });
 
+// ✅ UPDATED: Include jobRoles array for each employee
 const employeesWithName = computed(() => {
   const currentUserId = user.value?.user_id || user.value?.userId;
   return employees.value
@@ -78,7 +80,14 @@ const employeesWithName = computed(() => {
       ...e,
       name: `${e.fName || e.first_name || ''} ${e.lName || e.last_name || ''}`.trim() || 'Unnamed',
       job_role: e.job_role || 'Not assigned',
+      jobRoles: e.jobRoles || [], // ✅ NEW: Multiple roles
     }));
+});
+
+// ✅ NEW: Available roles to add (exclude already assigned)
+const availableRolesToAdd = computed(() => {
+  const assignedRoleIds = employeeRoles.value.map(r => r.job_role_id);
+  return jobRoles.value.filter(r => !assignedRoleIds.includes(r.job_role_id));
 });
 
 onMounted(async () => {
@@ -86,12 +95,31 @@ onMounted(async () => {
   await Promise.all([loadEmployees(), loadJobRoles()]);
 });
 
+// ✅ UPDATED: Load employees with their roles
 const loadEmployees = async () => {
   loading.value = true;
   try {
     const res = await EmployerService.getAllEmployees();
-    console.log('Employees loaded:', res.data);
-    employees.value = Array.isArray(res.data) ? res.data : [];
+    const allUsers = Array.isArray(res.data) ? res.data : [];
+    const currentUserId = user.value?.user_id || user.value?.userId;
+    
+    const employeesList = allUsers.filter(u => {
+      const empId = u.user_id || u.userId;
+      return u.role === 'employee' && empId !== currentUserId;
+    });
+    
+    // ✅ NEW: Load roles for each employee
+    for (const emp of employeesList) {
+      try {
+        const rolesRes = await EmployerService.getUserRoles(emp.user_id || emp.userId);
+        emp.jobRoles = Array.isArray(rolesRes.data) ? rolesRes.data : [];
+      } catch (err) {
+        console.error(`Error loading roles for ${emp.user_id}:`, err);
+        emp.jobRoles = [];
+      }
+    }
+    
+    employees.value = employeesList;
   } catch (err) {
     console.error("Error loading employees:", err);
     showSnackbar("Error loading employees", "error");
@@ -100,19 +128,110 @@ const loadEmployees = async () => {
   }
 };
 
-// ✅ NEW: Load job roles from backend
 const loadJobRoles = async () => {
   loadingRoles.value = true;
   try {
     const res = await EmployerService.getAllJobRoles();
     jobRoles.value = Array.isArray(res.data) ? res.data : [];
-    console.log(`Loaded ${jobRoles.value.length} job roles from backend`);
   } catch (err) {
     console.error("Error loading job roles:", err);
-    // Don't show error to user - job roles are optional
     jobRoles.value = [];
   } finally {
     loadingRoles.value = false;
+  }
+};
+
+// ✅ NEW: Load roles for specific employee
+const loadEmployeeRoles = async (userId) => {
+  loadingRoles.value = true;
+  try {
+    const res = await EmployerService.getUserRoles(userId);
+    employeeRoles.value = Array.isArray(res.data) ? res.data : [];
+  } catch (err) {
+    console.error("Error loading employee roles:", err);
+    employeeRoles.value = [];
+  } finally {
+    loadingRoles.value = false;
+  }
+};
+
+// ✅ NEW: Open manage roles dialog
+const openManageRolesDialog = async (employee) => {
+  selectedEmployee.value = employee;
+  selectedNewRole.value = null;
+  makePrimary.value = false;
+  await loadEmployeeRoles(employee.user_id || employee.userId);
+  showManageRolesDialog.value = true;
+};
+
+// ✅ NEW: Add role to employee
+const handleAddRole = async () => {
+  if (!selectedNewRole.value) {
+    showSnackbar("Please select a role", "error");
+    return;
+  }
+  
+  addingRole.value = true;
+  try {
+    await EmployerService.addRoleToUser(
+      selectedEmployee.value.user_id || selectedEmployee.value.userId,
+      {
+        jobRoleId: selectedNewRole.value,
+        isPrimary: makePrimary.value
+      }
+    );
+    
+    showSnackbar("Role added successfully!", "success");
+    selectedNewRole.value = null;
+    makePrimary.value = false;
+    
+    await loadEmployeeRoles(selectedEmployee.value.user_id || selectedEmployee.value.userId);
+    await loadEmployees(); // Refresh main table
+  } catch (err) {
+    console.error("Error adding role:", err);
+    const errorMsg = err.response?.data?.message || "Error adding role";
+    showSnackbar(errorMsg, "error");
+  } finally {
+    addingRole.value = false;
+  }
+};
+
+// ✅ NEW: Remove role from employee
+const handleRemoveRole = async (roleId) => {
+  if (employeeRoles.value.length === 1) {
+    showSnackbar("Cannot remove the last role", "error");
+    return;
+  }
+  
+  try {
+    await EmployerService.removeRoleFromUser(
+      selectedEmployee.value.user_id || selectedEmployee.value.userId,
+      roleId
+    );
+    
+    showSnackbar("Role removed successfully!", "success");
+    await loadEmployeeRoles(selectedEmployee.value.user_id || selectedEmployee.value.userId);
+    await loadEmployees();
+  } catch (err) {
+    console.error("Error removing role:", err);
+    showSnackbar("Error removing role", "error");
+  }
+};
+
+// ✅ NEW: Set primary role
+const handleSetPrimary = async (roleId) => {
+  try {
+    await EmployerService.setPrimaryRole(
+      selectedEmployee.value.user_id || selectedEmployee.value.userId,
+      roleId
+    );
+    
+    showSnackbar("Primary role updated!", "success");
+    await loadEmployeeRoles(selectedEmployee.value.user_id || selectedEmployee.value.userId);
+    await loadEmployees();
+  } catch (err) {
+    console.error("Error setting primary role:", err);
+    showSnackbar("Error setting primary role", "error");
   }
 };
 
@@ -267,38 +386,63 @@ const showSnackbar = (message, color = "success") => {
               </div>
             </template>
 
-            <template #item.job_role="{ item }">
-              <v-chip
-                :color="item.job_role === 'Not assigned' ? '#9e9e9e' : '#4361EE'"
-                size="small"
-                variant="tonal"
-              >
-                {{ item.job_role }}
-              </v-chip>
+            <!-- ✅ NEW: Job Roles Column -->
+            <template #[`item.roles`]="{ item }">
+              <div class="d-flex flex-wrap ga-1">
+                <v-chip
+                  v-for="role in (item.jobRoles || []).slice(0, 2)"
+                  :key="role.user_job_role_id"
+                  size="x-small"
+                  :color="role.is_primary ? '#12086F' : '#4361EE'"
+                  variant="tonal"
+                >
+                  {{ role.role_title }}
+                  <v-icon v-if="role.is_primary" size="x-small" class="ml-1">mdi-star</v-icon>
+                </v-chip>
+                <v-chip
+                  v-if="(item.jobRoles || []).length > 2"
+                  size="x-small"
+                  variant="text"
+                  color="#666"
+                >
+                  +{{ (item.jobRoles || []).length - 2 }}
+                </v-chip>
+                <v-chip
+                  v-if="(item.jobRoles || []).length === 0"
+                  size="x-small"
+                  color="#9e9e9e"
+                  variant="tonal"
+                >
+                  No roles
+                </v-chip>
+              </div>
             </template>
 
-            <template #item.actions="{ item }">
-              <v-btn
-                icon="mdi-eye"
-                size="small"
-                variant="plain"
-                color="#4361EE"
-                @click="openDetailsDialog(item)"
-              />
-              <v-btn
-                icon="mdi-pencil"
-                size="small"
-                variant="plain"
-                color="#4361EE"
-                @click="openEditDialog(item)"
-              />
-              <v-btn
-                icon="mdi-delete"
-                size="small"
-                variant="plain"
-                color="#d32f2f"
-                @click="openDeleteDialog(item)"
-              />
+            <!-- ✅ UPDATED: Actions with Manage Roles -->
+            <template #[`item.actions`]="{ item }">
+              <v-menu>
+                <template #activator="{ props }">
+                  <v-btn icon="mdi-dots-vertical" size="small" variant="text" v-bind="props" />
+                </template>
+                <v-list density="compact">
+                  <v-list-item @click="openDetailsDialog(item)" prepend-icon="mdi-eye">
+                    <v-list-item-title>View Details</v-list-item-title>
+                  </v-list-item>
+                  <v-list-item @click="openEditDialog(item)" prepend-icon="mdi-pencil">
+                    <v-list-item-title>Edit Info</v-list-item-title>
+                  </v-list-item>
+                  
+                  <!-- ✅ NEW: Manage Roles option -->
+                  <v-list-item @click="openManageRolesDialog(item)" prepend-icon="mdi-briefcase-account">
+                    <v-list-item-title>Manage Roles</v-list-item-title>
+                  </v-list-item>
+                  
+                  <v-divider class="my-1" />
+                  <v-list-item @click="openDeleteDialog(item)" prepend-icon="mdi-delete" class="text-error">
+                    <v-list-item-title>Delete</v-list-item-title>
+                  </v-list-item>
+                </v-list>
+              </v-menu>
             </template>
           </v-data-table>
         </v-card-text>
@@ -350,7 +494,6 @@ const showSnackbar = (message, color = "success") => {
             class="mb-3"
             color="#12086F"
           />
-          <!-- ✅ UPDATED: Autocomplete with suggestions -->
           <v-autocomplete
             v-model="newEmployee.job_role"
             :items="jobRoleSuggestions"
@@ -358,7 +501,7 @@ const showSnackbar = (message, color = "success") => {
             variant="outlined"
             density="compact"
             placeholder="Type or select a role"
-            hint="Select from existing roles or type a new one"
+            hint="You can add multiple roles after creating the employee"
             persistent-hint
             color="#12086F"
             clearable
@@ -443,7 +586,6 @@ const showSnackbar = (message, color = "success") => {
             class="mb-3"
             color="#12086F"
           />
-          <!-- ✅ UPDATED: Autocomplete with suggestions -->
           <v-autocomplete
             v-model="editForm.job_role"
             :items="jobRoleSuggestions"
@@ -451,7 +593,7 @@ const showSnackbar = (message, color = "success") => {
             variant="outlined"
             density="compact"
             placeholder="Type or select a role"
-            hint="Select from existing roles or type a new one"
+            hint="Use 'Manage Roles' for multiple roles"
             persistent-hint
             color="#12086F"
             clearable
@@ -490,6 +632,158 @@ const showSnackbar = (message, color = "success") => {
           >
             Save Changes
           </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- ✅ NEW: Manage Roles Dialog -->
+    <v-dialog v-model="showManageRolesDialog" max-width="600">
+      <v-card rounded="lg">
+        <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4 navy-text">
+          Manage Roles - {{ selectedEmployee?.fName || selectedEmployee?.first_name }} {{ selectedEmployee?.lName || selectedEmployee?.last_name }}
+        </v-card-title>
+        <v-divider />
+        
+        <v-card-text class="pa-5">
+          <!-- Current Roles -->
+          <div class="mb-4">
+            <div class="text-subtitle-2 mb-2 navy-text">Current Roles</div>
+            
+            <div v-if="loadingRoles" class="text-center py-4">
+              <v-progress-circular indeterminate color="#12086F" size="24" />
+            </div>
+            
+            <div v-else-if="employeeRoles.length === 0" class="text-caption text-grey pa-4 text-center">
+              <v-icon size="48" class="mb-2">mdi-briefcase-off-outline</v-icon>
+              <div>No roles assigned yet</div>
+            </div>
+            
+            <div v-else class="d-flex flex-column ga-2">
+              <v-card
+                v-for="role in employeeRoles"
+                :key="role.user_job_role_id"
+                variant="outlined"
+                class="pa-3"
+              >
+                <div class="d-flex align-center justify-space-between">
+                  <div class="flex-grow-1">
+                    <div class="d-flex align-center ga-2 mb-1">
+                      <v-icon :color="role.is_primary ? '#12086F' : '#4361EE'">
+                        mdi-briefcase
+                      </v-icon>
+                      <span class="font-weight-bold">{{ role.role_title }}</span>
+                      <v-chip
+                        v-if="role.is_primary"
+                        size="x-small"
+                        color="#12086F"
+                        variant="tonal"
+                      >
+                        <v-icon size="x-small" class="mr-1">mdi-star</v-icon>
+                        Primary
+                      </v-chip>
+                    </div>
+                    <div v-if="role.role_description" class="text-caption text-grey">
+                      {{ role.role_description }}
+                    </div>
+                  </div>
+                  
+                  <div class="d-flex ga-1">
+                    <v-btn
+                      v-if="!role.is_primary"
+                      icon
+                      size="x-small"
+                      variant="text"
+                      color="#f57c00"
+                      @click="handleSetPrimary(role.job_role_id)"
+                    >
+                      <v-icon>mdi-star-outline</v-icon>
+                      <v-tooltip activator="parent" location="top">Set as Primary</v-tooltip>
+                    </v-btn>
+                    <v-btn
+                      icon
+                      size="x-small"
+                      variant="text"
+                      color="#d32f2f"
+                      @click="handleRemoveRole(role.job_role_id)"
+                      :disabled="employeeRoles.length === 1"
+                    >
+                      <v-icon>mdi-delete</v-icon>
+                      <v-tooltip activator="parent" location="top">
+                        {{ employeeRoles.length === 1 ? 'Cannot remove last role' : 'Remove Role' }}
+                      </v-tooltip>
+                    </v-btn>
+                  </div>
+                </div>
+              </v-card>
+            </div>
+          </div>
+
+          <v-divider class="my-4" />
+
+          <!-- Add New Role -->
+          <div>
+            <div class="text-subtitle-2 mb-2 navy-text">Add New Role</div>
+            
+            <v-select
+              v-model="selectedNewRole"
+              :items="availableRolesToAdd"
+              item-title="title"
+              item-value="job_role_id"
+              label="Select Role"
+              variant="outlined"
+              density="compact"
+              class="mb-3"
+              color="#12086F"
+              :disabled="availableRolesToAdd.length === 0"
+            >
+              <template #item="{ props, item }">
+                <v-list-item v-bind="props">
+                  <template #prepend>
+                    <v-icon>mdi-briefcase</v-icon>
+                  </template>
+                  <v-list-item-title>{{ item.raw.title }}</v-list-item-title>
+                  <v-list-item-subtitle v-if="item.raw.description">
+                    {{ item.raw.description }}
+                  </v-list-item-subtitle>
+                </v-list-item>
+              </template>
+              <template #no-data>
+                <v-list-item>
+                  <v-list-item-title class="text-caption text-grey">
+                    All available roles are already assigned
+                  </v-list-item-title>
+                </v-list-item>
+              </template>
+            </v-select>
+
+            <v-checkbox
+              v-model="makePrimary"
+              label="Set as primary role"
+              color="#12086F"
+              density="compact"
+              hide-details
+              class="mb-3"
+              :disabled="!selectedNewRole"
+            />
+
+            <v-btn
+              color="#12086F"
+              variant="flat"
+              block
+              :loading="addingRole"
+              :disabled="!selectedNewRole"
+              @click="handleAddRole"
+              prepend-icon="mdi-plus"
+            >
+              Add Role
+            </v-btn>
+          </div>
+        </v-card-text>
+        
+        <v-divider />
+        <v-card-actions class="pa-4">
+          <v-spacer />
+          <v-btn variant="text" @click="showManageRolesDialog = false">Close</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -547,10 +841,27 @@ const showSnackbar = (message, color = "success") => {
             <div class="text-body-1">{{ selectedEmployee.phone_number || "N/A" }}</div>
           </div>
           <div class="mb-3">
-            <div class="text-caption text-grey">Job Role</div>
-            <v-chip :color="selectedEmployee.job_role ? '#4361EE' : '#9e9e9e'" size="small" variant="tonal">
-              {{ selectedEmployee.job_role || "Not assigned" }}
-            </v-chip>
+            <div class="text-caption text-grey">Job Roles</div>
+            <div class="d-flex flex-wrap ga-1 mt-1">
+              <v-chip
+                v-for="role in (selectedEmployee.jobRoles || [])"
+                :key="role.user_job_role_id"
+                size="small"
+                :color="role.is_primary ? '#12086F' : '#4361EE'"
+                variant="tonal"
+              >
+                {{ role.role_title }}
+                <v-icon v-if="role.is_primary" size="small" class="ml-1">mdi-star</v-icon>
+              </v-chip>
+              <v-chip
+                v-if="(selectedEmployee.jobRoles || []).length === 0"
+                size="small"
+                color="#9e9e9e"
+                variant="tonal"
+              >
+                No roles assigned
+              </v-chip>
+            </div>
           </div>
           <div class="mb-3">
             <div class="text-caption text-grey">User ID</div>

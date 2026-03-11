@@ -112,7 +112,7 @@ watch(() => route.path, () => {
 });
 
 const userInitials = computed(() => {
-  if (!user.value) return 'G';  // G for Guest
+  if (!user.value) return 'G';
   const firstName = user.value.fName || user.value.first_name || '';
   const lastName = user.value.lName || user.value.last_name || '';
   return (firstName[0] || '') + (lastName[0] || '');
@@ -166,7 +166,6 @@ const logout = () => {
           <p class="text-caption text-white-80 mt-1 mb-0">
             {{ businessArea || '...' }}
           </p>
-          <!-- Guest Badge -->
           <v-chip v-if="isGuest" size="x-small" color="info" variant="tonal" class="mt-2">
             <v-icon start size="x-small">mdi-eye-outline</v-icon>
             Guest Mode
@@ -174,7 +173,6 @@ const logout = () => {
         </div>
         <div v-show="rail" class="text-center">
           <v-icon color="white" size="32">mdi-calendar-clock</v-icon>
-          <!-- Guest indicator when collapsed -->
           <v-icon v-if="isGuest" color="info" size="16" class="mt-1">
             mdi-eye-outline
           </v-icon>
@@ -200,7 +198,6 @@ const logout = () => {
           class="nav-item"
           rounded="lg"
         />
-        <!-- ✅ NEW: Templates Link -->
         <v-list-item
           prepend-icon="mdi-content-save"
           title="Templates"
@@ -234,7 +231,7 @@ const logout = () => {
           class="nav-item"
           rounded="lg"
         />
-       <v-list-item
+        <v-list-item
           prepend-icon="mdi-swap-horizontal"
           title="Swaps"
           :to="isGuest ? { name: 'guestSwaps' } : { name: 'employerSwaps' }"
@@ -242,6 +239,35 @@ const logout = () => {
           class="nav-item"
           rounded="lg"
         />
+        
+        <!-- ✅ NEW: Alerts Page -->
+        <v-list-item
+          prepend-icon="mdi-bell-alert"
+          title="Alerts"
+          :to="isGuest ? undefined : { name: 'employerAlerts' }"
+          :disabled="isGuest"
+          color="white"
+          class="nav-item"
+          rounded="lg"
+        >
+          <template #append v-if="!isGuest && unreadCount > 0 && !rail">
+            <v-chip size="x-small" color="error" variant="flat">
+              {{ unreadCount }}
+            </v-chip>
+          </template>
+        </v-list-item>
+        
+        <!-- ✅ NEW: Messages Page -->
+        <v-list-item
+          prepend-icon="mdi-message-text"
+          title="Messages"
+          :to="isGuest ? undefined : { name: 'employerMessages' }"
+          :disabled="isGuest"
+          color="white"
+          class="nav-item"
+          rounded="lg"
+        />
+        
         <v-list-item
           prepend-icon="mdi-checkbox-marked-circle-outline"
           title="Tasks"
