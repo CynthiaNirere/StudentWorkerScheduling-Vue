@@ -15,7 +15,6 @@ const form = ref({
   lName: '',
   email: '',
   role:  '',
-  bio:   '',
 });
 
 // ── SKILLS ────────────────────────────────────────────────────────────────
@@ -29,15 +28,33 @@ const addSkill = () => {
 };
 const removeSkill = (idx) => skills.value.splice(idx, 1);
 
-// ── CERTIFICATIONS ────────────────────────────────────────────────────────
-const certifications = ref([]);
-const newCert        = ref('');
+// ── CERTIFICATIONS (file uploads) ─────────────────────────────────────────
+const certifications  = ref([]);   // [{ name, date, dataUrl, mimeType }]
+const certError       = ref('');
+const ALLOWED_TYPES   = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
-const addCert = () => {
-  const c = newCert.value.trim();
-  if (c && !certifications.value.includes(c)) certifications.value.push(c);
-  newCert.value = '';
+const onCertFileChange = (e) => {
+  certError.value = '';
+  const file = e.target.files?.[0];
+  if (!file) return;
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    certError.value = 'Only PDF and image files (JPEG, PNG, GIF, WEBP) are accepted.';
+    e.target.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    certifications.value.push({
+      name:     file.name,
+      date:     new Date().toLocaleDateString(),
+      dataUrl:  reader.result,
+      mimeType: file.type,
+    });
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
 };
+
 const removeCert = (idx) => certifications.value.splice(idx, 1);
 
 // ── SAVE ──────────────────────────────────────────────────────────────────
@@ -52,7 +69,6 @@ const saveProfile = async () => {
     ...user.value,
     fName:          form.value.fName,
     lName:          form.value.lName,
-    bio:            form.value.bio,
     skills:         [...skills.value],
     certifications: [...certifications.value],
   };
@@ -88,7 +104,6 @@ onMounted(() => {
       lName: user.value.lName || '',
       email: user.value.email || '',
       role:  user.value.role  || 'employee',
-      bio:   user.value.bio   || '',
     };
     skills.value         = [...(user.value.skills         || [])];
     certifications.value = [...(user.value.certifications || [])];
@@ -122,9 +137,12 @@ onMounted(() => {
           @click="router.push({ name: 'employeeDashboard' })" />
         <v-list-item prepend-icon="mdi-clock-outline" title="My Availability" rounded="lg" class="mb-1"
           @click="router.push({ name: 'employeeAvailability' })" />
-        <v-list-item prepend-icon="mdi-calendar-clock" title="Shift Requests" rounded="lg" class="mb-1" />
-        <v-list-item prepend-icon="mdi-checkbox-marked-circle-outline" title="My Tasks" rounded="lg" class="mb-1" />
-        <v-list-item prepend-icon="mdi-account-circle-outline" title="Profile" active rounded="lg" class="mb-1" />
+        <v-list-item prepend-icon="mdi-calendar-month" title="Team Schedule" rounded="lg" class="mb-1"
+          @click="router.push({ name: 'employeeSchedule' })" />
+        <v-list-item prepend-icon="mdi-account-circle-outline" title="Profile" active rounded="lg" class="mb-1"
+          @click="router.push({ name: 'employeeProfile' })" />
+        <v-list-item prepend-icon="mdi-cog-outline" title="Settings" rounded="lg" class="mb-1"
+          @click="router.push({ name: 'employeeSettings' })" />
       </v-list>
     </v-navigation-drawer>
 
@@ -208,8 +226,8 @@ onMounted(() => {
                   variant="tonal"
                   closable
                   @click:close="removeCert(i)"
-                >{{ cert }}</v-chip>
-                <span v-if="certifications.length === 0" class="text-caption text-disabled">No certifications added yet</span>
+                >{{ cert.name }}</v-chip>
+                <span v-if="certifications.length === 0" class="text-caption text-disabled">No certifications uploaded yet</span>
               </div>
             </v-card>
           </v-col>
@@ -253,6 +271,9 @@ onMounted(() => {
                   color="#12086F"
                   class="mb-3"
                   prepend-inner-icon="mdi-email-outline"
+                  readonly
+                  hint="Email cannot be changed"
+                  persistent-hint
                 />
                 <v-text-field
                   v-model="form.role"
@@ -268,27 +289,6 @@ onMounted(() => {
               </v-card-text>
             </v-card>
 
-            <!-- Bio -->
-            <v-card variant="outlined" rounded="lg" class="navy-card mb-4">
-              <v-card-title class="text-subtitle-1 font-weight-bold pa-4 navy-text d-flex align-center ga-2">
-                <v-icon size="18" color="#12086F">mdi-text-account</v-icon>
-                Bio
-              </v-card-title>
-              <v-divider />
-              <v-card-text class="pa-5">
-                <v-textarea
-                  v-model="form.bio"
-                  label="Tell us about yourself…"
-                  variant="outlined"
-                  density="compact"
-                  color="#12086F"
-                  rows="4"
-                  counter="300"
-                  maxlength="300"
-                  no-resize
-                />
-              </v-card-text>
-            </v-card>
 
             <!-- Skills -->
             <v-card variant="outlined" rounded="lg" class="navy-card mb-4">
@@ -326,7 +326,7 @@ onMounted(() => {
               </v-card-text>
             </v-card>
 
-            <!-- Certifications -->
+            <!-- Certifications (file upload) -->
             <v-card variant="outlined" rounded="lg" class="navy-card">
               <v-card-title class="text-subtitle-1 font-weight-bold pa-4 navy-text d-flex align-center ga-2">
                 <v-icon size="18" color="#12086F">mdi-certificate-outline</v-icon>
@@ -334,31 +334,61 @@ onMounted(() => {
               </v-card-title>
               <v-divider />
               <v-card-text class="pa-5">
-                <div class="d-flex ga-2 mb-4">
-                  <v-text-field
-                    v-model="newCert"
-                    label="Add a certification (e.g. Food Safety, First Aid)"
-                    variant="outlined"
-                    density="compact"
+
+                <!-- Upload button -->
+                <div class="mb-4">
+                  <v-btn
                     color="#12086F"
-                    hide-details
-                    @keyup.enter="addCert"
-                  />
-                  <v-btn color="#12086F" variant="flat" :disabled="!newCert.trim()" @click="addCert">
-                    Add
+                    variant="tonal"
+                    prepend-icon="mdi-upload"
+                    @click="$refs.certInput.click()"
+                  >
+                    Upload Certification
                   </v-btn>
+                  <input
+                    ref="certInput"
+                    type="file"
+                    accept=".pdf,image/*"
+                    style="display:none"
+                    @change="onCertFileChange"
+                  />
+                  <p class="text-caption text-grey mt-1 mb-0">Accepted: PDF, JPEG, PNG, GIF, WEBP</p>
+                  <v-alert
+                    v-if="certError"
+                    type="error"
+                    density="compact"
+                    variant="tonal"
+                    class="mt-2"
+                  >{{ certError }}</v-alert>
                 </div>
-                <div class="d-flex flex-wrap ga-2">
-                  <v-chip
+
+                <!-- Uploaded files list -->
+                <div v-if="certifications.length === 0" class="text-caption text-disabled">
+                  No certifications uploaded yet
+                </div>
+                <v-list v-else density="compact" class="pa-0">
+                  <v-list-item
                     v-for="(cert, i) in certifications"
                     :key="i"
-                    color="success"
-                    variant="tonal"
-                    closable
-                    @click:close="removeCert(i)"
-                  >{{ cert }}</v-chip>
-                  <span v-if="certifications.length === 0" class="text-caption text-disabled">No certifications yet — add one above</span>
-                </div>
+                    :prepend-icon="cert.mimeType === 'application/pdf' ? 'mdi-file-pdf-box' : 'mdi-file-image'"
+                    rounded="lg"
+                    class="mb-1"
+                    style="border:1px solid #e0e0e0"
+                  >
+                    <v-list-item-title class="text-body-2 font-weight-medium">{{ cert.name }}</v-list-item-title>
+                    <v-list-item-subtitle class="text-caption text-grey">Uploaded {{ cert.date }}</v-list-item-subtitle>
+                    <template #append>
+                      <v-btn
+                        icon="mdi-delete-outline"
+                        size="small"
+                        variant="text"
+                        color="error"
+                        @click="removeCert(i)"
+                      />
+                    </template>
+                  </v-list-item>
+                </v-list>
+
               </v-card-text>
             </v-card>
 

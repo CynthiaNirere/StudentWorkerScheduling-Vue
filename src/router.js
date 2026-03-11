@@ -16,6 +16,8 @@ import AdminViewDashboard from "./views/adminViewDashboard.vue";
 import EmployeeDashboard from "./views/EmployeeDashboard.vue";
 import EmployeeAvailability from "./views/EmployeeAvailabiliy.vue";
 import EmployeeSchedule from "./views/EmployeeSchedule.vue";
+import EmployeeProfile from "./views/EmployeeProfile.vue";
+import EmployeeSettings from "./views/EmployeeSettings.vue";
 import BusinessAreaSelect from "./views/BusinessAreaSelect.vue";
 import EmployerDashboard from "./views/EmployerDashboard.vue";
 import EmployerSchedule from "./views/EmployerSchedule.vue";
@@ -139,6 +141,18 @@ const router = createRouter({
       path: "/employee/schedule",
       name: "employeeSchedule",
       component: EmployeeSchedule,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/employee/profile",
+      name: "employeeProfile",
+      component: EmployeeProfile,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/employee/settings",
+      name: "employeeSettings",
+      component: EmployeeSettings,
       meta: { requiresAuth: true },
     },
     // ─── EMPLOYER ROUTES ────────────────────────────────────────────────
