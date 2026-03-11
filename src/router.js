@@ -25,7 +25,10 @@ import EmployerTimeOff from "./views/EmployerTimeOff.vue";
 import EmployerTasks from "./views/EmployerTasks.vue";
 import EmployerSwaps from "./views/EmployerSwaps.vue";
 import EmployerProfile from "./views/EmployerProfile.vue";
-import TemplateManagement from "./views/TemplateManagement.vue";  
+import TemplateManagement from "./views/TemplateManagement.vue";
+// ✅ NEW IMPORTS
+import EmployerAlerts from "./views/EmployerAlerts.vue";
+import EmployerMessages from "./views/EmployerMessages.vue";
 import Workplace from "./views/Workplace.vue";  
 import Profile from "./views/Profile.vue";  
 
@@ -189,6 +192,19 @@ const router = createRouter({
       path: "/employer/swaps",
       name: "employerSwaps",
       component: EmployerSwaps,
+      meta: { requiresAuth: true },
+    },
+    // ✅ NEW: ALERTS & MESSAGES ROUTES
+    {
+      path: "/employer/alerts",
+      name: "employerAlerts",
+      component: EmployerAlerts,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/employer/messages",
+      name: "employerMessages",
+      component: EmployerMessages,
       meta: { requiresAuth: true },
     },
     {

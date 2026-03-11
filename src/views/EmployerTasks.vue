@@ -1,632 +1,564 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
-import { useRouter } from "vue-router";
-import Utils from "../config/utils";
-import EmployerService from "../services/employerServices.js";
+import { ref, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import EmployerService from '../services/employerServices.js';
+import Utils from '../config/utils.js';
 import EmployerLayout from '../components/EmployerLayout.vue';
 
 const router = useRouter();
 const user = ref(null);
-
-const taskLists = ref([]);
-const selectedList = ref(null);
-const taskItems = ref([]);
-const employees = ref([]);
 const loading = ref(false);
-const loadingItems = ref(false);
 
-const showCreateListDialog = ref(false);
+// Data
+const taskLists = ref([]);
+const completionHistory = ref([]);
+const selectedDate = ref(new Date().toISOString().split('T')[0]);
+const tab = ref('today');
+
+// Dialog states
+const showCreateDialog = ref(false);
+const showItemsDialog = ref(false);
 const showAddItemDialog = ref(false);
-const showDeleteDialog = ref(false);
-const listToDelete = ref(null);
-const creatingList = ref(false);
-const addingItem = ref(false);
-const deleting = ref(false);
 
-const snackbar = ref(false);
-const snackbarMessage = ref("");
-const snackbarColor = ref("success");
-
-const newList = ref({
-  title: "",
-  description: "",
-  priority: "medium",
+// Form data
+const newTask = ref({
+  title: '',
+  description: '',
+  shiftType: 'all_day',
+  recursDaily: false,
+  isTemplate: false,
+  priority: 'medium'
 });
 
 const newItem = ref({
-  title: "",
-  description: "",
-  assignedTo: "",
-  status: "pending", // NEW: Default status
+  title: '',
+  description: '',
+  orderPosition: 1
 });
 
-onMounted(async () => {
-  user.value = Utils.getStore("user");
-  await Promise.all([loadTaskLists(), loadEmployees()]);
+const selectedTaskList = ref(null);
+
+// Computed
+const todayTasks = computed(() => {
+  const today = new Date().setHours(0, 0, 0, 0);
+  return taskLists.value.filter(t => {
+    if (t.isTemplate || t.is_template) return false;
+    const dueDate = t.dueDate ? new Date(Number(t.dueDate)).setHours(0, 0, 0, 0) : null;
+    return dueDate === today || t.recursDaily || t.recurs_daily;
+  });
 });
 
+const templateTasks = computed(() => {
+  return taskLists.value.filter(t => t.isTemplate || t.is_template);
+});
+
+const yesterdayCompletions = computed(() => {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setHours(0, 0, 0, 0);
+  const yesterdayTimestamp = yesterday.getTime();
+  
+  return completionHistory.value.filter(h => {
+    const completedDate = new Date(Number(h.completedAt || h.completed_at));
+    completedDate.setHours(0, 0, 0, 0);
+    return completedDate.getTime() === yesterdayTimestamp;
+  });
+});
+
+const yesterdayStats = computed(() => {
+  const totalItems = completionHistory.value.length;
+  const completed = yesterdayCompletions.value.length;
+  const percentage = totalItems > 0 ? Math.round((completed / totalItems) * 100) : 0;
+  return { total: totalItems, completed, percentage };
+});
+
+// Methods
 const loadTaskLists = async () => {
   loading.value = true;
   try {
-    const res = await EmployerService.getAllTaskLists();
-    taskLists.value = Array.isArray(res.data) ? res.data : [];
-  } catch (err) {
-    console.error("Error loading task lists:", err);
-    showSnackbar("Error loading task lists", "error");
+    const response = await EmployerService.getAllTaskLists();
+    taskLists.value = response.data || [];
+  } catch (error) {
+    console.error('Error loading task lists:', error);
   } finally {
     loading.value = false;
   }
 };
 
-const loadTaskItems = async (listId) => {
-  loadingItems.value = true;
+const loadCompletionHistory = async () => {
   try {
-    const res = await EmployerService.getTaskItemsByList(listId);
-    taskItems.value = Array.isArray(res.data) ? res.data : [];
-  } catch (err) {
-    console.error("Error loading task items:", err);
-    showSnackbar("Error loading task items", "error");
-  } finally {
-    loadingItems.value = false;
+    const response = await EmployerService.getTaskCompletionHistory();
+    completionHistory.value = response.data || [];
+  } catch (error) {
+    console.error('Error loading completion history:', error);
   }
 };
 
-const loadEmployees = async () => {
-  try {
-    const res = await EmployerService.getAllEmployees();
-    const all = Array.isArray(res.data) ? res.data : [];
-    const currentUserId = user.value?.user_id || user.value?.userId;
-    employees.value = all.filter((u) => {
-      const empId = u.user_id || u.userId;
-      return u.role === "employee" && empId !== currentUserId;
-    });
-  } catch (err) {
-    console.error("Error loading employees:", err);
-  }
-};
-
-const handleCreateList = async () => {
-  if (!newList.value.title) {
-    showSnackbar("Title is required", "error");
-    return;
-  }
-
-  creatingList.value = true;
+const createTaskList = async () => {
+  loading.value = true;
   try {
     await EmployerService.createTaskList({
-      ...newList.value,
-      createdBy: user.value?.user_id || user.value?.userId,
-      locationId: user.value?.work_location || 1,
-      createdAt: Date.now(),
+      ...newTask.value,
+      createdBy: user.value.user_id || user.value.id,
+      locationId: user.value.work_location,
+      createdAt: Date.now()
     });
-    showSnackbar("Task list created!", "success");
-    showCreateListDialog.value = false;
-    newList.value = { title: "", description: "", priority: "medium" };
+    
+    showCreateDialog.value = false;
+    resetNewTask();
     await loadTaskLists();
-  } catch (err) {
-    console.error('Create list error:', err);
-    showSnackbar("Error creating task list", "error");
+  } catch (error) {
+    console.error('Error creating task list:', error);
   } finally {
-    creatingList.value = false;
+    loading.value = false;
   }
 };
 
-const handleAddItem = async () => {
-  if (!newItem.value.title) {
-    showSnackbar("Title is required", "error");
-    return;
-  }
+const openItemsDialog = async (taskList) => {
+  selectedTaskList.value = taskList;
+  showItemsDialog.value = true;
+  await loadTaskListItems(taskList.tasklist_id || taskList.id);
+};
 
-  addingItem.value = true;
+const loadTaskListItems = async (tasklistId) => {
   try {
-    await EmployerService.createTaskItem({
-      tasklistId: selectedList.value.tasklist_id || selectedList.value.id,
-      ...newItem.value,
-      createdAt: Date.now(),
-    });
-    showSnackbar("Task item added!", "success");
-    showAddItemDialog.value = false;
-    newItem.value = { title: "", description: "", assignedTo: "", status: "pending" };
-    await loadTaskItems(selectedList.value.tasklist_id || selectedList.value.id);
-  } catch (err) {
-    console.error('Add item error:', err);
-    showSnackbar("Error adding task item", "error");
-  } finally {
-    addingItem.value = false;
-  }
-};
-
-// NEW: Update task status with three states
-const handleUpdateTaskStatus = async (item, newStatus) => {
-  try {
-    await EmployerService.updateTaskItem(item.item_id || item.id, { status: newStatus });
-    showSnackbar(`Task marked as ${newStatus}`, "success");
-    await loadTaskItems(selectedList.value.tasklist_id || selectedList.value.id);
-  } catch (err) {
-    console.error('Update item error:', err);
-    showSnackbar("Error updating task", "error");
-  }
-};
-
-// NEW: Cycle through statuses on checkbox click
-const handleCompleteItem = async (item) => {
-  const currentStatus = item.status || 'pending';
-  let newStatus;
-  
-  if (currentStatus === 'pending') {
-    newStatus = 'in_progress';
-  } else if (currentStatus === 'in_progress') {
-    newStatus = 'completed';
-  } else {
-    newStatus = 'pending';
-  }
-  
-  await handleUpdateTaskStatus(item, newStatus);
-};
-
-const openDeleteDialog = (list) => {
-  listToDelete.value = list;
-  showDeleteDialog.value = true;
-};
-
-const confirmDeleteList = async () => {
-  if (!listToDelete.value) return;
-  
-  deleting.value = true;
-  try {
-    await EmployerService.deleteTaskList(listToDelete.value.tasklist_id || listToDelete.value.id);
-    showSnackbar("Task list deleted", "success");
-    if (selectedList.value?.tasklist_id === listToDelete.value.tasklist_id) {
-      selectedList.value = null;
-      taskItems.value = [];
+    const response = await EmployerService.getTaskListItems(tasklistId);
+    if (selectedTaskList.value) {
+      selectedTaskList.value.items = response.data || [];
     }
-    await loadTaskLists();
-  } catch (err) {
-    console.error('Delete list error:', err);
-    showSnackbar("Error deleting list", "error");
-  } finally {
-    deleting.value = false;
-    showDeleteDialog.value = false;
-    listToDelete.value = null;
+  } catch (error) {
+    console.error('Error loading task items:', error);
   }
 };
 
-const selectList = async (list) => {
-  selectedList.value = list;
-  await loadTaskItems(list.tasklist_id || list.id);
+const addTaskItem = async () => {
+  if (!selectedTaskList.value) return;
+  
+  try {
+    await EmployerService.createTaskListItem({
+      ...newItem.value,
+      tasklistId: selectedTaskList.value.tasklist_id || selectedTaskList.value.id,
+      status: 'pending',
+      createdAt: Date.now()
+    });
+    
+    showAddItemDialog.value = false;
+    resetNewItem();
+    await loadTaskListItems(selectedTaskList.value.tasklist_id || selectedTaskList.value.id);
+  } catch (error) {
+    console.error('Error adding task item:', error);
+  }
+};
+
+const toggleItemCompletion = async (item) => {
+  try {
+    const newStatus = item.status === 'completed' ? 'pending' : 'completed';
+    await EmployerService.updateTaskListItem(item.item_id || item.id, {
+      status: newStatus,
+      completedAt: newStatus === 'completed' ? Date.now() : null,
+      completedBy: newStatus === 'completed' ? (user.value.user_id || user.value.id) : null
+    });
+    
+    await loadTaskListItems(selectedTaskList.value.tasklist_id || selectedTaskList.value.id);
+    await loadCompletionHistory();
+  } catch (error) {
+    console.error('Error toggling item completion:', error);
+  }
+};
+
+const deleteTaskList = async (id) => {
+  if (!confirm('Are you sure you want to delete this task list?')) return;
+  
+  try {
+    await EmployerService.deleteTaskList(id);
+    await loadTaskLists();
+  } catch (error) {
+    console.error('Error deleting task list:', error);
+  }
+};
+
+const deleteTaskItem = async (itemId) => {
+  if (!confirm('Are you sure you want to delete this item?')) return;
+  
+  try {
+    await EmployerService.deleteTaskListItem(itemId);
+    await loadTaskListItems(selectedTaskList.value.tasklist_id || selectedTaskList.value.id);
+  } catch (error) {
+    console.error('Error deleting task item:', error);
+  }
+};
+
+const resetNewTask = () => {
+  newTask.value = {
+    title: '',
+    description: '',
+    shiftType: 'all_day',
+    recursDaily: false,
+    isTemplate: false,
+    priority: 'medium'
+  };
+};
+
+const resetNewItem = () => {
+  newItem.value = {
+    title: '',
+    description: '',
+    orderPosition: 1
+  };
 };
 
 const getPriorityColor = (priority) => {
   const colors = {
-    low: '#9e9e9e',
-    medium: '#4361EE',
-    high: '#f57c00',
-    urgent: '#d32f2f',
+    low: 'green',
+    medium: 'blue',
+    high: 'orange',
+    urgent: 'red'
   };
-  return colors[priority] || '#9e9e9e';
+  return colors[priority] || 'grey';
 };
 
-const getStatusColor = (status) => {
-  const colors = {
-    active: '#2e7d32',
-    completed: '#12086F',
-    archived: '#9e9e9e',
-  };
-  return colors[status] || '#9e9e9e';
+const formatDate = (timestamp) => {
+  if (!timestamp) return 'N/A';
+  return new Date(Number(timestamp)).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
 };
 
-// NEW: Get task item status color
-const getTaskStatusColor = (status) => {
-  const colors = {
-    pending: '#9e9e9e',
-    in_progress: '#4361EE',
-    completed: '#2e7d32',
-  };
-  return colors[status] || '#9e9e9e';
-};
-
-// NEW: Get task status icon
-const getTaskStatusIcon = (status) => {
-  const icons = {
-    pending: 'mdi-checkbox-blank-circle-outline',
-    in_progress: 'mdi-progress-clock',
-    completed: 'mdi-check-circle',
-  };
-  return icons[status] || 'mdi-checkbox-blank-circle-outline';
-};
-
-// NEW: Format status for display
-const formatStatus = (status) => {
-  const formatted = {
-    pending: 'Not Started',
-    in_progress: 'In Progress',
-    completed: 'Completed',
-  };
-  return formatted[status] || status;
-};
-
-// NEW: Get employee name from ID
-const getEmployeeName = (employeeId) => {
-  if (!employeeId) return null;
-  const emp = employees.value.find(e => (e.user_id || e.userId) === employeeId);
-  if (!emp) return employeeId;
-  return `${emp.fName || emp.first_name || ''} ${emp.lName || emp.last_name || ''}`.trim();
-};
-
-const showSnackbar = (message, color = "success") => {
-  snackbarMessage.value = message;
-  snackbarColor.value = color;
-  snackbar.value = true;
-};
+onMounted(async () => {
+  user.value = Utils.getStore('user');
+  await loadTaskLists();
+  await loadCompletionHistory();
+});
 </script>
 
 <template>
   <EmployerLayout>
     <v-container fluid class="pa-6">
-      <!-- Header -->
-      <div class="d-flex align-center justify-space-between mb-5">
+      <div class="d-flex justify-space-between align-center mb-6">
         <div>
-          <h1 class="text-h4 font-weight-bold navy-text">Task Management</h1>
-          <p class="text-body-2 text-grey">
-            Create and manage task lists for your team
-          </p>
+          <h1 class="text-h4 font-weight-bold" style="color: #12086F;">Task Management</h1>
+          <p class="text-subtitle-1 text-grey">Manage daily tasks and templates</p>
         </div>
-        <v-btn
-          color="#12086F"
-          variant="flat"
-          prepend-icon="mdi-plus"
-          @click="showCreateListDialog = true"
-        >
+        <v-btn color="#12086F" @click="showCreateDialog = true" prepend-icon="mdi-plus">
           Create Task List
         </v-btn>
       </div>
 
-      <v-row>
-        <!-- Task Lists -->
-        <v-col cols="12" md="4">
-          <v-card variant="outlined" rounded="lg" class="navy-card">
-            <v-card-title class="text-body-1 font-weight-bold pa-4 pb-3">
-              Task Lists
-            </v-card-title>
-            <v-divider />
-            <v-card-text class="pa-0">
-              <v-list>
-                <v-list-item
-                  v-for="list in taskLists"
-                  :key="list.tasklist_id || list.id"
-                  :active="(selectedList?.tasklist_id || selectedList?.id) === (list.tasklist_id || list.id)"
-                  @click="selectList(list)"
-                  class="cursor-pointer"
-                >
-                  <v-list-item-title class="font-weight-medium">
-                    {{ list.title }}
-                  </v-list-item-title>
-                  <v-list-item-subtitle class="text-caption">
-                    <v-chip
-                      :color="getPriorityColor(list.priority)"
-                      size="x-small"
-                      variant="tonal"
-                      class="mr-1"
-                    >
-                      {{ list.priority }}
-                    </v-chip>
-                    <v-chip
-                      :color="getStatusColor(list.status)"
-                      size="x-small"
-                      variant="tonal"
-                    >
-                      {{ list.status }}
-                    </v-chip>
-                  </v-list-item-subtitle>
-                  
-                  <template #append>
-                    <v-btn 
-                      icon="mdi-delete" 
-                      size="small" 
-                      variant="plain"
-                      color="#d32f2f"
-                      @click.stop="openDeleteDialog(list)"
-                    />
-                  </template>
-                </v-list-item>
-              </v-list>
-
-              <div v-if="taskLists.length === 0" class="text-center pa-6">
-                <v-icon size="48" class="mb-2 text-grey">mdi-clipboard-list-outline</v-icon>
-                <div class="text-body-2 text-grey">No task lists yet</div>
-              </div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-
-        <!-- Task Items -->
-        <v-col cols="12" md="8">
-          <v-card variant="outlined" rounded="lg" class="navy-card">
-            <div v-if="!selectedList" class="pa-6 text-center">
-              <v-icon size="64" class="mb-2 text-grey">mdi-format-list-checks</v-icon>
-              <div class="text-body-1 text-grey">Select a task list to view items</div>
+      <!-- Yesterday's Performance Summary -->
+      <v-card class="mb-6" color="blue-grey-lighten-5">
+        <v-card-text>
+          <div class="d-flex align-center ga-4">
+            <v-icon size="48" color="blue-grey-darken-2">mdi-chart-timeline-variant</v-icon>
+            <div class="flex-grow-1">
+              <h3 class="text-h6 font-weight-bold mb-1">Yesterday's Task Completion</h3>
+              <v-progress-linear
+                :model-value="yesterdayStats.percentage"
+                height="24"
+                color="success"
+                rounded
+              >
+                <template v-slot:default>
+                  <strong class="text-white">{{ yesterdayStats.completed }}/{{ yesterdayStats.total }} tasks ({{ yesterdayStats.percentage }}%)</strong>
+                </template>
+              </v-progress-linear>
             </div>
+            <v-chip
+              :color="yesterdayStats.percentage >= 80 ? 'success' : yesterdayStats.percentage >= 50 ? 'warning' : 'error'"
+              size="large"
+            >
+              <v-icon start>{{ yesterdayStats.percentage >= 80 ? 'mdi-check-circle' : 'mdi-alert-circle' }}</v-icon>
+              {{ yesterdayStats.percentage }}%
+            </v-chip>
+          </div>
+        </v-card-text>
+      </v-card>
 
-            <template v-else>
-              <v-card-title class="pa-4 pb-3 d-flex align-center justify-space-between">
-                <div>
-                  <div class="text-body-1 font-weight-bold">{{ selectedList.title }}</div>
-                  <div class="text-caption text-grey">{{ selectedList.description }}</div>
-                </div>
-                <v-btn
-                  color="#12086F"
-                  variant="tonal"
-                  size="small"
-                  prepend-icon="mdi-plus"
-                  @click="showAddItemDialog = true"
-                >
-                  Add Item
-                </v-btn>
-              </v-card-title>
-              <v-divider />
-              <v-card-text class="pa-0">
-                <v-list>
-                  <v-list-item
-                    v-for="item in taskItems"
-                    :key="item.item_id || item.id"
-                  >
-                    <template #prepend>
-                      <v-icon
-                        :icon="getTaskStatusIcon(item.status)"
-                        :color="getTaskStatusColor(item.status)"
-                        size="24"
-                        class="cursor-pointer"
-                        @click="handleCompleteItem(item)"
-                      />
-                    </template>
-                    
-                    <v-list-item-title 
-                      :class="item.status === 'completed' ? 'text-decoration-line-through text-grey' : ''"
-                    >
-                      {{ item.title }}
-                    </v-list-item-title>
-                    
-                    <v-list-item-subtitle class="text-caption">
-                      <div v-if="item.description" class="mb-1">{{ item.description }}</div>
-                      <div class="d-flex ga-2 align-center flex-wrap">
-                        <v-chip
-                          :color="getTaskStatusColor(item.status)"
-                          size="x-small"
-                          variant="tonal"
-                        >
-                          {{ formatStatus(item.status) }}
-                        </v-chip>
-                        <v-chip
-                          v-if="item.assigned_to || item.assignedTo"
-                          color="#4361EE"
-                          size="x-small"
-                          variant="tonal"
-                          prepend-icon="mdi-account"
-                        >
-                          {{ getEmployeeName(item.assigned_to || item.assignedTo) }}
-                        </v-chip>
-                      </div>
-                    </v-list-item-subtitle>
+      <!-- Tabs -->
+      <v-tabs v-model="tab" color="#12086F" class="mb-4">
+        <v-tab value="today">
+          <v-icon start>mdi-calendar-today</v-icon>
+          Today's Tasks
+        </v-tab>
+        <v-tab value="templates">
+          <v-icon start>mdi-content-save</v-icon>
+          Templates
+        </v-tab>
+        <v-tab value="all">
+          <v-icon start>mdi-format-list-checkbox</v-icon>
+          All Tasks
+        </v-tab>
+      </v-tabs>
 
-                    <template #append>
-                      <v-menu>
-                        <template #activator="{ props }">
-                          <v-btn
-                            icon="mdi-dots-vertical"
-                            size="small"
-                            variant="plain"
-                            v-bind="props"
-                          />
-                        </template>
-                        <v-list density="compact">
-                          <v-list-item @click="handleUpdateTaskStatus(item, 'pending')">
-                            <v-list-item-title>
-                              <v-icon size="small" class="mr-2">mdi-checkbox-blank-circle-outline</v-icon>
-                              Mark as Not Started
-                            </v-list-item-title>
-                          </v-list-item>
-                          <v-list-item @click="handleUpdateTaskStatus(item, 'in_progress')">
-                            <v-list-item-title>
-                              <v-icon size="small" class="mr-2">mdi-progress-clock</v-icon>
-                              Mark as In Progress
-                            </v-list-item-title>
-                          </v-list-item>
-                          <v-list-item @click="handleUpdateTaskStatus(item, 'completed')">
-                            <v-list-item-title>
-                              <v-icon size="small" class="mr-2">mdi-check-circle</v-icon>
-                              Mark as Completed
-                            </v-list-item-title>
-                          </v-list-item>
-                        </v-list>
-                      </v-menu>
-                    </template>
-                  </v-list-item>
-                </v-list>
+      <!-- Tab Content -->
+      <v-window v-model="tab">
+        <!-- Today's Tasks -->
+        <v-window-item value="today">
+          <v-row>
+            <v-col v-for="task in todayTasks" :key="task.tasklist_id || task.id" cols="12" md="6" lg="4">
+              <v-card hover @click="openItemsDialog(task)" class="task-card">
+                <v-card-title class="d-flex align-center">
+                  <v-icon :color="getPriorityColor(task.priority)" class="mr-2">
+                    mdi-flag
+                  </v-icon>
+                  {{ task.title }}
+                  <v-spacer />
+                  <v-chip v-if="task.recursDaily || task.recurs_daily" size="x-small" color="purple" variant="tonal">
+                    <v-icon start size="x-small">mdi-sync</v-icon>
+                    Daily
+                  </v-chip>
+                </v-card-title>
+                <v-card-text>
+                  <p class="text-grey mb-2">{{ task.description || 'No description' }}</p>
+                  <div class="d-flex align-center ga-2">
+                    <v-chip size="small" variant="tonal">
+                      {{ (task.shiftType || task.shift_type || 'all_day').replace('_', ' ') }}
+                    </v-chip>
+                    <v-chip size="small" color="grey" variant="tonal">
+                      {{ task.items?.length || 0 }} items
+                    </v-chip>
+                  </div>
+                </v-card-text>
+              </v-card>
+            </v-col>
+            <v-col v-if="todayTasks.length === 0" cols="12">
+              <v-card class="text-center pa-8">
+                <v-icon size="64" color="grey-lighten-1">mdi-clipboard-check-outline</v-icon>
+                <h3 class="text-h6 mt-4 text-grey">No tasks for today</h3>
+                <p class="text-grey">Create a new task list or template to get started</p>
+              </v-card>
+            </v-col>
+          </v-row>
+        </v-window-item>
 
-                <div v-if="loadingItems" class="text-center pa-6">
-                  <v-progress-circular indeterminate color="#12086F" size="28" />
-                </div>
+        <!-- Templates -->
+        <v-window-item value="templates">
+          <v-row>
+            <v-col v-for="task in templateTasks" :key="task.tasklist_id || task.id" cols="12" md="6" lg="4">
+              <v-card hover @click="openItemsDialog(task)" class="task-card">
+                <v-card-title class="d-flex align-center">
+                  <v-icon color="purple" class="mr-2">mdi-content-save</v-icon>
+                  {{ task.title }}
+                  <v-spacer />
+                  <v-btn icon size="small" variant="text" @click.stop="deleteTaskList(task.tasklist_id || task.id)">
+                    <v-icon>mdi-delete</v-icon>
+                  </v-btn>
+                </v-card-title>
+                <v-card-text>
+                  <p class="text-grey mb-2">{{ task.description || 'No description' }}</p>
+                  <v-chip size="small" color="grey" variant="tonal">
+                    {{ task.items?.length || 0 }} items
+                  </v-chip>
+                </v-card-text>
+              </v-card>
+            </v-col>
+            <v-col v-if="templateTasks.length === 0" cols="12">
+              <v-card class="text-center pa-8">
+                <v-icon size="64" color="grey-lighten-1">mdi-content-save-outline</v-icon>
+                <h3 class="text-h6 mt-4 text-grey">No templates yet</h3>
+                <p class="text-grey">Create reusable task templates for common workflows</p>
+              </v-card>
+            </v-col>
+          </v-row>
+        </v-window-item>
 
-                <div v-else-if="taskItems.length === 0" class="text-center pa-6">
-                  <v-icon size="48" class="mb-2 text-grey">mdi-checkbox-blank-outline</v-icon>
-                  <div class="text-body-2 text-grey">No items in this list</div>
-                </div>
-              </v-card-text>
-            </template>
+        <!-- All Tasks -->
+        <v-window-item value="all">
+          <v-card>
+            <v-table>
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Priority</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Due Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="task in taskLists" :key="task.tasklist_id || task.id">
+                  <td>
+                    <strong>{{ task.title }}</strong>
+                    <v-chip v-if="task.isTemplate || task.is_template" size="x-small" color="purple" variant="tonal" class="ml-2">
+                      Template
+                    </v-chip>
+                  </td>
+                  <td>
+                    <v-chip :color="getPriorityColor(task.priority)" size="small">
+                      {{ task.priority }}
+                    </v-chip>
+                  </td>
+                  <td>{{ (task.shiftType || task.shift_type || 'all_day').replace('_', ' ') }}</td>
+                  <td>
+                    <v-chip :color="task.status === 'completed' ? 'success' : 'grey'" size="small">
+                      {{ task.status }}
+                    </v-chip>
+                  </td>
+                  <td>{{ formatDate(task.dueDate || task.due_date) }}</td>
+                  <td>
+                    <v-btn icon size="small" variant="text" @click="openItemsDialog(task)">
+                      <v-icon>mdi-eye</v-icon>
+                    </v-btn>
+                    <v-btn icon size="small" variant="text" @click="deleteTaskList(task.tasklist_id || task.id)">
+                      <v-icon>mdi-delete</v-icon>
+                    </v-btn>
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
           </v-card>
-        </v-col>
-      </v-row>
+        </v-window-item>
+      </v-window>
+
+      <!-- Create Task List Dialog -->
+      <v-dialog v-model="showCreateDialog" max-width="600">
+        <v-card>
+          <v-card-title class="text-h5 font-weight-bold">Create Task List</v-card-title>
+          <v-card-text>
+            <v-text-field
+              v-model="newTask.title"
+              label="Title"
+              required
+              class="mb-3"
+            />
+            <v-textarea
+              v-model="newTask.description"
+              label="Description"
+              rows="3"
+              class="mb-3"
+            />
+            <v-select
+              v-model="newTask.shiftType"
+              :items="['morning', 'afternoon', 'evening', 'closing', 'all_day']"
+              label="Shift Type"
+              class="mb-3"
+            />
+            <v-select
+              v-model="newTask.priority"
+              :items="['low', 'medium', 'high', 'urgent']"
+              label="Priority"
+              class="mb-3"
+            />
+            <v-checkbox
+              v-model="newTask.recursDaily"
+              label="Recurs Daily"
+              hide-details
+              class="mb-2"
+            />
+            <v-checkbox
+              v-model="newTask.isTemplate"
+              label="Save as Template"
+              hide-details
+            />
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn @click="showCreateDialog = false">Cancel</v-btn>
+            <v-btn color="#12086F" @click="createTaskList">Create</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <!-- Task Items Dialog -->
+      <v-dialog v-model="showItemsDialog" max-width="800">
+        <v-card v-if="selectedTaskList">
+          <v-card-title class="text-h5 font-weight-bold d-flex align-center">
+            <v-icon class="mr-2" :color="getPriorityColor(selectedTaskList.priority)">mdi-flag</v-icon>
+            {{ selectedTaskList.title }}
+            <v-spacer />
+            <v-btn icon size="small" @click="showItemsDialog = false">
+              <v-icon>mdi-close</v-icon>
+            </v-btn>
+          </v-card-title>
+          <v-card-subtitle class="mt-2">
+            {{ selectedTaskList.description }}
+          </v-card-subtitle>
+          <v-divider />
+          <v-card-text>
+            <div class="d-flex justify-space-between align-center mb-4">
+              <h3 class="text-h6">Task Items</h3>
+              <v-btn size="small" color="#12086F" @click="showAddItemDialog = true">
+                <v-icon start>mdi-plus</v-icon>
+                Add Item
+              </v-btn>
+            </div>
+            
+            <v-list v-if="selectedTaskList.items && selectedTaskList.items.length > 0">
+              <v-list-item
+                v-for="item in selectedTaskList.items"
+                :key="item.item_id || item.id"
+                class="mb-2"
+              >
+                <template v-slot:prepend>
+                  <v-checkbox
+                    :model-value="item.status === 'completed'"
+                    @update:model-value="toggleItemCompletion(item)"
+                    hide-details
+                  />
+                </template>
+                <v-list-item-title :class="{ 'text-decoration-line-through text-grey': item.status === 'completed' }">
+                  {{ item.title }}
+                </v-list-item-title>
+                <v-list-item-subtitle v-if="item.description">
+                  {{ item.description }}
+                </v-list-item-subtitle>
+                <template v-slot:append>
+                  <v-chip v-if="item.completedAt || item.completed_at" size="x-small" color="success" variant="tonal">
+                    {{ formatDate(item.completedAt || item.completed_at) }}
+                  </v-chip>
+                  <v-btn icon size="small" variant="text" @click="deleteTaskItem(item.item_id || item.id)">
+                    <v-icon size="small">mdi-delete</v-icon>
+                  </v-btn>
+                </template>
+              </v-list-item>
+            </v-list>
+            
+            <v-card v-else class="text-center pa-6 bg-grey-lighten-4">
+              <v-icon size="48" color="grey-lighten-1">mdi-clipboard-outline</v-icon>
+              <p class="text-grey mt-2 mb-0">No items yet. Add some tasks to get started!</p>
+            </v-card>
+          </v-card-text>
+        </v-card>
+      </v-dialog>
+
+      <!-- Add Task Item Dialog -->
+      <v-dialog v-model="showAddItemDialog" max-width="500">
+        <v-card>
+          <v-card-title class="text-h6">Add Task Item</v-card-title>
+          <v-card-text>
+            <v-text-field
+              v-model="newItem.title"
+              label="Task Title"
+              required
+              class="mb-3"
+            />
+            <v-textarea
+              v-model="newItem.description"
+              label="Description (optional)"
+              rows="2"
+            />
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn @click="showAddItemDialog = false">Cancel</v-btn>
+            <v-btn color="#12086F" @click="addTaskItem">Add</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
     </v-container>
-
-    <!-- Create List Dialog -->
-    <v-dialog v-model="showCreateListDialog" max-width="500">
-      <v-card rounded="lg">
-        <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4 navy-text">
-          Create Task List
-        </v-card-title>
-        <v-divider />
-        <v-card-text class="pa-5">
-          <v-text-field
-            v-model="newList.title"
-            label="Title *"
-            variant="outlined"
-            density="compact"
-            class="mb-3"
-            placeholder="e.g., Opening Checklist"
-            color="#12086F"
-          />
-          <v-textarea
-            v-model="newList.description"
-            label="Description"
-            variant="outlined"
-            density="compact"
-            rows="2"
-            class="mb-3"
-            color="#12086F"
-          />
-          <v-select
-            v-model="newList.priority"
-            :items="['low', 'medium', 'high', 'urgent']"
-            label="Priority"
-            variant="outlined"
-            density="compact"
-            color="#12086F"
-          />
-        </v-card-text>
-        <v-divider />
-        <v-card-actions class="pa-4">
-          <v-spacer />
-          <v-btn variant="text" @click="showCreateListDialog = false">Cancel</v-btn>
-          <v-btn
-            color="#12086F"
-            variant="flat"
-            :loading="creatingList"
-            @click="handleCreateList"
-          >
-            Create List
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <!-- Add Item Dialog -->
-    <v-dialog v-model="showAddItemDialog" max-width="500">
-      <v-card rounded="lg">
-        <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4 navy-text">
-          Add Task Item
-        </v-card-title>
-        <v-divider />
-        <v-card-text class="pa-5">
-          <v-text-field
-            v-model="newItem.title"
-            label="Title *"
-            variant="outlined"
-            density="compact"
-            class="mb-3"
-            placeholder="e.g., Turn on lights"
-            color="#12086F"
-          />
-          <v-textarea
-            v-model="newItem.description"
-            label="Description"
-            variant="outlined"
-            density="compact"
-            rows="2"
-            class="mb-3"
-            color="#12086F"
-          />
-          <v-select
-            v-model="newItem.assignedTo"
-            :items="employees"
-            :item-title="(e) => `${e.fName || e.first_name || ''} ${e.lName || e.last_name || ''}`"
-            item-value="user_id"
-            label="Assign to (optional)"
-            variant="outlined"
-            density="compact"
-            clearable
-            class="mb-3"
-            color="#12086F"
-          />
-          <v-select
-            v-model="newItem.status"
-            :items="[
-              { title: 'Not Started', value: 'pending' },
-              { title: 'In Progress', value: 'in_progress' },
-              { title: 'Completed', value: 'completed' }
-            ]"
-            label="Status"
-            variant="outlined"
-            density="compact"
-            color="#12086F"
-          />
-        </v-card-text>
-        <v-divider />
-        <v-card-actions class="pa-4">
-          <v-spacer />
-          <v-btn variant="text" @click="showAddItemDialog = false">Cancel</v-btn>
-          <v-btn
-            color="#12086F"
-            variant="flat"
-            :loading="addingItem"
-            @click="handleAddItem"
-          >
-            Add Item
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <!-- Delete Confirmation Dialog -->
-    <v-dialog v-model="showDeleteDialog" max-width="400">
-      <v-card rounded="lg" v-if="listToDelete">
-        <v-card-title class="text-h6 pa-5 pb-4">Confirm Delete</v-card-title>
-        <v-divider />
-        <v-card-text class="pa-5">
-          <p class="text-body-1">
-            Are you sure you want to delete <strong>{{ listToDelete.title }}</strong>?
-          </p>
-          <p class="text-body-2 text-grey mt-2">
-            This will also delete all items in this list. This action cannot be undone.
-          </p>
-        </v-card-text>
-        <v-divider />
-        <v-card-actions class="pa-4">
-          <v-spacer />
-          <v-btn variant="text" @click="showDeleteDialog = false" :disabled="deleting">Cancel</v-btn>
-          <v-btn
-            color="error"
-            variant="flat"
-            :loading="deleting"
-            @click="confirmDeleteList"
-          >
-            Delete
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <v-snackbar
-      v-model="snackbar"
-      :color="snackbarColor"
-      timeout="3000"
-      location="bottom right"
-     >
-      {{ snackbarMessage }}
-    </v-snackbar>
   </EmployerLayout>
 </template>
 
 <style scoped>
-.navy-text {
-  color: #12086F !important;
-}
-
-.navy-card {
-  border-color: #e0e0e0;
-  box-shadow: 0 1px 3px rgba(18, 8, 111, 0.05);
-}
-
-.cursor-pointer {
+.task-card {
   cursor: pointer;
+  transition: all 0.2s;
+}
+
+.task-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 </style>

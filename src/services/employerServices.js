@@ -1,10 +1,22 @@
 import apiClient from "./services.js";
+import Utils from "../config/utils.js";
 
-// ✅ ADDED: Helper to add demo header when in guest mode
+// ✅ FIXED: Properly check for real user before adding demo header
 const addDemoHeader = (config = {}) => {
+  // First check if we have a REAL logged-in user
+  const user = Utils.getStore('user');
+  
+  // If we have a real user with email/ID, NEVER use demo mode
+  if (user && (user.email || user.user_id || user.userId || user.id)) {
+    console.log('✅ Real user detected, NO demo mode:', user.email || user.user_id);
+    return config;
+  }
+  
+  // Only use demo mode if explicitly in guest mode AND no real user
   const isGuest = localStorage.getItem('isGuest') === 'true';
   
   if (isGuest) {
+    console.log('👁️ Guest mode - adding demo header');
     return {
       ...config,
       headers: {
@@ -14,12 +26,15 @@ const addDemoHeader = (config = {}) => {
     };
   }
   
+  // Default: no demo mode
   return config;
 };
 
 export default {
 
+  // ═══════════════════════════════════════════════════════════════════════
   // SHIFTS
+  // ═══════════════════════════════════════════════════════════════════════
 
   getAllShifts(){
     return apiClient.get("/shifts", addDemoHeader());
@@ -57,7 +72,9 @@ export default {
     return apiClient.put(`/shifts/${id}/publish`, {}, addDemoHeader());
   },
 
+  // ═══════════════════════════════════════════════════════════════════════
   // SCHEDULE TEMPLATES
+  // ═══════════════════════════════════════════════════════════════════════
 
   getAllTemplates() {
     return apiClient.get("/schedule-templates", addDemoHeader());
@@ -83,7 +100,13 @@ export default {
     return apiClient.post(`/schedule-templates/${id}/apply`, { startDate }, addDemoHeader());
   },
 
+  createScheduleTemplate(template) {
+    return apiClient.post("/schedule-templates", template, addDemoHeader());
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════
   // NOTIFICATIONS
+  // ═══════════════════════════════════════════════════════════════════════
 
   getAllNotifications() {
     return apiClient.get("/notifications", addDemoHeader());
@@ -101,8 +124,9 @@ export default {
     return apiClient.delete(`/notifications/${id}`, addDemoHeader());
   },
 
- 
+  // ═══════════════════════════════════════════════════════════════════════
   // SHIFT SWAP REQUESTS
+  // ═══════════════════════════════════════════════════════════════════════
 
   getAllShiftSwapRequests() {
     return apiClient.get("/shift-swap-requests", addDemoHeader());
@@ -128,7 +152,9 @@ export default {
     return apiClient.put(`/shift-swap-requests/${id}/reject`, {}, addDemoHeader());
   },
 
+  // ═══════════════════════════════════════════════════════════════════════
   // TIME OFF REQUESTS
+  // ═══════════════════════════════════════════════════════════════════════
 
   getAllTimeOffRequests() {
     return apiClient.get("/time-off-requests", addDemoHeader());
@@ -154,7 +180,9 @@ export default {
     return apiClient.delete(`/time-off-requests/${id}`, addDemoHeader());
   },
 
+  // ═══════════════════════════════════════════════════════════════════════
   // EMPLOYEES (USERS)
+  // ═══════════════════════════════════════════════════════════════════════
 
   getAllEmployees() {
     return apiClient.get("/users", addDemoHeader());
@@ -176,8 +204,33 @@ export default {
     return apiClient.delete(`/users/${id}`, addDemoHeader());
   },
 
-  
+  // ═══════════════════════════════════════════════════════════════════════
+  // ✅ NEW: USER JOB ROLES (Multiple Roles per Employee)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  addRoleToUser(userId, roleData) {
+    return apiClient.post(`/user-job-roles/user/${userId}/roles`, roleData, addDemoHeader());
+  },
+
+  getUserRoles(userId) {
+    return apiClient.get(`/user-job-roles/user/${userId}/roles`, addDemoHeader());
+  },
+
+  removeRoleFromUser(userId, roleId) {
+    return apiClient.delete(`/user-job-roles/user/${userId}/roles/${roleId}`, addDemoHeader());
+  },
+
+  setPrimaryRole(userId, roleId) {
+    return apiClient.put(`/user-job-roles/user/${userId}/roles/${roleId}/primary`, {}, addDemoHeader());
+  },
+
+  getUsersByRole(roleId) {
+    return apiClient.get(`/user-job-roles/role/${roleId}/users`, addDemoHeader());
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════
   // AVAILABILITY
+  // ═══════════════════════════════════════════════════════════════════════
 
   getAllAvailability() {
     return apiClient.get("/availability", addDemoHeader());
@@ -199,7 +252,9 @@ export default {
     return apiClient.delete(`/availability/${id}`, addDemoHeader());
   },
 
+  // ═══════════════════════════════════════════════════════════════════════
   // TASK LISTS
+  // ═══════════════════════════════════════════════════════════════════════
 
   getAllTaskLists() {
     return apiClient.get("/task-lists", addDemoHeader());
@@ -229,7 +284,9 @@ export default {
     return apiClient.put(`/task-lists/${id}/archive`, {}, addDemoHeader());
   },
 
+  // ═══════════════════════════════════════════════════════════════════════
   // TASK LIST ITEMS
+  // ═══════════════════════════════════════════════════════════════════════
 
   getAllTaskItems() {
     return apiClient.get("/task-list-items", addDemoHeader());
@@ -259,7 +316,89 @@ export default {
     return apiClient.put("/task-list-items/reorder", { items }, addDemoHeader());
   },
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // ✅ NEW: SHIFT TASKS (Assign Tasks to Shifts)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  assignTaskToShift(shiftId, tasklistId) {
+    return apiClient.post("/shift-tasks", { shiftId, tasklistId }, addDemoHeader());
+  },
+
+  bulkAssignTasksToShift(shiftId, tasklistIds) {
+    return apiClient.post("/shift-tasks/bulk", { shiftId, tasklistIds }, addDemoHeader());
+  },
+
+  getShiftTasks(shiftId) {
+    return apiClient.get(`/shift-tasks/shift/${shiftId}`, addDemoHeader());
+  },
+
+  getTaskShifts(tasklistId) {
+    return apiClient.get(`/shift-tasks/task/${tasklistId}`, addDemoHeader());
+  },
+
+  removeTaskFromShift(shiftId, tasklistId) {
+    return apiClient.delete(`/shift-tasks/shift/${shiftId}/task/${tasklistId}`, addDemoHeader());
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ✅ NEW: MESSAGES (Employer-Employee Communication)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  sendMessage(messageData) {
+    return apiClient.post("/messages", messageData, addDemoHeader());
+  },
+
+  broadcastMessage(messageData) {
+    return apiClient.post("/messages/broadcast", messageData, addDemoHeader());
+  },
+
+  getInbox() {
+    return apiClient.get("/messages/inbox", addDemoHeader());
+  },
+
+  getSentMessages() {
+    return apiClient.get("/messages/sent", addDemoHeader());
+  },
+
+  getUnreadMessageCount() {
+    return apiClient.get("/messages/unread-count", addDemoHeader());
+  },
+
+  markMessageAsRead(id) {
+    return apiClient.put(`/messages/${id}/read`, {}, addDemoHeader());
+  },
+
+  deleteMessage(id) {
+    return apiClient.delete(`/messages/${id}`, addDemoHeader());
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ✅ NEW: TASK COMPLETION HISTORY & ENHANCED TASK METHODS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  getTaskCompletionHistory() {
+    return apiClient.get("/tasklists/history/all", addDemoHeader());
+  },
+
+  getTaskListItems(tasklistId) {
+    return apiClient.get(`/tasklistitems/tasklist/${tasklistId}`, addDemoHeader());
+  },
+
+  createTaskListItem(item) {
+    return apiClient.post("/tasklistitems", item, addDemoHeader());
+  },
+
+  updateTaskListItem(id, updates) {
+    return apiClient.put(`/tasklistitems/${id}`, updates, addDemoHeader());
+  },
+
+  deleteTaskListItem(id) {
+    return apiClient.delete(`/tasklistitems/${id}`, addDemoHeader());
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════
   // BUSINESS AREAS (LOCATIONS)
+  // ═══════════════════════════════════════════════════════════════════════
 
   getAllLocations() {
     return apiClient.get("/business-areas", addDemoHeader());
@@ -281,7 +420,9 @@ export default {
     return apiClient.delete(`/business-areas/${id}`, addDemoHeader());
   },
 
+  // ═══════════════════════════════════════════════════════════════════════
   // JOB ROLES
+  // ═══════════════════════════════════════════════════════════════════════
 
   getAllJobRoles() {
     return apiClient.get("/job-roles", addDemoHeader());
@@ -303,7 +444,9 @@ export default {
     return apiClient.delete(`/job-roles/${id}`, addDemoHeader());
   },
 
+  // ═══════════════════════════════════════════════════════════════════════
   // CLOCK IN/OUT
+  // ═══════════════════════════════════════════════════════════════════════
 
   getAllClockRecords() {
     return apiClient.get("/clock-records", addDemoHeader());
