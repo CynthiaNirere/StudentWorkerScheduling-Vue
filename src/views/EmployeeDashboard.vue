@@ -208,8 +208,10 @@ onMounted(() => {
           title="Profile"
           rounded="lg"
           class="mb-1"
-          @click="router.push({ name: 'profile' })"
+          @click="router.push({ name: 'employeeProfile' })"
         />
+        <v-list-item prepend-icon="mdi-cog-outline" title="Settings" rounded="lg" class="mb-1"
+          @click="router.push({ name: 'employeeSettings' })" />
       </v-list>
     </v-navigation-drawer>
 
@@ -286,7 +288,7 @@ onMounted(() => {
             </div>
             <v-divider class="mb-2" />
             <v-list density="compact" class="pa-0">
-              <v-list-item prepend-icon="mdi-account" title="Profile" @click="router.push({ name: 'profile' })" />
+              <v-list-item prepend-icon="mdi-account" title="Profile" @click="router.push({ name: 'employeeProfile' })" />
               <v-list-item
                 prepend-icon="mdi-logout"
                 title="Sign Out"
@@ -615,6 +617,7 @@ onMounted(() => {
     <v-snackbar v-model="snackbar" :color="snackbarColor" timeout="3000" location="bottom right">
       {{ snackbarMsg }}
     </v-snackbar>
+
   </v-app>
 </template>
 

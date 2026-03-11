@@ -83,9 +83,17 @@ const logout = () => {
           rounded="lg"
         />
         <v-list-item
-          prepend-icon="mdi-account"
+          prepend-icon="mdi-account-circle-outline"
           title="Profile"
-          :to="{ name: 'profile' }"
+          :to="{ name: 'employeeProfile' }"
+          color="white"
+          class="nav-item"
+          rounded="lg"
+        />
+        <v-list-item
+          prepend-icon="mdi-cog-outline"
+          title="Settings"
+          :to="{ name: 'employeeSettings' }"
           color="white"
           class="nav-item"
           rounded="lg"
@@ -125,7 +133,7 @@ const logout = () => {
                 <v-list-item
                   prepend-icon="mdi-account"
                   title="Profile"
-                  :to="{ name: 'profile' }"
+                  :to="{ name: 'employeeProfile' }"
                 />
                 <v-list-item
                   prepend-icon="mdi-logout"

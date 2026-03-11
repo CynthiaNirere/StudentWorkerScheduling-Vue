@@ -388,7 +388,9 @@ onUnmounted(() => {
         <v-list-item prepend-icon="mdi-calendar-month" title="Team Schedule" rounded="lg" class="mb-1"
           @click="router.push({ name: 'employeeSchedule' })" />
         <v-list-item prepend-icon="mdi-account-circle-outline" title="Profile" rounded="lg" class="mb-1"
-          @click="router.push({ name: 'profile' })" />
+          @click="router.push({ name: 'employeeProfile' })" />
+        <v-list-item prepend-icon="mdi-cog-outline" title="Settings" rounded="lg" class="mb-1"
+          @click="router.push({ name: 'employeeSettings' })" />
       </v-list>
     </v-navigation-drawer>
 
