@@ -1,11 +1,8 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
-import { useRouter } from "vue-router";
 import Utils from "../config/utils";
 import EmployerService from "../services/employerServices.js";
 import EmployerLayout from '../components/EmployerLayout.vue';
-
-const router = useRouter();
 const user = ref(null);
 
 const employees = ref([]);
@@ -23,7 +20,7 @@ const snackbarMessage = ref("");
 const snackbarColor = ref("success");
 
 const newMessage = ref({
-  recipientId: "",
+  recipientId: [],
   subject: "",
   message: "",
   linkUrl: ""
@@ -82,7 +79,7 @@ const messages = computed(() => {
 });
 
 const handleSendMessage = async () => {
-  if (!newMessage.value.message || !newMessage.value.recipientId) {
+  if (!newMessage.value.message || newMessage.value.recipientId.length === 0) {
     showSnackbar("Recipient and message are required", "error");
     return;
   }
@@ -99,7 +96,7 @@ const handleSendMessage = async () => {
     
     showSnackbar("Message sent successfully!", "success");
     showComposeDialog.value = false;
-    newMessage.value = { recipientId: "", subject: "", message: "", linkUrl: "" };
+    newMessage.value = { recipientId: [], subject: "", message: "", linkUrl: "" };
     await loadMessages();
     
   } catch (err) {
@@ -166,12 +163,6 @@ const formatTimestamp = (timestamp) => {
     hour: 'numeric', 
     minute: '2-digit' 
   });
-};
-
-const getEmployeeName = (recipientId) => {
-  const emp = employees.value.find(e => (e.user_id || e.userId) === recipientId);
-  if (!emp) return recipientId;
-  return `${emp.fName || emp.first_name} ${emp.lName || emp.last_name}`.trim();
 };
 
 const showSnackbar = (message, color = "success") => {
@@ -332,6 +323,9 @@ const showSnackbar = (message, color = "success") => {
             label="To *"
             variant="outlined"
             density="compact"
+            multiple
+            chips
+            closable-chips
             class="mb-3"
             color="#12086F"
           />
