@@ -1,20 +1,10 @@
 import apiClient from "./services.js";
 import Utils from "../config/utils.js";
 
-// ✅ FIXED: Properly check for real user before adding demo header
 const addDemoHeader = (config = {}) => {
-  // First check if we have a REAL logged-in user
-  const user = Utils.getStore('user');
-  
-  // If we have a real user with email/ID, NEVER use demo mode
-  if (user && (user.email || user.user_id || user.userId || user.id)) {
-    console.log('✅ Real user detected, NO demo mode:', user.email || user.user_id);
-    return config;
-  }
-  
-  // Only use demo mode if explicitly in guest mode AND no real user
   const isGuest = localStorage.getItem('isGuest') === 'true';
   
+  // ✅ Check guest mode FIRST, before checking user
   if (isGuest) {
     console.log('👁️ Guest mode - adding demo header');
     return {
@@ -26,7 +16,12 @@ const addDemoHeader = (config = {}) => {
     };
   }
   
-  // Default: no demo mode
+  // Only log real user if NOT in guest mode
+  const user = Utils.getStore('user');
+  if (user && (user.email || user.user_id || user.userId || user.id)) {
+    console.log('✅ Real user detected, NO demo mode:', user.email || user.user_id);
+  }
+  
   return config;
 };
 
