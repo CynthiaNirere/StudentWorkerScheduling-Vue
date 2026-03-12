@@ -271,8 +271,15 @@ const logout = () => {
         <v-list-item
           prepend-icon="mdi-checkbox-marked-circle-outline"
           title="Tasks"
-          :to="isGuest ? undefined : { name: 'employerTasks' }"
-          :disabled="isGuest"
+          :to="isGuest ? { name: 'guestTasks' } : { name: 'employerTasks' }"
+          color="white"
+          class="nav-item"
+          rounded="lg"
+        />
+         <v-list-item
+          prepend-icon="mdi-calendar-text"
+          title="Templates"
+          :to="isGuest ? { name: 'guestTemplates' } : { name: 'employerTemplates' }"
           color="white"
           class="nav-item"
           rounded="lg"

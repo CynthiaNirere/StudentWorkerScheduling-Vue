@@ -9,6 +9,8 @@ import GuestEmployees from './views/GuestEmployees.vue';
 import GuestAvailability from './views/GuestAvailability.vue';
 import GuestTimeOff from './views/GuestTimeOff.vue';
 import GuestSwaps from './views/GuestSwaps.vue';
+import GuestTasks from './views/GuestTasks.vue'; 
+import GuestTemplate from './views/GuestTemplate.vue';
 import Login from "./views/Login.vue";
 import SignUp from "./views/SignUp.vue";
 import RoleSelect from "./views/RoleSelect.vue";
@@ -79,6 +81,12 @@ const router = createRouter({
       path: "/guest/swaps",
       name: "guestSwaps",
       component: GuestSwaps,
+      meta: { requiresAuth: false },
+    },
+    {
+      path: "/guest/tasks",
+      name: "guestTasks",
+      component: GuestTasks,
       meta: { requiresAuth: false },
     },
     // ─── AUTH ROUTES ───────────────────────────────────────────────────
@@ -233,6 +241,13 @@ const router = createRouter({
       component: TemplateManagement,
       meta: { requiresAuth: true },
     },
+    {
+      path: "/guest/templates",
+      name: "guestTemplates",
+      component: GuestTemplate,
+      meta: { requiresAuth: false },
+    },
+    
     // ─── CATCH ALL ──────────────────────────────────────────────────────
     {
       path: "/:pathMatch(.*)*",
