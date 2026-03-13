@@ -5,26 +5,19 @@
     permanent
     color="primary"
     dark
-    @click="rail = false"
+    @mouseenter="rail = false"
+    @mouseleave="rail = true"
   >
     <!-- Logo/Header -->
     <v-list-item
       prepend-icon="mdi-calendar-clock"
       title="ShiftBoard"
       nav
-    >
-      <template v-slot:append>
-        <v-btn
-          variant="text"
-          icon="mdi-chevron-left"
-          @click.stop="rail = !rail"
-        ></v-btn>
-      </template>
-    </v-list-item>
+    />
 
     <v-divider></v-divider>
 
-    <!-- User Info Section (clickable, opens profile popup) -->
+    <!-- User Info Section -->
     <v-menu v-if="user" location="end" offset="8">
       <template v-slot:activator="{ props }">
         <v-list-item v-bind="props" class="py-4" style="cursor: pointer;">
@@ -80,50 +73,50 @@
       <v-list-item
         prepend-icon="mdi-view-dashboard"
         title="Dashboard"
-        value="dashboard"
-        :to="dashboardRoute"
-        active-class="bg-accent"
-      ></v-list-item>
-
+        :class="{ 'bg-accent': isActive(dashboardRoute) }"
+        rounded="lg"
+        @click="router.push(dashboardRoute)"
+      />
       <v-list-item
         prepend-icon="mdi-office-building"
         title="Workplace"
-        value="workplace"
-        to="/workplace"
-        active-class="bg-accent"
-      ></v-list-item>
-
+        :class="{ 'bg-accent': isActive('/workplace') }"
+        rounded="lg"
+        @click="router.push('/workplace')"
+      />
       <v-list-item
         prepend-icon="mdi-account-cog"
         title="Profile"
-        value="profile"
-        to="/profile"
-        active-class="bg-accent"
-      ></v-list-item>
+        :class="{ 'bg-accent': isActive('/profile') }"
+        rounded="lg"
+        @click="router.push('/profile')"
+      />
     </v-list>
   </v-navigation-drawer>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import Utils from '../config/utils.js';
 import AuthServices from '../services/authServices.js';
 
 const router = useRouter();
+const route = useRoute();
 const drawer = ref(true);
-const rail = ref(false);
+const rail = ref(true);
 
-// Get user from localStorage
 const user = computed(() => Utils.getStore('user'));
 
-// Compute user initials (e.g., "CN" for Cynthia Nirere)
 const userInitials = computed(() => {
   if (!user.value) return '';
   const first = user.value.fName?.[0] || '';
   const last = user.value.lName?.[0] || '';
   return `${first}${last}`.toUpperCase();
 });
+
+// ✅ Manual exact active check — no Vuetify router magic
+const isActive = (path) => route.path === path;
 
 const handleLogout = async () => {
   try {
@@ -136,7 +129,6 @@ const handleLogout = async () => {
   }
 };
 
-// Dashboard route based on user role
 const dashboardRoute = computed(() => {
   const role = user.value?.role;
   if (role === 'admin') return '/admin';
@@ -148,9 +140,9 @@ const dashboardRoute = computed(() => {
 <style scoped>
 .v-navigation-drawer {
   z-index: 1000;
+  transition: width 0.3s ease !important;
 }
 
-/* Active menu item styling */
 .bg-accent {
   background-color: rgba(67, 97, 238, 0.15) !important;
 }

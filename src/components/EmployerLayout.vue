@@ -201,7 +201,7 @@ const logout = () => {
         <v-list-item
           prepend-icon="mdi-content-save"
           title="Templates"
-          :to="isGuest ? undefined : { name: 'employerTemplates' }"
+          :to="isGuest ? { name: 'guestTemplates' } : { name: 'employerTemplates' }"
           :disabled="isGuest"
           color="white"
           class="nav-item"
@@ -239,8 +239,6 @@ const logout = () => {
           class="nav-item"
           rounded="lg"
         />
-        
-        <!-- ✅ NEW: Alerts Page -->
         <v-list-item
           prepend-icon="mdi-bell-alert"
           title="Alerts"
@@ -256,8 +254,6 @@ const logout = () => {
             </v-chip>
           </template>
         </v-list-item>
-        
-        <!-- ✅ NEW: Messages Page -->
         <v-list-item
           prepend-icon="mdi-message-text"
           title="Messages"
@@ -267,19 +263,10 @@ const logout = () => {
           class="nav-item"
           rounded="lg"
         />
-        
         <v-list-item
           prepend-icon="mdi-checkbox-marked-circle-outline"
           title="Tasks"
           :to="isGuest ? { name: 'guestTasks' } : { name: 'employerTasks' }"
-          color="white"
-          class="nav-item"
-          rounded="lg"
-        />
-         <v-list-item
-          prepend-icon="mdi-calendar-text"
-          title="Templates"
-          :to="isGuest ? { name: 'guestTemplates' } : { name: 'employerTemplates' }"
           color="white"
           class="nav-item"
           rounded="lg"
@@ -438,5 +425,4 @@ const logout = () => {
   flex: 1;
   overflow-y: auto;
 }
-
 </style>
