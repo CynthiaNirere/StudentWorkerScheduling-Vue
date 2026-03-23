@@ -35,7 +35,6 @@ const loadTemplates = async () => {
   try {
     const res = await EmployerService.getAllTemplates();
     const allTemplates = Array.isArray(res.data) ? res.data : [];
-    // Filter for demo templates only
     templates.value = allTemplates;
   } catch (err) {
     console.error('Error loading templates:', err);
@@ -50,13 +49,7 @@ const formatDate = (timestamp) => {
   return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
 };
 
-const exitGuestMode = () => {
-  localStorage.removeItem('isGuest');
-  localStorage.removeItem('user');
-  router.push({ name: 'landing' });
-};
-
-const goBack = () => {
+const goToSchedule = () => {
   router.push({ name: 'guestSchedule' });
 };
 </script>
@@ -64,19 +57,6 @@ const goBack = () => {
 <template>
   <EmployerLayout :isGuest="true">
     <v-container fluid class="pa-6">
-      <!-- Guest Mode Banner -->
-      <v-alert type="info" variant="tonal" prominent class="mb-6">
-        <div class="d-flex align-center justify-space-between">
-          <div>
-            <v-icon size="large" class="mr-3">mdi-eye-outline</v-icon>
-            <strong>Guest Mode</strong> - Viewing demo schedule templates (read-only)
-          </div>
-          <v-btn color="primary" variant="outlined" @click="exitGuestMode">
-            Exit Guest Mode
-          </v-btn>
-        </div>
-      </v-alert>
-
       <!-- Header -->
       <div class="d-flex align-center justify-space-between mb-6">
         <div>
@@ -89,14 +69,19 @@ const goBack = () => {
           color="#12086F"
           variant="flat"
           prepend-icon="mdi-arrow-left"
-          @click="goBack"
+          @click="goToSchedule"
         >
           Back to Schedule
         </v-btn>
       </div>
 
-      <!-- Templates Grid -->
-      <v-row v-if="!loading">
+      <!-- Loading State -->
+      <div v-if="loading" class="text-center py-12">
+        <v-progress-circular indeterminate color="#12086F" size="48" />
+      </div>
+
+      <!-- Templates Grid (if templates exist) -->
+      <v-row v-else-if="templates.length > 0">
         <v-col 
           v-for="template in templates" 
           :key="template.template_id || template.id"
@@ -159,36 +144,44 @@ const goBack = () => {
             </v-card-actions>
           </v-card>
         </v-col>
-
-        <!-- Empty State -->
-        <v-col v-if="templates.length === 0" cols="12">
-          <v-card variant="outlined" rounded="lg" class="pa-12 text-center">
-            <v-icon size="80" color="#e0e0e0" class="mb-4">
-              mdi-calendar-text-outline
-            </v-icon>
-            <h3 class="text-h6 font-weight-bold mb-2">No Templates Yet</h3>
-            <p class="text-body-2 text-grey mb-6">
-              Schedule templates help you quickly create recurring weekly schedules
-            </p>
-          </v-card>
-        </v-col>
       </v-row>
 
-      <!-- Loading State -->
-      <div v-else class="text-center py-12">
-        <v-progress-circular indeterminate color="#12086F" size="48" />
-      </div>
+      <!-- Empty State (matches design) -->
+      <v-card v-else variant="outlined" rounded="lg" class="empty-state-card">
+        <v-card-text class="pa-12 text-center">
+          <v-icon size="100" color="#BDBDBD" class="mb-6">
+            mdi-file-document-outline
+          </v-icon>
+          
+          <h3 class="text-h6 font-weight-regular text-grey mb-3">
+            No templates yet
+          </h3>
+          
+          <p class="text-body-2 text-grey mb-6">
+            Create a schedule and save it as a template to reuse it later
+          </p>
+
+          <v-btn
+            color="#12086F"
+            variant="outlined"
+            @click="goToSchedule"
+            disabled
+          >
+            Go to Schedule
+          </v-btn>
+        </v-card-text>
+      </v-card>
 
       <!-- How Templates Work Info Box -->
-      <v-card variant="tonal" color="#E3F2FD" class="mt-6" rounded="lg">
+      <v-card variant="outlined" rounded="lg" class="mt-6 info-card">
         <v-card-text class="pa-5">
           <div class="d-flex align-start">
-            <v-icon color="#1976D2" size="28" class="mr-4">mdi-information</v-icon>
+            <v-icon color="#1976D2" size="28" class="mr-4">mdi-information-outline</v-icon>
             <div>
-              <h3 class="text-body-1 font-weight-bold mb-2" style="color: #1976D2;">
+              <h3 class="text-body-1 font-weight-bold mb-3" style="color: #1976D2;">
                 How Templates Work
               </h3>
-              <ul class="text-body-2 text-grey ml-2">
+              <ul class="text-body-2 text-grey template-list">
                 <li>Templates save the structure of your weekly schedule</li>
                 <li>Click "Apply Template" to create shifts for any week</li>
                 <li>Shifts are created as drafts - you can edit before publishing</li>
@@ -216,5 +209,29 @@ const goBack = () => {
 .template-card:hover {
   box-shadow: 0 4px 12px rgba(18, 8, 111, 0.12);
   transform: translateY(-2px);
+}
+
+.empty-state-card {
+  border-color: #e0e0e0;
+  background: #FAFAFA;
+}
+
+.info-card {
+  border-color: #E3F2FD;
+  background: #FAFAFA;
+}
+
+.template-list {
+  list-style-position: outside;
+  padding-left: 20px;
+  line-height: 1.8;
+}
+
+.template-list li {
+  color: #757575;
+}
+
+.ga-2 {
+  gap: 8px;
 }
 </style>

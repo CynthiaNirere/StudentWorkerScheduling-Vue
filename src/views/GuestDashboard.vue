@@ -6,9 +6,7 @@ import EmployerService from '../services/employerServices.js';
 
 const router = useRouter();
 const loading = ref(true);
-const alerts = ref([]);
 const weeklySchedule = ref([]);
-const schedulePublished = ref(false);
 
 // Demo user credentials
 const DEMO_USER = {
@@ -18,7 +16,7 @@ const DEMO_USER = {
   fName: 'Demo',
   lName: 'Manager',
   role: 'employer',
-  work_location: null, // Will be set from demo location
+  work_location: null,
   token: 'demo-token'
 };
 
@@ -29,56 +27,12 @@ onMounted(async () => {
     return;
   }
   
-  // Set demo user in localStorage so services work
   localStorage.setItem('user', JSON.stringify(DEMO_USER));
-  
-  await loadDashboardData();
+  await loadWeeklySchedule();
 });
 
-const loadDashboardData = async () => {
-  loading.value = true;
-  try {
-    await Promise.all([loadAlerts(), loadWeeklySchedule()]);
-  } catch (err) {
-    console.error('Dashboard load error:', err);
-  } finally {
-    loading.value = false;
-  }
-};
-
-const loadAlerts = async () => {
-  try {
-    // ✅ FIXED: Changed from getAllShiftSwapRequests to getAllSwapRequests
-    const [swapRes, timeOffRes] = await Promise.all([
-        EmployerService.getAllShiftSwapRequests().catch(() => ({ data: [] })),
-      EmployerService.getAllTimeOffRequests().catch(() => ({ data: [] })),
-    ]);
-    
-    const swaps = Array.isArray(swapRes.data) ? swapRes.data : [];
-    const timeOffs = Array.isArray(timeOffRes.data) ? timeOffRes.data : [];
-    
-    alerts.value = [
-      ...swaps.filter(s => s.status === 'pending').slice(0, 2).map(s => ({
-        id: `swap-${s.swap_id}`,
-        type: 'Shift Cover Request',
-        message: `Employee needs coverage`,
-        time: timeAgo(s.created_at),
-        actions: ['Approve', 'Deny'],
-      })),
-      ...timeOffs.filter(t => t.status === 'pending').slice(0, 1).map(t => ({
-        id: `timeoff-${t.request_id}`,
-        type: 'Time Off Request',
-        message: `Employee requested time off`,
-        time: timeAgo(t.created_at),
-        actions: ['Approve', 'Deny'],
-      })),
-    ];
-  } catch (err) {
-    console.error('Error loading alerts:', err);
-  }
-};
-
 const loadWeeklySchedule = async () => {
+  loading.value = true;
   try {
     const monday = getMonday(new Date());
     const startDate = monday.getTime();
@@ -86,30 +40,45 @@ const loadWeeklySchedule = async () => {
     
     const res = await EmployerService.getShiftsByWeek(startDate, endDate);
     weeklySchedule.value = Array.isArray(res.data) ? res.data : [];
-    schedulePublished.value = weeklySchedule.value.some(s => s.status === 'published');
   } catch (err) {
     console.error('Error loading schedule:', err);
+  } finally {
+    loading.value = false;
   }
 };
 
+const scheduleStatus = computed(() => {
+  const hasPublished = weeklySchedule.value.some(s => s.status === 'published');
+  return hasPublished ? 'Published' : 'Draft';
+});
+
 const weekDays = computed(() => {
-  const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+  const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
   const today = new Date();
-  const monday = getMonday(today);
+  const sunday = getSunday(today);
   
   return days.map((label, i) => {
-    const date = new Date(monday);
-    date.setDate(monday.getDate() + i);
+    const date = new Date(sunday);
+    date.setDate(sunday.getDate() + i);
     const dateNum = date.getDate();
+    const month = date.toLocaleString('en-US', { month: 'short' });
+    const isToday = date.toDateString() === today.toDateString();
     const shifts = weeklySchedule.value.filter(s => {
       const shiftDate = new Date(Number(s.shift_time || s.shiftTime));
       return shiftDate.toDateString() === date.toDateString();
     });
-    return { label, dateNum, shifts };
+    return { label, dateNum, month, isToday, shifts };
   });
 });
 
-// ✅ ADDED: Missing helper functions
+const getSunday = (date) => {
+  const d = new Date(date);
+  const day = d.getDay();
+  d.setDate(d.getDate() - day);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
 const getMonday = (date) => {
   const d = new Date(date);
   const day = d.getDay();
@@ -127,22 +96,6 @@ const formatShiftTime = (minutes) => {
   return `${hour}:${String(m).padStart(2, '0')} ${ampm}`;
 };
 
-const timeAgo = (timestamp) => {
-  if (!timestamp) return '';
-  const diff = Date.now() - Number(timestamp);
-  const hours = Math.floor(diff / 3600000);
-  if (hours < 1) return 'Just now';
-  if (hours < 24) return `${hours} hours ago`;
-  const days = Math.floor(hours / 24);
-  return `${days} days ago`;
-};
-
-const getActionColor = (action) => {
-  if (action === 'Approve') return '#2e7d32';
-  if (action === 'Deny') return '#d32f2f';
-  return '#12086F';
-};
-
 const exitGuestMode = () => {
   localStorage.removeItem('isGuest');
   localStorage.removeItem('user');
@@ -153,137 +106,122 @@ const exitGuestMode = () => {
 <template>
   <EmployerLayout :isGuest="true">
     <v-container fluid class="pa-6">
-      <!-- Guest Mode Banner -->
-      <v-alert
-        type="info"
-        variant="tonal"
-        prominent
-        class="mb-6"
-      >
-        <div class="d-flex align-center justify-space-between">
-          <div>
-            <v-icon size="large" class="mr-3">mdi-eye-outline</v-icon>
-            <strong>Guest Mode</strong> - You're viewing demo data. 
-            <span class="text-caption">Actions are disabled in guest mode.</span>
-          </div>
-          <v-btn
-            color="primary"
-            variant="outlined"
-            @click="exitGuestMode"
-          >
-            Exit Guest Mode
-          </v-btn>
-        </div>
-      </v-alert>
-
-      <div class="mb-6">
+      <!-- Header -->
+      <div class="mb-8">
         <h1 class="text-h4 font-weight-bold navy-text mb-2">Dashboard</h1>
-        <p class="text-subtitle-1 text-medium-emphasis">Demo Campus Gym - Demo Workspace</p>
+        <p class="text-body-1 text-grey">Welcome back! Here's what's happening this week.</p>
       </div>
 
-      <!-- Quick Actions (Disabled) -->
-      <v-row class="mb-6">
-        <v-col cols="auto">
-          <v-btn color="#12086F" variant="flat" size="large" disabled>
-            Create Schedule
-          </v-btn>
-        </v-col>
-        <v-col cols="auto">
-          <v-btn color="#4361EE" variant="outlined" size="large" disabled>
-            Add Employee
-          </v-btn>
-        </v-col>
-        <v-col cols="auto">
-          <v-btn color="#4361EE" variant="outlined" size="large" disabled>
-            Create Shift
-          </v-btn>
-        </v-col>
-      </v-row>
+      <!-- Quick Actions (All Disabled) -->
+      <div class="d-flex ga-3 mb-8">
+        <v-btn
+          color="#12086F"
+          variant="flat"
+          size="large"
+          prepend-icon="mdi-calendar-plus"
+          disabled
+        >
+          Create Schedule
+        </v-btn>
+        <v-btn
+          color="#4361EE"
+          variant="outlined"
+          size="large"
+          prepend-icon="mdi-account-plus"
+          disabled
+        >
+          Add Employee
+        </v-btn>
+        <v-btn
+          color="#4361EE"
+          variant="outlined"
+          size="large"
+          prepend-icon="mdi-clock-plus-outline"
+          disabled
+        >
+          Create Shift
+        </v-btn>
+      </div>
 
-      <!-- Alerts & Notifications -->
-      <v-card class="mb-6 navy-card" variant="outlined" rounded="lg">
-        <v-card-title class="d-flex justify-space-between align-center pa-4">
-          <span class="text-h6 font-weight-bold">Alerts & Notifications</span>
-          <v-btn variant="text" size="small" color="#4361EE" disabled>View All</v-btn>
-        </v-card-title>
-        <v-divider />
-        <v-card-text class="pa-0">
-          <div v-if="loading" class="text-center py-8">
-            <v-progress-circular indeterminate color="#12086F" />
+      <!-- This Week's Schedule -->
+      <v-card variant="outlined" rounded="lg" class="schedule-card">
+        <v-card-title class="pa-5 d-flex align-center justify-space-between">
+          <div class="d-flex align-center">
+            <v-icon color="#12086F" size="28" class="mr-3">mdi-calendar</v-icon>
+            <span class="text-h6 font-weight-bold">This Week's Schedule</span>
           </div>
-          
-          <div v-else-if="alerts.length === 0" class="text-center py-8">
-            <v-icon color="grey" size="48">mdi-check-circle-outline</v-icon>
-            <p class="text-grey mt-2">No pending alerts</p>
-          </div>
-          
-          <div v-else>
-            <div v-for="(alert, idx) in alerts" :key="alert.id" class="pa-4"
-              :class="{ 'bg-grey-lighten-5': idx % 2 === 0 }">
-              <div class="d-flex justify-space-between align-start mb-2">
-                <div class="flex-grow-1">
-                  <v-chip size="small" color="#12086F" variant="tonal" class="mb-2">
-                    {{ alert.type }}
-                  </v-chip>
-                  <p class="text-body-1 mb-1">{{ alert.message }}</p>
-                  <p class="text-caption text-grey">{{ alert.time }}</p>
-                </div>
-                <v-btn icon="mdi-close" size="small" variant="text" disabled />
-              </div>
-              
-              <div class="d-flex gap-2 mt-3">
-                <v-btn v-for="action in alert.actions" :key="action"
-                  :color="getActionColor(action)"
-                  :variant="action === 'Approve' ? 'flat' : 'outlined'"
-                  size="small"
-                  disabled>
-                  {{ action }}
-                </v-btn>
-              </div>
-            </div>
-          </div>
-        </v-card-text>
-      </v-card>
-
-      <!-- Schedule Preview -->
-      <v-card class="navy-card" variant="outlined" rounded="lg">
-        <v-card-title class="d-flex justify-space-between align-center pa-4">
-          <span class="text-h6 font-weight-bold">This Week's Schedule Preview</span>
-          <div class="d-flex align-center gap-3">
-            <v-chip :color="schedulePublished ? '#2e7d32' : '#f57c00'"
-              size="small" variant="tonal">
-              {{ schedulePublished ? 'Schedule Published' : 'Schedule Not Published' }}
+          <div class="d-flex align-center ga-3">
+            <v-chip
+              :color="scheduleStatus === 'Published' ? '#2e7d32' : '#f57c00'"
+              variant="tonal"
+              size="small"
+            >
+              {{ scheduleStatus }}
             </v-chip>
-            <v-btn variant="text" size="small" color="#4361EE" disabled>
+            <v-btn
+              color="#4361EE"
+              variant="text"
+              size="small"
+              append-icon="mdi-arrow-right"
+              disabled
+            >
               View Full Schedule
             </v-btn>
           </div>
         </v-card-title>
+
         <v-divider />
-        <v-card-text class="pa-4">
-          <div v-if="loading" class="text-center py-8">
-            <v-progress-circular indeterminate color="#12086F" />
+
+        <v-card-text class="pa-5">
+          <div v-if="loading" class="text-center py-12">
+            <v-progress-circular indeterminate color="#12086F" size="48" />
           </div>
-          
-          <div v-else class="schedule-grid">
-            <div v-for="day in weekDays" :key="day.label" class="schedule-column">
-              <div class="schedule-header pa-3 text-center">
-                <div class="text-subtitle-2 font-weight-bold text-white">{{ day.label }}</div>
-                <div class="text-h6 font-weight-bold text-white">{{ day.dateNum }}</div>
-              </div>
-              
-              <div class="schedule-body pa-2">
-                <div v-for="shift in day.shifts" :key="shift.shift_id" class="shift-item pa-2 mb-2">
-                  <div class="text-caption font-weight-bold">
-                    {{ formatShiftTime(shift.start_time || shift.startTime) }}
-                  </div>
-                  <div class="text-caption">
-                    {{ shift.employee_name || shift.employeeName || 'Employee' }}
-                  </div>
+
+          <div v-else class="week-grid">
+            <div
+              v-for="day in weekDays"
+              :key="day.label"
+              class="day-column"
+              :class="{ 'day-today': day.isToday }"
+            >
+              <!-- Day Header -->
+              <div class="day-header">
+                <div class="text-caption font-weight-bold text-white mb-1">
+                  {{ day.label }}
                 </div>
-                
-                <div v-if="day.shifts.length === 0" class="text-center text-caption text-grey py-4">
-                  No shifts
+                <div class="text-h5 font-weight-bold text-white">
+                  {{ day.dateNum }}
+                </div>
+                <div class="text-caption text-white" style="opacity: 0.9;">
+                  {{ day.month }}
+                </div>
+                <div v-if="day.isToday" class="today-badge">
+                  ⭐ Today
+                </div>
+              </div>
+
+              <!-- Day Body -->
+              <div class="day-body">
+                <div v-if="day.shifts.length === 0" class="no-shifts">
+                  <v-icon color="#e0e0e0" size="40" class="mb-2">
+                    mdi-calendar-blank-outline
+                  </v-icon>
+                  <div class="text-caption text-grey">No shifts</div>
+                </div>
+
+                <div v-else>
+                  <div
+                    v-for="shift in day.shifts"
+                    :key="shift.shift_id"
+                    class="shift-card mb-2"
+                  >
+                    <div class="text-caption font-weight-bold mb-1">
+                      {{ formatShiftTime(shift.start_time || shift.startTime) }}
+                    </div>
+                    <div class="text-caption text-grey">
+                      {{ shift.employee_name || shift.employeeName || 'Unassigned' }}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -299,41 +237,86 @@ const exitGuestMode = () => {
   color: #12086F !important;
 }
 
-.navy-card {
+.schedule-card {
   border-color: #e0e0e0;
-  box-shadow: 0 1px 3px rgba(18, 8, 111, 0.05);
+  box-shadow: 0 2px 8px rgba(18, 8, 111, 0.08);
 }
 
-.schedule-grid {
+.week-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 1px;
-  background: #e0e0e0;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
+  gap: 12px;
+}
+
+.day-column {
+  border-radius: 12px;
   overflow: hidden;
-}
-
-.schedule-column {
   background: white;
-  min-height: 200px;
+  border: 1px solid #e0e0e0;
+  min-height: 240px;
+  transition: all 0.2s;
 }
 
-.schedule-header {
+.day-column:hover {
+  box-shadow: 0 4px 12px rgba(18, 8, 111, 0.12);
+  transform: translateY(-2px);
+}
+
+.day-today {
+  border: 2px solid #FFC107;
+  box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.1);
+}
+
+.day-header {
   background: linear-gradient(135deg, #12086F 0%, #2B354F 100%);
+  padding: 16px;
+  text-align: center;
+  position: relative;
+}
+
+.day-today .day-header {
+  background: linear-gradient(135deg, #FFC107 0%, #FFA000 100%);
+}
+
+.today-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(255, 255, 255, 0.2);
   color: white;
-}
-
-.schedule-body {
-  min-height: 150px;
-}
-
-.shift-item {
-  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
-  border-left: 3px solid #4361EE;
+  font-size: 10px;
+  padding: 2px 6px;
   border-radius: 4px;
+  font-weight: bold;
 }
 
-.gap-2 { gap: 8px; }
-.gap-3 { gap: 12px; }
+.day-body {
+  padding: 12px;
+  min-height: 140px;
+}
+
+.no-shifts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 8px;
+}
+
+.shift-card {
+  background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+  border-left: 3px solid #4361EE;
+  padding: 10px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.shift-card:hover {
+  background: linear-gradient(135deg, #BBDEFB 0%, #90CAF9 100%);
+  transform: translateX(2px);
+}
+
+.ga-3 {
+  gap: 12px;
+}
 </style>
