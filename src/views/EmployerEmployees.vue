@@ -18,13 +18,13 @@ const showAddDialog = ref(false);
 const showEditDialog = ref(false);
 const showDetailsDialog = ref(false);
 const showDeleteDialog = ref(false);
-const showManageRolesDialog = ref(false); // ✅ NEW
+const showManageRolesDialog = ref(false);
 const selectedEmployee = ref(null);
 const employeeToDelete = ref(null);
 const saving = ref(false);
 const deleting = ref(false);
 
-// ✅ NEW: For managing roles
+// For managing roles
 const employeeRoles = ref([]);
 const selectedNewRole = ref(null);
 const makePrimary = ref(false);
@@ -50,12 +50,12 @@ const editForm = ref({
   job_role: "",
 });
 
-// ✅ UPDATED: Headers with Roles column
+// Headers with Roles column
 const headers = [
   { title: "Name", key: "name", sortable: true },
   { title: "Email", key: "email", sortable: true },
   { title: "Phone", key: "phone_number", sortable: true },
-  { title: "Job Roles", key: "roles", sortable: false }, // ✅ NEW
+  { title: "Job Roles", key: "roles", sortable: false },
   { title: "Actions", key: "actions", sortable: false, align: "end" },
 ];
 
@@ -68,23 +68,17 @@ const jobRoleSuggestions = computed(() => {
   return allRoles.sort();
 });
 
-// ✅ UPDATED: Include jobRoles array for each employee
+// Include jobRoles array for each employee
 const employeesWithName = computed(() => {
-  const currentUserId = user.value?.user_id || user.value?.userId;
-  return employees.value
-    .filter(e => {
-      const empId = e.user_id || e.userId;
-      return empId !== currentUserId && e.role === 'employee';
-    })
-    .map((e) => ({
-      ...e,
-      name: `${e.fName || e.first_name || ''} ${e.lName || e.last_name || ''}`.trim() || 'Unnamed',
-      job_role: e.job_role || 'Not assigned',
-      jobRoles: e.jobRoles || [], // ✅ NEW: Multiple roles
-    }));
+  return employees.value.map((e) => ({
+    ...e,
+    name: `${e.fName || e.first_name || ''} ${e.lName || e.last_name || ''}`.trim() || 'Unnamed',
+    job_role: e.job_role || 'Not assigned',
+    jobRoles: e.jobRoles || [],
+  }));
 });
 
-// ✅ NEW: Available roles to add (exclude already assigned)
+// Available roles to add (exclude already assigned)
 const availableRolesToAdd = computed(() => {
   const assignedRoleIds = employeeRoles.value.map(r => r.job_role_id);
   return jobRoles.value.filter(r => !assignedRoleIds.includes(r.job_role_id));
@@ -95,7 +89,7 @@ onMounted(async () => {
   await Promise.all([loadEmployees(), loadJobRoles()]);
 });
 
-// ✅ UPDATED: Load employees with their roles
+// Load employees with their roles
 const loadEmployees = async () => {
   loading.value = true;
   try {
@@ -108,7 +102,7 @@ const loadEmployees = async () => {
       return u.role === 'employee' && empId !== currentUserId;
     });
     
-    // ✅ NEW: Load roles for each employee
+    // Load roles for each employee
     for (const emp of employeesList) {
       try {
         const rolesRes = await EmployerService.getUserRoles(emp.user_id || emp.userId);
@@ -141,7 +135,7 @@ const loadJobRoles = async () => {
   }
 };
 
-// ✅ NEW: Load roles for specific employee
+// Load roles for specific employee
 const loadEmployeeRoles = async (userId) => {
   loadingRoles.value = true;
   try {
@@ -155,7 +149,7 @@ const loadEmployeeRoles = async (userId) => {
   }
 };
 
-// ✅ NEW: Open manage roles dialog
+// Open manage roles dialog
 const openManageRolesDialog = async (employee) => {
   selectedEmployee.value = employee;
   selectedNewRole.value = null;
@@ -164,7 +158,7 @@ const openManageRolesDialog = async (employee) => {
   showManageRolesDialog.value = true;
 };
 
-// ✅ NEW: Add role to employee
+// Add role to employee
 const handleAddRole = async () => {
   if (!selectedNewRole.value) {
     showSnackbar("Please select a role", "error");
@@ -196,7 +190,7 @@ const handleAddRole = async () => {
   }
 };
 
-// ✅ NEW: Remove role from employee
+// Remove role from employee
 const handleRemoveRole = async (roleId) => {
   if (employeeRoles.value.length === 1) {
     showSnackbar("Cannot remove the last role", "error");
@@ -218,7 +212,7 @@ const handleRemoveRole = async (roleId) => {
   }
 };
 
-// ✅ NEW: Set primary role
+// Set primary role
 const handleSetPrimary = async (roleId) => {
   try {
     await EmployerService.setPrimaryRole(
@@ -243,10 +237,30 @@ const handleAddEmployee = async () => {
 
   saving.value = true;
   try {
-    await EmployerService.createEmployee({
+    const res = await EmployerService.createEmployee({
       ...newEmployee.value,
       role: 'employee',
     });
+
+    // If a job role was selected, add it to the UserJobRole table
+    const createdUser = res.data?.user || res.data;
+    const newUserId = createdUser?.user_id || createdUser?.userId;
+    if (newEmployee.value.job_role && newUserId) {
+      const matchedRole = jobRoles.value.find(
+        r => r.title === newEmployee.value.job_role
+      );
+      if (matchedRole) {
+        try {
+          await EmployerService.addRoleToUser(newUserId, {
+            jobRoleId: matchedRole.job_role_id,
+            isPrimary: true
+          });
+        } catch (roleErr) {
+          console.error('Error adding role to new employee:', roleErr);
+        }
+      }
+    }
+
     showSnackbar("Employee added successfully!", "success");
     showAddDialog.value = false;
     newEmployee.value = {
@@ -285,7 +299,29 @@ const handleEditEmployee = async () => {
 
   saving.value = true;
   try {
-    await EmployerService.updateEmployee(selectedEmployee.value.user_id || selectedEmployee.value.userId, editForm.value);
+    const empId = selectedEmployee.value.user_id || selectedEmployee.value.userId;
+    await EmployerService.updateEmployee(empId, editForm.value);
+
+    // If a job role was selected, also add it to the UserJobRole table
+    if (editForm.value.job_role) {
+      const matchedRole = jobRoles.value.find(
+        r => r.title === editForm.value.job_role
+      );
+      if (matchedRole) {
+        try {
+          await EmployerService.addRoleToUser(empId, {
+            jobRoleId: matchedRole.job_role_id,
+            isPrimary: true
+          });
+        } catch (roleErr) {
+          // Ignore if role already assigned
+          if (!roleErr.response?.data?.message?.includes('already')) {
+            console.error('Error adding role during edit:', roleErr);
+          }
+        }
+      }
+    }
+
     showSnackbar("Employee updated successfully!", "success");
     showEditDialog.value = false;
     await loadEmployees();
@@ -386,7 +422,7 @@ const showSnackbar = (message, color = "success") => {
               </div>
             </template>
 
-            <!-- ✅ NEW: Job Roles Column -->
+            <!-- Job Roles Column -->
             <template #[`item.roles`]="{ item }">
               <div class="d-flex flex-wrap ga-1">
                 <v-chip
@@ -418,7 +454,7 @@ const showSnackbar = (message, color = "success") => {
               </div>
             </template>
 
-            <!-- ✅ UPDATED: Actions with Manage Roles -->
+            <!-- Actions with Manage Roles -->
             <template #[`item.actions`]="{ item }">
               <v-menu>
                 <template #activator="{ props }">
@@ -432,7 +468,7 @@ const showSnackbar = (message, color = "success") => {
                     <v-list-item-title>Edit Info</v-list-item-title>
                   </v-list-item>
                   
-                  <!-- ✅ NEW: Manage Roles option -->
+                  <!-- Manage Roles option -->
                   <v-list-item @click="openManageRolesDialog(item)" prepend-icon="mdi-briefcase-account">
                     <v-list-item-title>Manage Roles</v-list-item-title>
                   </v-list-item>
@@ -636,7 +672,7 @@ const showSnackbar = (message, color = "success") => {
       </v-card>
     </v-dialog>
 
-    <!-- ✅ NEW: Manage Roles Dialog -->
+    <!-- Manage Roles Dialog -->
     <v-dialog v-model="showManageRolesDialog" max-width="600">
       <v-card rounded="lg">
         <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4 navy-text">
