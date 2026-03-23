@@ -11,6 +11,8 @@ import GuestTimeOff from './views/GuestTimeOff.vue';
 import GuestSwaps from './views/GuestSwaps.vue';
 import GuestTasks from './views/GuestTasks.vue'; 
 import GuestTemplate from './views/GuestTemplate.vue';
+import GuestAlerts from './views/GuestAlerts.vue';
+import GuestMessages from './views/GuestMessages.vue';
 import Login from "./views/Login.vue";
 import SignUp from "./views/SignUp.vue";
 import RoleSelect from "./views/RoleSelect.vue";
@@ -89,6 +91,18 @@ const router = createRouter({
       component: GuestTasks,
       meta: { requiresAuth: false },
     },
+    {
+  path: "/guest/alerts",
+  name: "guestAlerts",
+  component: GuestAlerts,
+  meta: { requiresAuth: false },
+},
+{
+  path: "/guest/messages",
+  name: "guestMessages",
+  component: GuestMessages,
+  meta: { requiresAuth: false },
+},
     // ─── AUTH ROUTES ───────────────────────────────────────────────────
     {
       path: "/signup",

@@ -182,96 +182,93 @@ const logout = () => {
       <v-divider class="border-white-20" />
 
       <v-list nav class="px-2">
-        <v-list-item
-          prepend-icon="mdi-view-dashboard"
-          title="Dashboard"
-          :to="isGuest ? { name: 'guestDashboard' } : { name: 'employerDashboard' }"
-          color="white"
-          class="nav-item"
-          rounded="lg"
-        />
-        <v-list-item
-          prepend-icon="mdi-calendar"
-          title="Schedule"
-          :to="isGuest ? { name: 'guestSchedule' } : { name: 'employerSchedule' }"
-          color="white"
-          class="nav-item"
-          rounded="lg"
-        />
-        <v-list-item
-          prepend-icon="mdi-content-save"
-          title="Templates"
-          :to="isGuest ? { name: 'guestTemplates' } : { name: 'employerTemplates' }"
-          :disabled="isGuest"
-          color="white"
-          class="nav-item"
-          rounded="lg"
-        />
-        <v-list-item
-          prepend-icon="mdi-account-group"
-          title="Employees"
-          :to="isGuest ? { name: 'guestEmployees' } : { name: 'employerEmployees' }"
-          color="white"
-          class="nav-item"
-          rounded="lg"
-        />
-        <v-list-item
-          prepend-icon="mdi-clock-outline"
-          title="Availability"
-          :to="isGuest ? { name: 'guestAvailability' } : { name: 'employerAvailability' }"
-          color="white"
-          class="nav-item"
-          rounded="lg"
-        />
-        <v-list-item
-          prepend-icon="mdi-calendar-remove"
-          title="Time Off"
-          :to="isGuest ? { name: 'guestTimeOff' } : { name: 'employerTimeOff' }"
-          color="white"
-          class="nav-item"
-          rounded="lg"
-        />
-        <v-list-item
-          prepend-icon="mdi-swap-horizontal"
-          title="Swaps"
-          :to="isGuest ? { name: 'guestSwaps' } : { name: 'employerSwaps' }"
-          color="white"
-          class="nav-item"
-          rounded="lg"
-        />
-        <v-list-item
-          prepend-icon="mdi-bell-alert"
-          title="Alerts"
-          :to="isGuest ? undefined : { name: 'employerAlerts' }"
-          :disabled="isGuest"
-          color="white"
-          class="nav-item"
-          rounded="lg"
-        >
-          <template #append v-if="!isGuest && unreadCount > 0 && !rail">
-            <v-chip size="x-small" color="error" variant="flat">
-              {{ unreadCount }}
-            </v-chip>
-          </template>
-        </v-list-item>
-        <v-list-item
-          prepend-icon="mdi-message-text"
-          title="Messages"
-          :to="isGuest ? undefined : { name: 'employerMessages' }"
-          :disabled="isGuest"
-          color="white"
-          class="nav-item"
-          rounded="lg"
-        />
-        <v-list-item
-          prepend-icon="mdi-checkbox-marked-circle-outline"
-          title="Tasks"
-          :to="isGuest ? { name: 'guestTasks' } : { name: 'employerTasks' }"
-          color="white"
-          class="nav-item"
-          rounded="lg"
-        />
-      </v-list>
+  <v-list-item
+    prepend-icon="mdi-view-dashboard"
+    title="Dashboard"
+    :to="isGuest ? { name: 'guestDashboard' } : { name: 'employerDashboard' }"
+    color="white"
+    class="nav-item"
+    rounded="lg"
+  />
+  <v-list-item
+    prepend-icon="mdi-calendar"
+    title="Schedule"
+    :to="isGuest ? { name: 'guestSchedule' } : { name: 'employerSchedule' }"
+    color="white"
+    class="nav-item"
+    rounded="lg"
+  />
+  <v-list-item
+    prepend-icon="mdi-calendar-text"
+    title="Templates"
+    :to="isGuest ? { name: 'guestTemplates' } : { name: 'employerTemplates' }"
+    color="white"
+    class="nav-item"
+    rounded="lg"
+  />
+  <v-list-item
+    prepend-icon="mdi-account-group"
+    title="Employees"
+    :to="isGuest ? { name: 'guestEmployees' } : { name: 'employerEmployees' }"
+    color="white"
+    class="nav-item"
+    rounded="lg"
+  />
+  <v-list-item
+    prepend-icon="mdi-clock-outline"
+    title="Availability"
+    :to="isGuest ? { name: 'guestAvailability' } : { name: 'employerAvailability' }"
+    color="white"
+    class="nav-item"
+    rounded="lg"
+  />
+  <v-list-item
+    prepend-icon="mdi-calendar-remove"
+    title="Time Off"
+    :to="isGuest ? { name: 'guestTimeOff' } : { name: 'employerTimeOff' }"
+    color="white"
+    class="nav-item"
+    rounded="lg"
+  />
+  <v-list-item
+    prepend-icon="mdi-swap-horizontal"
+    title="Swaps"
+    :to="isGuest ? { name: 'guestSwaps' } : { name: 'employerSwaps' }"
+    color="white"
+    class="nav-item"
+    rounded="lg"
+  />
+  <v-list-item
+    prepend-icon="mdi-bell-alert"
+    title="Alerts"
+    :to="isGuest ? { name: 'guestAlerts' } : { name: 'employerAlerts' }"
+    color="white"
+    class="nav-item"
+    rounded="lg"
+  >
+    <template #append v-if="!isGuest && unreadCount > 0 && !rail">
+      <v-chip size="x-small" color="error" variant="flat">
+        {{ unreadCount }}
+      </v-chip>
+    </template>
+  </v-list-item>
+  <v-list-item
+    prepend-icon="mdi-message-text"
+    title="Messages"
+    :to="isGuest ? { name: 'guestMessages' } : { name: 'employerMessages' }"
+    color="white"
+    class="nav-item"
+    rounded="lg"
+  />
+  <v-list-item
+    prepend-icon="mdi-checkbox-marked-circle-outline"
+    title="Tasks"
+    :to="isGuest ? { name: 'guestTasks' } : { name: 'employerTasks' }"
+    color="white"
+    class="nav-item"
+    rounded="lg"
+  />
+</v-list>
     </v-navigation-drawer>
 
     <!-- Main Content Area -->
