@@ -50,7 +50,7 @@ const editForm = ref({
   job_role: "",
 });
 
-// ✅ UPDATED: Headers with Roles column
+// UPDATED: Headers with Roles column
 const headers = [
   { title: "Name", key: "name", sortable: true },
   { title: "Email", key: "email", sortable: true },
@@ -68,7 +68,7 @@ const jobRoleSuggestions = computed(() => {
   return allRoles.sort();
 });
 
-// ✅ UPDATED: Include jobRoles array for each employee
+//  UPDATED: Include jobRoles array for each employee
 const employeesWithName = computed(() => {
   const currentUserId = user.value?.user_id || user.value?.userId;
   return employees.value
@@ -84,7 +84,7 @@ const employeesWithName = computed(() => {
     }));
 });
 
-// ✅ NEW: Available roles to add (exclude already assigned)
+//  NEW: Available roles to add (exclude already assigned)
 const availableRolesToAdd = computed(() => {
   const assignedRoleIds = employeeRoles.value.map(r => r.job_role_id);
   return jobRoles.value.filter(r => !assignedRoleIds.includes(r.job_role_id));
