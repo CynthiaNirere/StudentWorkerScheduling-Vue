@@ -31,6 +31,18 @@ const toggleTask = (taskId) => {
   if (task) task.completed = !task.completed;
 };
 
+// ─── LATE BUFFER & TODAY'S SCHEDULE ──────────────────────────────────────
+const LATE_BUFFER_MINUTES = 15;
+
+// Today's scheduled shifts — in production these come from the API
+const todayScheduledShifts = ref([
+  { id: 1, label: 'Morning Shift', start: '09:00', end: '13:00', display: '9:00 AM – 1:00 PM' },
+  { id: 2, label: 'Evening Shift', start: '17:00', end: '21:00', display: '5:00 PM – 9:00 PM' }
+]);
+
+const clockInBlocked = ref(false);
+const clockInBlockMessage = ref('');
+
 // ─── SHIFT SESSIONS ───────────────────────────────────────────────────────
 const shiftSessions = ref([]);
 
@@ -40,10 +52,44 @@ const totalHoursThisWeek = computed(() =>
   completedShifts.value.reduce((sum, shift) => sum + parseFloat(shift.totalHours || 0), 0).toFixed(1)
 );
 
+const maxAllowedClockIns = computed(() => todayScheduledShifts.value.length);
+const allShiftsDone = computed(() =>
+  completedShifts.value.length >= maxAllowedClockIns.value && !currentShift.value
+);
+const nextScheduledShift = computed(() =>
+  todayScheduledShifts.value[completedShifts.value.length] || null
+);
+
 const checkIn = () => {
+  if (allShiftsDone.value) return;
+
+  const scheduled = nextScheduledShift.value;
+  if (scheduled) {
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const [startH, startM] = scheduled.start.split(':').map(Number);
+    const startMinutes = startH * 60 + startM;
+
+    if (currentMinutes < startMinutes) {
+      showSnackbar('You have clocked in early. Your manager has been notified.', 'warning');
+    }
+
+    if (currentMinutes > startMinutes + LATE_BUFFER_MINUTES) {
+      clockInBlocked.value = true;
+      clockInBlockMessage.value =
+        `You are outside the allowed clock-in window for your ${scheduled.label}. This has been flagged for your supervisor.`;
+      return;
+    }
+  }
+
+  clockInBlocked.value = false;
+  clockInBlockMessage.value = '';
+
   const now = new Date();
+  const shiftNumber = shiftSessions.value.length + 1;
   shiftSessions.value.push({
-    id: shiftSessions.value.length + 1,
+    id: shiftNumber,
+    label: scheduled?.label || `Shift #${shiftNumber}`,
     checkInTime: now.getTime(),
     checkOutTime: null,
     totalHours: 0,
@@ -58,6 +104,8 @@ const checkOut = (shiftId) => {
     shift.checkOutTime = now.getTime();
     shift.status = 'checked-out';
     shift.totalHours = calculateTotalHours(shift.checkInTime, shift.checkOutTime);
+    clockInBlocked.value = false;
+    clockInBlockMessage.value = '';
   }
 };
 
@@ -340,13 +388,40 @@ onMounted(() => {
 
                 <v-divider class="my-4" />
 
-                <!-- Today's Shift Info -->
+                <!-- Today's Scheduled Shifts -->
                 <div class="shift-info mb-4">
-                  <p class="text-subtitle-2 font-weight-bold mb-1">Today's Shift</p>
-                  <p class="text-body-2 font-weight-bold mb-0">9:00 AM - 5:00 PM @ {{ businessArea }}</p>
+                  <p class="text-subtitle-2 font-weight-bold mb-2">Today's Schedule</p>
+                  <div
+                    v-for="(s, i) in todayScheduledShifts"
+                    :key="s.id"
+                    class="d-flex align-center justify-space-between mb-1"
+                  >
+                    <div class="d-flex align-center ga-2">
+                      <v-icon size="14" :color="completedShifts.length > i ? 'success' : (currentShift && completedShifts.length === i ? 'warning' : '#12086F')">
+                        {{ completedShifts.length > i ? 'mdi-check-circle' : (currentShift && completedShifts.length === i ? 'mdi-clock-fast' : 'mdi-clock-outline') }}
+                      </v-icon>
+                      <span class="text-body-2 font-weight-medium">{{ s.label }}</span>
+                    </div>
+                    <span class="text-caption text-grey">{{ s.display }}</span>
+                  </div>
+                  <p class="text-caption text-grey mt-1 mb-0">@ {{ businessArea }}</p>
                 </div>
 
                 <v-divider class="my-4" />
+
+                <!-- Late Block Alert -->
+                <div v-if="clockInBlocked" class="late-block-alert mb-4">
+                  <div class="d-flex align-start ga-2">
+                    <v-icon color="error" size="18" style="margin-top: 2px;">mdi-alert-circle</v-icon>
+                    <div class="flex-grow-1">
+                      <p class="text-body-2 font-weight-bold text-error mb-1">Clock-In Blocked</p>
+                      <p class="text-body-2 mb-0">{{ clockInBlockMessage }}</p>
+                    </div>
+                    <v-btn icon size="x-small" variant="text" @click="clockInBlocked = false">
+                      <v-icon size="small">mdi-close</v-icon>
+                    </v-btn>
+                  </div>
+                </div>
 
                 <!-- Active Shift -->
                 <div v-if="currentShift" class="active-shift mb-4">
@@ -372,16 +447,21 @@ onMounted(() => {
                 <!-- Completed Shifts -->
                 <div v-if="completedShifts.length > 0" class="mb-4">
                   <div class="d-flex justify-space-between align-center mb-3">
-                    <p class="text-body-2 font-weight-bold mb-0">Completed Shifts</p>
+                    <p class="text-body-2 font-weight-bold mb-0">Today's Progress</p>
                     <div class="text-right">
-                      <p class="text-caption text-grey mb-0">This Week</p>
+                      <p class="text-caption text-grey mb-0">Total Today</p>
                       <p class="text-subtitle-2 font-weight-bold text-success mb-0">{{ totalHoursThisWeek }}h</p>
                     </div>
                   </div>
-                  <div v-for="shift in completedShifts" :key="shift.id" class="completed-shift-card mb-2">
+                  <div v-for="(shift, index) in completedShifts" :key="shift.id" class="completed-shift-card mb-2">
                     <div class="d-flex justify-space-between align-center mb-1">
-                      <p class="text-body-2 font-weight-bold mb-0">Shift #{{ shift.id }}</p>
-                      <v-chip color="grey" size="small" variant="tonal">Completed</v-chip>
+                      <div class="d-flex align-center ga-1">
+                        <v-icon size="14" color="success">mdi-check-circle</v-icon>
+                        <p class="text-body-2 font-weight-bold mb-0">{{ shift.label }}</p>
+                      </div>
+                      <v-chip color="success" size="small" variant="tonal">
+                        {{ index === 0 ? 'First Shift Done' : index === 1 ? 'Second Shift Done' : 'Done' }}
+                      </v-chip>
                     </div>
                     <v-row dense>
                       <v-col cols="4" class="text-center">
@@ -400,9 +480,20 @@ onMounted(() => {
                   </div>
                 </div>
 
-                <!-- Next Shift -->
+                <!-- All Shifts Done Banner -->
                 <div
-                  v-if="!currentShift && completedShifts.length > 0"
+                  v-if="allShiftsDone"
+                  class="text-center pa-4 mb-2"
+                  style="background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0;"
+                >
+                  <v-icon color="success" size="28" class="mb-2">mdi-check-circle</v-icon>
+                  <p class="text-body-2 font-weight-bold text-success mb-1">All shifts completed for today!</p>
+                  <p class="text-caption text-grey mb-0">{{ totalHoursThisWeek }}h total worked</p>
+                </div>
+
+                <!-- Next Shift (upcoming from calendar, only when no more today's shifts pending) -->
+                <div
+                  v-if="!currentShift && completedShifts.length > 0 && allShiftsDone"
                   class="text-center mb-4 pa-3"
                   style="background: #f0f7ff; border-radius: 8px;"
                 >
@@ -410,9 +501,16 @@ onMounted(() => {
                   <p class="text-subtitle-2 font-weight-bold text-primary mb-0">{{ nextShift }}</p>
                 </div>
 
-                <!-- Check In Button -->
-                <v-btn v-if="!currentShift" block color="#12086F" variant="flat" size="large" @click="checkIn">
-                  {{ shiftSessions.length === 0 ? 'Start First Shift' : `Start Shift #${shiftSessions.length + 1}` }}
+                <!-- Check In Button — hidden once all today's shifts are done -->
+                <v-btn
+                  v-if="!currentShift && !allShiftsDone"
+                  block
+                  color="#12086F"
+                  variant="flat"
+                  size="large"
+                  @click="checkIn"
+                >
+                  {{ nextScheduledShift ? `Clock In — ${nextScheduledShift.label}` : `Start Shift #${shiftSessions.length + 1}` }}
                 </v-btn>
               </v-card-text>
             </v-card>
@@ -843,6 +941,15 @@ onMounted(() => {
 }
 
 .gap-3 { gap: 12px; }
+
+/* ── Late Block Alert ───────────────────────────────────────────────────── */
+.late-block-alert {
+  padding: 14px;
+  background-color: #fff5f5;
+  border: 1px solid #fca5a5;
+  border-left: 4px solid #ef4444;
+  border-radius: 8px;
+}
 
 
 </style>

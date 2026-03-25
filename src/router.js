@@ -230,7 +230,7 @@ const router = createRouter({
       component: EmployerSwaps,
       meta: { requiresAuth: true },
     },
-    // ✅ NEW: ALERTS & MESSAGES ROUTES
+    // NEW: ALERTS & MESSAGES ROUTES
     {
       path: "/employer/alerts",
       name: "employerAlerts",

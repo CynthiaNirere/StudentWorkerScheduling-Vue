@@ -52,6 +52,7 @@ const editForm = ref({
   job_role: "",
 });
 
+// UPDATED: Headers with Roles column
 // Headers with Roles column
 const headers = [
   { title: "Name", key: "name", sortable: true },
@@ -70,6 +71,7 @@ const jobRoleSuggestions = computed(() => {
   return allRoles.sort();
 });
 
+//  UPDATED: Include jobRoles array for each employee
 // Include jobRoles array for each employee
 const employeesWithName = computed(() => {
   return employees.value.map((e) => ({
