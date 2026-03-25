@@ -344,6 +344,11 @@ export default {
     return apiClient.get("/business-areas", addDemoHeader());
   },
 
+  // ✅ NEW: Alias for business area filtering (used by EmployerEmployees.vue)
+  getBusinessAreas() {
+    return apiClient.get("/business-areas", addDemoHeader());
+  },
+
   getLocationById(id) {
     return apiClient.get(`/business-areas/${id}`, addDemoHeader());
   },

@@ -345,7 +345,14 @@ const minutesToTime = (minutes) => {
   };
 };
 
+// ✅ FIXED: Prevent duplicate shifts + handle task errors gracefully
 const handleSaveShift = async () => {
+  // ✅ FIX #1: Prevent double-clicks from creating duplicate shifts
+  if (creatingShift.value) {
+    console.log('⚠️ Shift save already in progress, ignoring duplicate call');
+    return;
+  }
+
   if (!shiftForm.value.allowEmpty && !shiftForm.value.userId) {
     showSnackbar("Please assign an employee or enable 'Create Empty Shift'", "error");
     return;
@@ -384,25 +391,50 @@ const handleSaveShift = async () => {
     if (editMode.value && selectedShift.value) {
       // Update existing shift
       await EmployerService.updateShift(selectedShift.value.shift_id || selectedShift.value.id, shiftData);
+      
+      // ✅ FIX #2: Handle task updates with try-catch
+      if (shiftForm.value.assignedTasks.length > 0) {
+        try {
+          const shiftId = selectedShift.value.shift_id || selectedShift.value.id;
+          await EmployerService.bulkAssignTasksToShift(shiftId, shiftForm.value.assignedTasks);
+          console.log('✅ Tasks updated successfully');
+        } catch (taskErr) {
+          console.error('⚠️ Task assignment failed (shift still updated):', taskErr);
+          showSnackbar("Shift updated but tasks failed to assign", "warning");
+        }
+      }
+      
       showSnackbar("Shift updated successfully!", "success");
     } else {
       // Create new shift
       const shiftRes = await EmployerService.createShift(shiftData);
       const createdShiftId = shiftRes.data?.shift_id || shiftRes.data?.id;
+      
+      console.log('✅ Shift created with ID:', createdShiftId);
 
+      // ✅ FIX #2: Wrap task assignment in try-catch so shift still saves if tasks fail
       if (shiftForm.value.assignedTasks.length > 0 && createdShiftId) {
-        await EmployerService.bulkAssignTasksToShift(createdShiftId, shiftForm.value.assignedTasks);
+        try {
+          await EmployerService.bulkAssignTasksToShift(createdShiftId, shiftForm.value.assignedTasks);
+          console.log('✅ Tasks assigned successfully');
+          showSnackbar("Shift created with tasks!", "success");
+        } catch (taskErr) {
+          console.error('⚠️ Task assignment failed (shift still saved):', taskErr);
+          showSnackbar("Shift created but tasks failed to assign", "warning");
+        }
+      } else {
+        showSnackbar("Shift created successfully!", "success");
       }
-      showSnackbar("Shift created successfully!", "success");
     }
 
     showShiftDialog.value = false;
     shiftCreationStep.value = 1;
     await loadShifts();
   } catch (err) {
-    console.error('Save shift error:', err);
+    console.error('❌ Save shift error:', err);
     showSnackbar(editMode.value ? "Error updating shift" : "Error creating shift", "error");
   } finally {
+    // ✅ FIX #1: ALWAYS reset flag even if error occurs
     creatingShift.value = false;
   }
 };
@@ -527,7 +559,7 @@ const handleSaveTemplate = async () => {
       };
     });
 
-    await EmployerService.createScheduleTemplate({
+    await EmployerService.createTemplate({
       name: templateName.value,
       description: templateDescription.value || "",
       locationId: user.value?.work_location || 1,
