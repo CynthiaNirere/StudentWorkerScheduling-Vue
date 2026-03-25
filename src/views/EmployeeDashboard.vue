@@ -70,6 +70,10 @@ const checkIn = () => {
     const [startH, startM] = scheduled.start.split(':').map(Number);
     const startMinutes = startH * 60 + startM;
 
+    if (currentMinutes < startMinutes) {
+      showSnackbar('You have clocked in early. Your manager has been notified.', 'warning');
+    }
+
     if (currentMinutes > startMinutes + LATE_BUFFER_MINUTES) {
       clockInBlocked.value = true;
       clockInBlockMessage.value =
