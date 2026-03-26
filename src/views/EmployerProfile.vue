@@ -1,11 +1,13 @@
 <script setup>
 import { ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
+import { useTheme } from 'vuetify';  // ✅ ADD THIS
 import Utils from "../config/utils";
 import EmployerService from "../services/employerServices.js";
 import EmployerLayout from '../components/EmployerLayout.vue';
 
 const router = useRouter();
+const theme = useTheme();  // ✅ ADD THIS
 const user = ref(null);
 
 const loading = ref(false);
@@ -18,7 +20,7 @@ const profileForm = ref({
   phone_number: "",
 });
 
-// NEW: Notification preferences
+// NEW: Notification preferences + Theme preference
 const notificationPreferences = ref({
   emailNotifications: false,
   smsNotifications: false,
@@ -26,6 +28,9 @@ const notificationPreferences = ref({
   swapRequests: true,
   scheduleChanges: true,
 });
+
+// ✅ ADD THIS: Theme preference
+const themePreference = ref('light');
 
 const snackbar = ref(false);
 const snackbarMessage = ref("");
@@ -35,6 +40,7 @@ onMounted(async () => {
   user.value = Utils.getStore("user");
   if (user.value) {
     await loadUserProfile();
+    
     // Load notification preferences from localStorage
     const savedPrefs = localStorage.getItem('notificationPreferences');
     if (savedPrefs) {
@@ -44,10 +50,23 @@ onMounted(async () => {
         console.error('Error loading notification preferences:', err);
       }
     }
+    
+    // ✅ ADD THIS: Load theme preference
+    const savedTheme = localStorage.getItem('themePreference');
+    if (savedTheme) {
+      themePreference.value = savedTheme;
+      theme.global.name.value = savedTheme;
+    }
   }
 });
 
-// NEW: Load fresh user data from server
+// ✅ ADD THIS: Watch for theme changes
+watch(themePreference, (newTheme) => {
+  theme.global.name.value = newTheme;
+  localStorage.setItem('themePreference', newTheme);
+  console.log('Theme changed to:', newTheme);
+});
+
 const loadUserProfile = async () => {
   loading.value = true;
   try {
@@ -60,10 +79,9 @@ const loadUserProfile = async () => {
         first_name: userData.fName || userData.first_name || "",
         last_name: userData.lName || userData.last_name || "",
         email: userData.email || "",
-        phone_number: userData.phone_number || "", // FIXED: Load from server
+        phone_number: userData.phone_number || "",
       };
       
-      // Update stored user data
       const updatedUser = {
         ...user.value,
         fName: userData.fName || userData.first_name,
@@ -71,14 +89,13 @@ const loadUserProfile = async () => {
         first_name: userData.fName || userData.first_name,
         last_name: userData.lName || userData.last_name,
         email: userData.email,
-        phone_number: userData.phone_number, // FIXED: Store phone number
+        phone_number: userData.phone_number,
       };
       Utils.setStore("user", updatedUser);
       user.value = updatedUser;
     }
   } catch (err) {
     console.error('Error loading profile:', err);
-    // Fallback to stored user if server fails
     profileForm.value = {
       first_name: user.value.fName || user.value.first_name || "",
       last_name: user.value.lName || user.value.last_name || "",
@@ -100,19 +117,17 @@ const handleSaveProfile = async () => {
   try {
     const userId = user.value.user_id || user.value.userId;
     
-    // FIXED: Explicitly include phone_number in update
     const updateData = {
       first_name: profileForm.value.first_name,
       last_name: profileForm.value.last_name,
       email: profileForm.value.email,
-      phone_number: profileForm.value.phone_number || null, // FIXED: Send phone number
+      phone_number: profileForm.value.phone_number || null,
     };
     
     console.log('Updating profile with:', updateData);
     
     await EmployerService.updateEmployee(userId, updateData);
     
-    // FIXED: Update stored user with phone number
     const updatedUser = { 
       ...user.value, 
       fName: profileForm.value.first_name,
@@ -120,7 +135,7 @@ const handleSaveProfile = async () => {
       first_name: profileForm.value.first_name,
       last_name: profileForm.value.last_name,
       email: profileForm.value.email,
-      phone_number: profileForm.value.phone_number, // FIXED: Save phone number to store
+      phone_number: profileForm.value.phone_number,
     };
     
     Utils.setStore("user", updatedUser);
@@ -137,10 +152,8 @@ const handleSaveProfile = async () => {
   }
 };
 
-// Save notification preferences
 const saveNotificationPreferences = async () => {
   try {
-    // Save to localStorage for now
     localStorage.setItem('notificationPreferences', JSON.stringify(notificationPreferences.value));
     console.log('Saving notification preferences:', notificationPreferences.value);
     showSnackbar("Notification preferences saved!", "success");
@@ -212,7 +225,6 @@ const showSnackbar = (message, color = "success") => {
               color="#12086F"
               readonly
             />
-            <!-- FIXED: Phone number field with proper binding -->
             <v-text-field
               v-model="profileForm.phone_number"
               label="Phone Number"
@@ -273,14 +285,6 @@ const showSnackbar = (message, color = "success") => {
               </v-col>
               <v-col cols="12" md="6">
                 <div class="mb-3">
-                  <div class="text-caption text-grey">Last Login</div>
-                  <div class="text-body-2">
-                    {{ user?.last_login ? new Date(Number(user.last_login)).toLocaleString() : "N/A" }}
-                  </div>
-                </div>
-              </v-col>
-              <v-col cols="12" md="6">
-                <div class="mb-3">
                   <div class="text-caption text-grey">Phone Number (Saved)</div>
                   <div class="text-body-2">
                     {{ user?.phone_number || profileForm.phone_number || "Not set" }}
@@ -288,6 +292,37 @@ const showSnackbar = (message, color = "success") => {
                 </div>
               </v-col>
             </v-row>
+          </v-card-text>
+        </v-card>
+
+        <!-- ✅ NEW: Appearance Settings -->
+        <v-card variant="outlined" rounded="lg" class="mb-4 navy-card">
+          <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4">
+            Appearance
+          </v-card-title>
+          <v-divider />
+          <v-card-text class="pa-5">
+            <div class="text-subtitle-2 font-weight-bold mb-3">Theme</div>
+            <v-btn-toggle
+              v-model="themePreference"
+              color="#12086F"
+              variant="outlined"
+              mandatory
+              divided
+              class="mb-3"
+            >
+              <v-btn value="light" class="flex-grow-1">
+                <v-icon start>mdi-white-balance-sunny</v-icon>
+                Light Mode
+              </v-btn>
+              <v-btn value="dark" class="flex-grow-1">
+                <v-icon start>mdi-moon-waning-crescent</v-icon>
+                Dark Mode
+              </v-btn>
+            </v-btn-toggle>
+            <div class="text-caption text-grey">
+              Choose your preferred color theme. Changes apply immediately.
+            </div>
           </v-card-text>
         </v-card>
 
