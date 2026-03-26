@@ -94,7 +94,13 @@ onMounted(async () => {
   if (props.isGuest) {
     businessArea.value = 'Demo Campus Gym';
   } else if (user.value?.work_location) {
-    businessArea.value = 'The Brew';
+    try {
+      const res = await EmployerService.getLocationById(user.value.work_location);
+      businessArea.value = res.data?.name || 'My Workplace';
+    } catch (err) {
+      console.error('Error loading business area:', err);
+      businessArea.value = 'My Workplace';
+    }
   }
 
   await loadPendingRequests();

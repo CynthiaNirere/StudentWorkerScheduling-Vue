@@ -52,8 +52,6 @@ const editForm = ref({
   job_role: "",
 });
 
-// UPDATED: Headers with Roles column
-// Headers with Roles column
 const headers = [
   { title: "Name", key: "name", sortable: true },
   { title: "Email", key: "email", sortable: true },
@@ -71,8 +69,6 @@ const jobRoleSuggestions = computed(() => {
   return allRoles.sort();
 });
 
-//  UPDATED: Include jobRoles array for each employee
-// Include jobRoles array for each employee
 const employeesWithName = computed(() => {
   return employees.value.map((e) => ({
     ...e,
@@ -82,18 +78,15 @@ const employeesWithName = computed(() => {
   }));
 });
 
-// ✅ NEW: Filter employees by business area
 const filteredEmployees = computed(() => {
   if (!selectedBusinessArea.value) {
-    return employeesWithName.value; // Show all if no filter selected
+    return employeesWithName.value;
   }
-  
   return employeesWithName.value.filter(emp => 
     emp.work_location === selectedBusinessArea.value
   );
 });
 
-// Available roles to add (exclude already assigned)
 const availableRolesToAdd = computed(() => {
   const assignedRoleIds = employeeRoles.value.map(r => r.job_role_id);
   return jobRoles.value.filter(r => !assignedRoleIds.includes(r.job_role_id));
@@ -104,12 +97,10 @@ onMounted(async () => {
   await Promise.all([loadBusinessAreas(), loadEmployees(), loadJobRoles()]);
 });
 
-// ✅ NEW: Load business areas
 const loadBusinessAreas = async () => {
   try {
     const res = await EmployerService.getBusinessAreas();
     businessAreas.value = Array.isArray(res.data) ? res.data : [];
-    console.log('📍 Loaded business areas:', businessAreas.value);
   } catch (err) {
     console.error("Error loading business areas:", err);
     businessAreas.value = [];
@@ -267,6 +258,7 @@ const handleAddEmployee = async () => {
     const res = await EmployerService.createEmployee({
       ...newEmployee.value,
       role: 'employee',
+      work_location: user.value?.work_location,
     });
 
     // If a job role was selected, add it to the UserJobRole table
@@ -424,7 +416,6 @@ const showSnackbar = (message, color = "success") => {
         </v-btn>
       </div>
 
-      <!-- ✅ NEW: Business Area Filter -->
       <v-row class="mb-4">
         <v-col cols="12" md="4">
           <v-select
