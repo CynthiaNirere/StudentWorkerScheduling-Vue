@@ -10,6 +10,8 @@ const user = ref(null);
 
 const employees = ref([]);
 const jobRoles = ref([]);
+const businessAreas = ref([]);
+const selectedBusinessArea = ref(null);
 const loading = ref(false);
 const loadingRoles = ref(false);
 const search = ref("");
@@ -76,6 +78,15 @@ const employeesWithName = computed(() => {
   }));
 });
 
+const filteredEmployees = computed(() => {
+  if (!selectedBusinessArea.value) {
+    return employeesWithName.value;
+  }
+  return employeesWithName.value.filter(emp => 
+    emp.work_location === selectedBusinessArea.value
+  );
+});
+
 const availableRolesToAdd = computed(() => {
   const assignedRoleIds = employeeRoles.value.map(r => r.job_role_id);
   return jobRoles.value.filter(r => !assignedRoleIds.includes(r.job_role_id));
@@ -83,8 +94,18 @@ const availableRolesToAdd = computed(() => {
 
 onMounted(async () => {
   user.value = Utils.getStore("user");
-  await Promise.all([loadEmployees(), loadJobRoles()]);
+  await Promise.all([loadBusinessAreas(), loadEmployees(), loadJobRoles()]);
 });
+
+const loadBusinessAreas = async () => {
+  try {
+    const res = await EmployerService.getBusinessAreas();
+    businessAreas.value = Array.isArray(res.data) ? res.data : [];
+  } catch (err) {
+    console.error("Error loading business areas:", err);
+    businessAreas.value = [];
+  }
+};
 
 // Load employees with their roles
 const loadEmployees = async () => {
@@ -395,12 +416,59 @@ const showSnackbar = (message, color = "success") => {
         </v-btn>
       </div>
 
+      <v-row class="mb-4">
+        <v-col cols="12" md="4">
+          <v-select
+            v-model="selectedBusinessArea"
+            :items="[
+              { title: 'All Locations', value: null },
+              ...businessAreas.map(ba => ({
+                title: ba.name,
+                value: ba.location_id || ba.locationId
+              }))
+            ]"
+            label="Filter by Business Area"
+            variant="outlined"
+            density="comfortable"
+            clearable
+            prepend-inner-icon="mdi-map-marker"
+            color="#12086F"
+          >
+            <template #item="{ props, item }">
+              <v-list-item v-bind="props">
+                <template #prepend v-if="item.value !== null">
+                  <v-icon>mdi-store</v-icon>
+                </template>
+                <template #prepend v-else>
+                  <v-icon>mdi-earth</v-icon>
+                </template>
+              </v-list-item>
+            </template>
+          </v-select>
+        </v-col>
+        
+        <v-col cols="12" md="8" class="d-flex align-center">
+          <v-chip 
+            v-if="selectedBusinessArea"
+            color="#12086F"
+            variant="tonal"
+            class="mr-2"
+          >
+            {{ businessAreas.find(ba => (ba.location_id || ba.locationId) === selectedBusinessArea)?.name }}
+            <v-icon end size="small" @click="selectedBusinessArea = null">mdi-close</v-icon>
+          </v-chip>
+          <span v-if="selectedBusinessArea" class="text-caption text-medium-emphasis">
+            Showing {{ filteredEmployees.length }} of {{ employees.length }} employees
+          </span>
+        </v-col>
+      </v-row>
+
       <!-- Employee Table -->
       <v-card variant="outlined" rounded="lg" class="navy-card">
         <v-card-text class="pa-0">
           <v-data-table
             :headers="headers"
-            :items="employeesWithName"
+            :items="filteredEmployees"
             :search="search"
             :loading="loading"
             items-per-page="10"
