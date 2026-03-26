@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
+import { useTheme } from 'vuetify'; // ✅ ADD THIS
 import Utils from '../config/utils.js';
 import EmployerService from '../services/employerServices.js';
 
@@ -13,6 +14,7 @@ const props = defineProps({
 
 const router = useRouter();
 const route = useRoute();
+const theme = useTheme(); // ✅ ADD THIS
 let refreshInterval = null;
 const user = ref(null);
 const businessArea = ref('');
@@ -21,6 +23,14 @@ const rail = ref(true);
 const showNotifications = ref(false);
 const pendingSwaps = ref([]);
 const pendingTimeOff = ref([]);
+
+// ✅ ADD THIS: Dynamic sidebar gradient based on theme
+const sidebarGradient = computed(() => {
+  if (theme.global.name.value === 'dark') {
+    return 'linear-gradient(180deg, #1E1E1E 0%, #2D2D2D 100%)';
+  }
+  return 'linear-gradient(180deg, #12086F 0%, #2B354F 100%)';
+});
 
 const notifications = computed(() => {
   const items = [];
@@ -97,6 +107,12 @@ onMounted(async () => {
     businessArea.value = 'The Brew';
   }
 
+  // ✅ ADD THIS: Load saved theme preference
+  const savedTheme = localStorage.getItem('themePreference');
+  if (savedTheme) {
+    theme.global.name.value = savedTheme;
+  }
+
   await loadPendingRequests();
   refreshInterval = setInterval(loadPendingRequests, 30000);
   window.addEventListener('notifications-updated', loadPendingRequests);
@@ -159,6 +175,7 @@ const logout = () => {
       @mouseenter="handleMouseEnter"
       @mouseleave="handleMouseLeave"
       class="sidebar"
+      :style="{ background: sidebarGradient }"
     >
       <div class="sidebar-header pa-4">
         <div v-show="!rail">
@@ -182,99 +199,99 @@ const logout = () => {
       <v-divider class="border-white-20" />
 
       <v-list nav class="px-2">
-  <v-list-item
-    prepend-icon="mdi-view-dashboard"
-    title="Dashboard"
-    :to="isGuest ? { name: 'guestDashboard' } : { name: 'employerDashboard' }"
-    color="white"
-    class="nav-item"
-    rounded="lg"
-  />
-  <v-list-item
-    prepend-icon="mdi-calendar"
-    title="Schedule"
-    :to="isGuest ? { name: 'guestSchedule' } : { name: 'employerSchedule' }"
-    color="white"
-    class="nav-item"
-    rounded="lg"
-  />
-  <v-list-item
-    prepend-icon="mdi-calendar-text"
-    title="Templates"
-    :to="isGuest ? { name: 'guestTemplates' } : { name: 'employerTemplates' }"
-    color="white"
-    class="nav-item"
-    rounded="lg"
-  />
-  <v-list-item
-    prepend-icon="mdi-account-group"
-    title="Employees"
-    :to="isGuest ? { name: 'guestEmployees' } : { name: 'employerEmployees' }"
-    color="white"
-    class="nav-item"
-    rounded="lg"
-  />
-  <v-list-item
-    prepend-icon="mdi-clock-outline"
-    title="Availability"
-    :to="isGuest ? { name: 'guestAvailability' } : { name: 'employerAvailability' }"
-    color="white"
-    class="nav-item"
-    rounded="lg"
-  />
-  <v-list-item
-    prepend-icon="mdi-calendar-remove"
-    title="Time Off"
-    :to="isGuest ? { name: 'guestTimeOff' } : { name: 'employerTimeOff' }"
-    color="white"
-    class="nav-item"
-    rounded="lg"
-  />
-  <v-list-item
-    prepend-icon="mdi-swap-horizontal"
-    title="Swaps"
-    :to="isGuest ? { name: 'guestSwaps' } : { name: 'employerSwaps' }"
-    color="white"
-    class="nav-item"
-    rounded="lg"
-  />
-  <v-list-item
-    prepend-icon="mdi-bell-alert"
-    title="Alerts"
-    :to="isGuest ? { name: 'guestAlerts' } : { name: 'employerAlerts' }"
-    color="white"
-    class="nav-item"
-    rounded="lg"
-  >
-    <template #append v-if="!isGuest && unreadCount > 0 && !rail">
-      <v-chip size="x-small" color="error" variant="flat">
-        {{ unreadCount }}
-      </v-chip>
-    </template>
-  </v-list-item>
-  <v-list-item
-    prepend-icon="mdi-message-text"
-    title="Messages"
-    :to="isGuest ? { name: 'guestMessages' } : { name: 'employerMessages' }"
-    color="white"
-    class="nav-item"
-    rounded="lg"
-  />
-  <v-list-item
-    prepend-icon="mdi-checkbox-marked-circle-outline"
-    title="Tasks"
-    :to="isGuest ? { name: 'guestTasks' } : { name: 'employerTasks' }"
-    color="white"
-    class="nav-item"
-    rounded="lg"
-  />
-</v-list>
+        <v-list-item
+          prepend-icon="mdi-view-dashboard"
+          title="Dashboard"
+          :to="isGuest ? { name: 'guestDashboard' } : { name: 'employerDashboard' }"
+          color="white"
+          class="nav-item"
+          rounded="lg"
+        />
+        <v-list-item
+          prepend-icon="mdi-calendar"
+          title="Schedule"
+          :to="isGuest ? { name: 'guestSchedule' } : { name: 'employerSchedule' }"
+          color="white"
+          class="nav-item"
+          rounded="lg"
+        />
+        <v-list-item
+          prepend-icon="mdi-calendar-text"
+          title="Templates"
+          :to="isGuest ? { name: 'guestTemplates' } : { name: 'employerTemplates' }"
+          color="white"
+          class="nav-item"
+          rounded="lg"
+        />
+        <v-list-item
+          prepend-icon="mdi-account-group"
+          title="Employees"
+          :to="isGuest ? { name: 'guestEmployees' } : { name: 'employerEmployees' }"
+          color="white"
+          class="nav-item"
+          rounded="lg"
+        />
+        <v-list-item
+          prepend-icon="mdi-clock-outline"
+          title="Availability"
+          :to="isGuest ? { name: 'guestAvailability' } : { name: 'employerAvailability' }"
+          color="white"
+          class="nav-item"
+          rounded="lg"
+        />
+        <v-list-item
+          prepend-icon="mdi-calendar-remove"
+          title="Time Off"
+          :to="isGuest ? { name: 'guestTimeOff' } : { name: 'employerTimeOff' }"
+          color="white"
+          class="nav-item"
+          rounded="lg"
+        />
+        <v-list-item
+          prepend-icon="mdi-swap-horizontal"
+          title="Swaps"
+          :to="isGuest ? { name: 'guestSwaps' } : { name: 'employerSwaps' }"
+          color="white"
+          class="nav-item"
+          rounded="lg"
+        />
+        <v-list-item
+          prepend-icon="mdi-bell-alert"
+          title="Alerts"
+          :to="isGuest ? { name: 'guestAlerts' } : { name: 'employerAlerts' }"
+          color="white"
+          class="nav-item"
+          rounded="lg"
+        >
+          <template #append v-if="!isGuest && unreadCount > 0 && !rail">
+            <v-chip size="x-small" color="error" variant="flat">
+              {{ unreadCount }}
+            </v-chip>
+          </template>
+        </v-list-item>
+        <v-list-item
+          prepend-icon="mdi-message-text"
+          title="Messages"
+          :to="isGuest ? { name: 'guestMessages' } : { name: 'employerMessages' }"
+          color="white"
+          class="nav-item"
+          rounded="lg"
+        />
+        <v-list-item
+          prepend-icon="mdi-checkbox-marked-circle-outline"
+          title="Tasks"
+          :to="isGuest ? { name: 'guestTasks' } : { name: 'employerTasks' }"
+          color="white"
+          class="nav-item"
+          rounded="lg"
+        />
+      </v-list>
     </v-navigation-drawer>
 
     <!-- Main Content Area -->
     <div class="main-content">
       <!-- Top Navigation Bar -->
-      <v-app-bar elevation="0" color="white" density="compact" class="top-bar">
+      <v-app-bar elevation="0" density="compact" class="top-bar">
         <v-spacer />
 
         <!-- Notification Bell -->
@@ -291,7 +308,7 @@ const logout = () => {
             <v-divider />
             <div v-if="notifications.length === 0" class="text-center pa-6">
               <v-icon size="40" color="grey-lighten-1" class="mb-2">mdi-bell-check-outline</v-icon>
-              <p class="text-grey">No pending requests</p>
+              <p class="text-medium-emphasis">No pending requests</p>
             </div>
             <div v-else>
               <div
@@ -329,7 +346,7 @@ const logout = () => {
                   <span class="text-white font-weight-bold">{{ userInitials }}</span>
                 </v-avatar>
                 <div class="text-body-2 font-weight-bold">{{ userFullName }}</div>
-                <div class="text-caption text-grey">{{ userEmail }}</div>
+                <div class="text-caption text-medium-emphasis">{{ userEmail }}</div>
                 <v-chip v-if="isGuest" size="x-small" color="info" variant="tonal" class="mt-2">
                   Guest Mode
                 </v-chip>
@@ -369,11 +386,9 @@ const logout = () => {
 .employer-layout {
   display: flex;
   min-height: 100vh;
-  background-color: #f5f5f5;
 }
 
 .sidebar {
-  background: linear-gradient(180deg, #12086F 0%, #2B354F 100%);
   color: white;
   transition: width 0.3s ease;
 }
@@ -411,11 +426,6 @@ const logout = () => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background-color: #f5f5f5;
-}
-
-.top-bar {
-  border-bottom: 1px solid #e0e0e0;
 }
 
 .page-content {

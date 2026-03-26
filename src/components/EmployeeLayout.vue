@@ -1,17 +1,33 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { useTheme } from 'vuetify'; // ✅ ADD THIS
 import Utils from '../config/utils.js';
 
 const router = useRouter();
+const theme = useTheme(); // ✅ ADD THIS
 const user = ref(null);
 const rail = ref(true);
+
+// ✅ ADD THIS: Dynamic sidebar gradient based on theme
+const sidebarGradient = computed(() => {
+  if (theme.global.name.value === 'dark') {
+    return 'linear-gradient(180deg, #1E1E1E 0%, #2D2D2D 100%)';
+  }
+  return 'linear-gradient(180deg, #12086F 0%, #2B354F 100%)';
+});
 
 const handleMouseEnter = () => { rail.value = false; };
 const handleMouseLeave = () => { rail.value = true; };
 
 onMounted(() => {
   user.value = Utils.getStore('user');
+  
+  // ✅ ADD THIS: Load saved theme preference
+  const savedTheme = localStorage.getItem('themePreference');
+  if (savedTheme) {
+    theme.global.name.value = savedTheme;
+  }
 });
 
 const userInitials = computed(() => {
@@ -45,6 +61,7 @@ const logout = () => {
       @mouseenter="handleMouseEnter"
       @mouseleave="handleMouseLeave"
       class="sidebar"
+      :style="{ background: sidebarGradient }"
     >
       <div class="sidebar-header pa-4">
         <div v-show="!rail">
@@ -104,7 +121,7 @@ const logout = () => {
     <!-- Main Content Area -->
     <div class="main-content">
       <!-- Top App Bar -->
-      <v-app-bar elevation="0" color="white" density="compact" class="top-bar">
+      <v-app-bar elevation="0" density="compact" class="top-bar">
         <v-spacer />
 
         <!-- Account Menu -->
@@ -124,7 +141,7 @@ const logout = () => {
                   <span class="text-white font-weight-bold">{{ userInitials }}</span>
                 </v-avatar>
                 <div class="text-body-2 font-weight-bold">{{ userFullName }}</div>
-                <div class="text-caption text-grey">{{ userEmail }}</div>
+                <div class="text-caption text-medium-emphasis">{{ userEmail }}</div>
               </div>
 
               <v-divider class="my-2" />
@@ -159,11 +176,9 @@ const logout = () => {
 .employee-layout {
   display: flex;
   min-height: 100vh;
-  background-color: #f5f5f5;
 }
 
 .sidebar {
-  background: linear-gradient(180deg, #12086F 0%, #2B354F 100%);
   color: white;
   transition: width 0.3s ease;
 }
@@ -192,11 +207,6 @@ const logout = () => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background-color: #f5f5f5;
-}
-
-.top-bar {
-  border-bottom: 1px solid #e0e0e0;
 }
 
 .page-content {
