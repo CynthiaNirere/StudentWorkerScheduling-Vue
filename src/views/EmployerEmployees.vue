@@ -50,8 +50,6 @@ const editForm = ref({
   job_role: "",
 });
 
-// UPDATED: Headers with Roles column
-// Headers with Roles column
 const headers = [
   { title: "Name", key: "name", sortable: true },
   { title: "Email", key: "email", sortable: true },
@@ -69,8 +67,6 @@ const jobRoleSuggestions = computed(() => {
   return allRoles.sort();
 });
 
-//  UPDATED: Include jobRoles array for each employee
-// Include jobRoles array for each employee
 const employeesWithName = computed(() => {
   return employees.value.map((e) => ({
     ...e,
@@ -80,8 +76,6 @@ const employeesWithName = computed(() => {
   }));
 });
 
-//  NEW: Available roles to add (exclude already assigned)
-// Available roles to add (exclude already assigned)
 const availableRolesToAdd = computed(() => {
   const assignedRoleIds = employeeRoles.value.map(r => r.job_role_id);
   return jobRoles.value.filter(r => !assignedRoleIds.includes(r.job_role_id));
@@ -243,6 +237,7 @@ const handleAddEmployee = async () => {
     const res = await EmployerService.createEmployee({
       ...newEmployee.value,
       role: 'employee',
+      work_location: user.value?.work_location,
     });
 
     // If a job role was selected, add it to the UserJobRole table
