@@ -19,9 +19,9 @@ const vuetify = createVuetify({
   components,
   directives,
   theme: {
-    defaultTheme: "navyBlueTheme",
+    defaultTheme: "light",
     themes: {
-      navyBlueTheme: {
+      light: {
         dark: false,
         colors: {
           primary: "#12086F",
@@ -42,6 +42,29 @@ const vuetify = createVuetify({
           "on-error": "#FFFFFF",
           "on-background": "#1A1A1A",
           "on-surface": "#1A1A1A",
+        },
+      },
+      dark: {
+        dark: true,
+        colors: {
+          primary: "#7B68EE",        // Lighter purple for dark mode
+          secondary: "#5B6FFF",      // Lighter blue
+          accent: "#6B8AFF",         // Lighter accent
+          info: "#6BAFFF",           // Lighter info
+          success: "#5CDAFF",        // Lighter success
+          warning: "#FFB84D",        // Lighter warning
+          error: "#FF6B93",          // Lighter error
+          background: "#121212",     // Dark background
+          surface: "#1E1E1E",        // Dark surface
+
+          // Text colors for dark mode
+          "on-primary": "#FFFFFF",
+          "on-secondary": "#FFFFFF",
+          "on-accent": "#FFFFFF",
+          "on-success": "#000000",
+          "on-error": "#FFFFFF",
+          "on-background": "#FFFFFF",
+          "on-surface": "#FFFFFF",
         },
       },
     },

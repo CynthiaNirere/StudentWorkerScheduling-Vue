@@ -1,13 +1,13 @@
 <script setup>
 import { ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
-import { useTheme } from 'vuetify';  // ✅ ADD THIS
+import { useTheme } from 'vuetify';
 import Utils from "../config/utils";
 import EmployerService from "../services/employerServices.js";
 import EmployerLayout from '../components/EmployerLayout.vue';
 
 const router = useRouter();
-const theme = useTheme();  // ✅ ADD THIS
+const theme = useTheme();
 const user = ref(null);
 
 const loading = ref(false);
@@ -20,7 +20,6 @@ const profileForm = ref({
   phone_number: "",
 });
 
-// NEW: Notification preferences + Theme preference
 const notificationPreferences = ref({
   emailNotifications: false,
   smsNotifications: false,
@@ -29,7 +28,6 @@ const notificationPreferences = ref({
   scheduleChanges: true,
 });
 
-// ✅ ADD THIS: Theme preference
 const themePreference = ref('light');
 
 const snackbar = ref(false);
@@ -41,7 +39,6 @@ onMounted(async () => {
   if (user.value) {
     await loadUserProfile();
     
-    // Load notification preferences from localStorage
     const savedPrefs = localStorage.getItem('notificationPreferences');
     if (savedPrefs) {
       try {
@@ -51,20 +48,24 @@ onMounted(async () => {
       }
     }
     
-    // ✅ ADD THIS: Load theme preference
-    const savedTheme = localStorage.getItem('themePreference');
-    if (savedTheme) {
-      themePreference.value = savedTheme;
-      theme.global.name.value = savedTheme;
-    }
+    // ✅ FIXED: Load and apply theme
+    const savedTheme = localStorage.getItem('themePreference') || 'light';
+    themePreference.value = savedTheme;
+    theme.global.name.value = savedTheme;
+    console.log('Theme loaded:', savedTheme);
   }
 });
 
-// ✅ ADD THIS: Watch for theme changes
+// ✅ FIXED: Watch for theme changes and apply immediately
 watch(themePreference, (newTheme) => {
+  console.log('Switching to theme:', newTheme);
   theme.global.name.value = newTheme;
   localStorage.setItem('themePreference', newTheme);
-  console.log('Theme changed to:', newTheme);
+  
+  // Force a slight delay to ensure theme applies
+  setTimeout(() => {
+    console.log('Theme applied:', theme.global.name.value);
+  }, 100);
 });
 
 const loadUserProfile = async () => {
@@ -124,8 +125,6 @@ const handleSaveProfile = async () => {
       phone_number: profileForm.value.phone_number || null,
     };
     
-    console.log('Updating profile with:', updateData);
-    
     await EmployerService.updateEmployee(userId, updateData);
     
     const updatedUser = { 
@@ -141,8 +140,6 @@ const handleSaveProfile = async () => {
     Utils.setStore("user", updatedUser);
     user.value = updatedUser;
     
-    console.log('Profile updated, phone number saved:', profileForm.value.phone_number);
-    
     showSnackbar("Profile updated successfully!", "success");
   } catch (err) {
     console.error('Update profile error:', err);
@@ -155,7 +152,6 @@ const handleSaveProfile = async () => {
 const saveNotificationPreferences = async () => {
   try {
     localStorage.setItem('notificationPreferences', JSON.stringify(notificationPreferences.value));
-    console.log('Saving notification preferences:', notificationPreferences.value);
     showSnackbar("Notification preferences saved!", "success");
   } catch (err) {
     console.error('Error saving preferences:', err);
@@ -173,23 +169,21 @@ const showSnackbar = (message, color = "success") => {
 <template>
   <EmployerLayout>
     <v-container fluid class="pa-6" style="max-width: 900px;">
-      <!-- Header -->
       <div class="mb-5">
-        <h1 class="text-h4 font-weight-bold navy-text">Profile & Settings</h1>
-        <p class="text-body-2 text-grey">
+        <h1 class="text-h4 font-weight-bold">Profile & Settings</h1>
+        <p class="text-body-2 text-medium-emphasis">
           Manage your account information and preferences
         </p>
       </div>
 
-      <!-- Loading State -->
       <div v-if="loading" class="text-center pa-6">
-        <v-progress-circular indeterminate color="#12086F" size="32" />
-        <div class="text-body-2 text-grey mt-3">Loading profile...</div>
+        <v-progress-circular indeterminate color="primary" size="32" />
+        <div class="text-body-2 text-medium-emphasis mt-3">Loading profile...</div>
       </div>
 
       <template v-else>
         <!-- Profile Information -->
-        <v-card variant="outlined" rounded="lg" class="mb-4 navy-card">
+        <v-card variant="outlined" rounded="lg" class="mb-4">
           <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4">
             Profile Information
           </v-card-title>
@@ -202,7 +196,7 @@ const showSnackbar = (message, color = "success") => {
                   label="First Name *"
                   variant="outlined"
                   density="compact"
-                  color="#12086F"
+                  color="primary"
                 />
               </v-col>
               <v-col cols="12" md="6">
@@ -211,7 +205,7 @@ const showSnackbar = (message, color = "success") => {
                   label="Last Name"
                   variant="outlined"
                   density="compact"
-                  color="#12086F"
+                  color="primary"
                 />
               </v-col>
             </v-row>
@@ -222,7 +216,7 @@ const showSnackbar = (message, color = "success") => {
               variant="outlined"
               density="compact"
               class="mb-3"
-              color="#12086F"
+              color="primary"
               readonly
             />
             <v-text-field
@@ -231,19 +225,19 @@ const showSnackbar = (message, color = "success") => {
               variant="outlined"
               density="compact"
               class="mb-3"
-              color="#12086F"
+              color="primary"
               placeholder="(555) 123-4567"
               hint="Your phone number will be saved when you click Save Changes"
               persistent-hint
             />
-            <v-alert type="info" variant="tonal" density="compact" color="#4361EE">
+            <v-alert type="info" variant="tonal" density="compact">
               Authentication is managed through Google. You cannot change your email here.
             </v-alert>
           </v-card-text>
           <v-divider />
           <v-card-actions class="pa-4 justify-end">
             <v-btn
-              color="#12086F"
+              color="primary"
               variant="flat"
               :loading="saving"
               @click="handleSaveProfile"
@@ -254,7 +248,7 @@ const showSnackbar = (message, color = "success") => {
         </v-card>
 
         <!-- Account Details -->
-        <v-card variant="outlined" rounded="lg" class="mb-4 navy-card">
+        <v-card variant="outlined" rounded="lg" class="mb-4">
           <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4">
             Account Details
           </v-card-title>
@@ -263,29 +257,29 @@ const showSnackbar = (message, color = "success") => {
             <v-row dense>
               <v-col cols="12" md="6">
                 <div class="mb-3">
-                  <div class="text-caption text-grey">User ID</div>
+                  <div class="text-caption text-medium-emphasis">User ID</div>
                   <div class="text-body-2">{{ user?.user_id || user?.userId }}</div>
                 </div>
               </v-col>
               <v-col cols="12" md="6">
                 <div class="mb-3">
-                  <div class="text-caption text-grey">Role</div>
-                  <v-chip size="small" color="#12086F" variant="tonal">
+                  <div class="text-caption text-medium-emphasis">Role</div>
+                  <v-chip size="small" color="primary" variant="tonal">
                     {{ user?.role }}
                   </v-chip>
                 </div>
               </v-col>
               <v-col cols="12" md="6">
                 <div class="mb-3">
-                  <div class="text-caption text-grey">Authentication Provider</div>
-                  <v-chip size="small" color="#4361EE" variant="tonal">
+                  <div class="text-caption text-medium-emphasis">Authentication Provider</div>
+                  <v-chip size="small" color="secondary" variant="tonal">
                     Google
                   </v-chip>
                 </div>
               </v-col>
               <v-col cols="12" md="6">
                 <div class="mb-3">
-                  <div class="text-caption text-grey">Phone Number (Saved)</div>
+                  <div class="text-caption text-medium-emphasis">Phone Number (Saved)</div>
                   <div class="text-body-2">
                     {{ user?.phone_number || profileForm.phone_number || "Not set" }}
                   </div>
@@ -295,8 +289,8 @@ const showSnackbar = (message, color = "success") => {
           </v-card-text>
         </v-card>
 
-        <!-- ✅ NEW: Appearance Settings -->
-        <v-card variant="outlined" rounded="lg" class="mb-4 navy-card">
+        <!-- Appearance Settings -->
+        <v-card variant="outlined" rounded="lg" class="mb-4">
           <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4">
             Appearance
           </v-card-title>
@@ -305,35 +299,36 @@ const showSnackbar = (message, color = "success") => {
             <div class="text-subtitle-2 font-weight-bold mb-3">Theme</div>
             <v-btn-toggle
               v-model="themePreference"
-              color="#12086F"
+              color="primary"
               variant="outlined"
               mandatory
               divided
               class="mb-3"
+              style="width: 100%"
             >
-              <v-btn value="light" class="flex-grow-1">
+              <v-btn value="light" style="flex: 1">
                 <v-icon start>mdi-white-balance-sunny</v-icon>
                 Light Mode
               </v-btn>
-              <v-btn value="dark" class="flex-grow-1">
+              <v-btn value="dark" style="flex: 1">
                 <v-icon start>mdi-moon-waning-crescent</v-icon>
                 Dark Mode
               </v-btn>
             </v-btn-toggle>
-            <div class="text-caption text-grey">
+            <div class="text-caption text-medium-emphasis">
               Choose your preferred color theme. Changes apply immediately.
             </div>
           </v-card-text>
         </v-card>
 
         <!-- Notification Preferences -->
-        <v-card variant="outlined" rounded="lg" class="navy-card">
+        <v-card variant="outlined" rounded="lg">
           <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4">
             Notification Preferences
           </v-card-title>
           <v-divider />
           <v-card-text class="pa-5">
-            <v-alert type="info" variant="tonal" class="mb-4" color="#4361EE">
+            <v-alert type="info" variant="tonal" class="mb-4">
               Notification preferences are saved locally. Backend integration coming soon!
             </v-alert>
             
@@ -344,7 +339,7 @@ const showSnackbar = (message, color = "success") => {
                 label="Email notifications"
                 hint="Receive email notifications for important updates"
                 persistent-hint
-                color="#12086F"
+                color="primary"
                 density="compact"
               />
               <v-checkbox
@@ -352,7 +347,7 @@ const showSnackbar = (message, color = "success") => {
                 label="SMS notifications"
                 hint="Receive text message notifications for urgent updates"
                 persistent-hint
-                color="#12086F"
+                color="primary"
                 density="compact"
               />
             </div>
@@ -366,7 +361,7 @@ const showSnackbar = (message, color = "success") => {
                 label="Shift reminders"
                 hint="Get reminded about upcoming shifts"
                 persistent-hint
-                color="#12086F"
+                color="primary"
                 density="compact"
               />
               <v-checkbox
@@ -374,7 +369,7 @@ const showSnackbar = (message, color = "success") => {
                 label="Swap requests"
                 hint="Notifications for shift swap requests"
                 persistent-hint
-                color="#12086F"
+                color="primary"
                 density="compact"
               />
               <v-checkbox
@@ -382,7 +377,7 @@ const showSnackbar = (message, color = "success") => {
                 label="Schedule changes"
                 hint="Be notified when schedules are published or changed"
                 persistent-hint
-                color="#12086F"
+                color="primary"
                 density="compact"
               />
             </div>
@@ -390,7 +385,7 @@ const showSnackbar = (message, color = "success") => {
           <v-divider />
           <v-card-actions class="pa-4 justify-end">
             <v-btn
-              color="#12086F"
+              color="primary"
               variant="flat"
               @click="saveNotificationPreferences"
             >
@@ -414,12 +409,5 @@ const showSnackbar = (message, color = "success") => {
 </template>
 
 <style scoped>
-.navy-text {
-  color: #12086F !important;
-}
-
-.navy-card {
-  border-color: #e0e0e0;
-  box-shadow: 0 1px 3px rgba(18, 8, 111, 0.05);
-}
+/* Removed hardcoded colors - let Vuetify theme handle it */
 </style>
