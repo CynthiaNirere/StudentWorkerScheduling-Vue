@@ -589,6 +589,7 @@ const openLoadTemplateDialog = () => {
   showLoadTemplateDialog.value = true;
 };
 
+
 const handleLoadTemplate = async () => {
   if (!selectedTemplateId.value) {
     showSnackbar("Please select a template", "error");
@@ -597,9 +598,11 @@ const handleLoadTemplate = async () => {
 
   loadingTemplate.value = true;
   try {
-    const startDate = weekDays.value[0].dateString;
-    await EmployerService.applyTemplate(selectedTemplateId.value, startDate);
-    
+    const [year, month, day] = weekDays.value[0].dateString.split('-').map(Number);
+    const startTimestamp = new Date(year, month - 1, day, 12, 0, 0, 0).getTime();
+
+    await EmployerService.applyTemplate(selectedTemplateId.value, startTimestamp);
+
     showSnackbar("Template loaded successfully!", "success");
     showLoadTemplateDialog.value = false;
     selectedTemplateId.value = null;
@@ -611,7 +614,6 @@ const handleLoadTemplate = async () => {
     loadingTemplate.value = false;
   }
 };
-
 const getEmployeeName = (shift) => {
   const userId = shift.user_id || shift.userId;
   if (!userId) return "Unassigned";

@@ -385,12 +385,27 @@ export default {
     return apiClient.delete(`/job-roles/${id}`, addDemoHeader());
   },
 
+ // ✅ PATCH: Replace the clock record section at the bottom of employerServices.js
+// Find these three lines:
+//   getAllClockRecords()
+//   approveClockRecord()
+// And replace the entire block with this:
+
   getAllClockRecords() {
     return apiClient.get("/clock-records", addDemoHeader());
   },
 
   approveClockRecord(id) {
     return apiClient.put(`/clock-records/${id}/approve`, {}, addDemoHeader());
+  },
+
+  rejectClockRecord(id, reason = '') {
+    return apiClient.put(`/clock-records/${id}/reject`, { reason }, addDemoHeader());
+  },
+
+  modifyClockRecord(id, data) {
+    // data: { clockInTime, clockOutTime, notes }
+    return apiClient.put(`/clock-records/${id}/modify`, data, addDemoHeader());
   },
 
 };
