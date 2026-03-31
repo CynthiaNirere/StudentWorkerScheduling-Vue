@@ -143,7 +143,6 @@ const handleAdd = async () => {
     showAddDialog.value = false;
     await loadAvailability();
   } catch (err) {
-    console.error('Error adding availability:', err);
     showSnackbar('Error adding availability', 'error');
   } finally {
     processing.value = false;
@@ -171,7 +170,6 @@ const handleEdit = async () => {
     showEditDialog.value = false;
     await loadAvailability();
   } catch (err) {
-    console.error('Error updating availability:', err);
     showSnackbar('Error updating availability', 'error');
   } finally {
     processing.value = false;
@@ -193,7 +191,6 @@ const handleDelete = async () => {
     itemToDelete.value = null;
     await loadAvailability();
   } catch (err) {
-    console.error('Error deleting availability:', err);
     showSnackbar('Error deleting availability', 'error');
   } finally {
     processing.value = false;
@@ -204,13 +201,10 @@ const handleDelete = async () => {
 <template>
   <EmployerLayout>
     <v-container fluid class="pa-6">
-      <!-- Header -->
       <div class="d-flex align-center justify-space-between mb-5">
         <div>
           <h1 class="text-h4 font-weight-bold navy-text">Employee Availability</h1>
-          <p class="text-body-2 text-grey">
-            Manage when employees are available to work
-          </p>
+          <p class="text-body-2 text-grey">Manage when employees are available to work</p>
         </div>
         <div class="d-flex align-center ga-3">
           <v-btn color="#12086F" prepend-icon="mdi-plus" size="small" @click="openAddDialog">Add Availability</v-btn>
@@ -229,33 +223,26 @@ const handleDelete = async () => {
         </div>
       </div>
 
-      <!-- Loading -->
       <v-card v-if="loading" variant="outlined" rounded="lg" class="pa-6 text-center navy-card">
         <v-progress-circular indeterminate color="#12086F" size="32" />
       </v-card>
 
-      <!-- Availability Grid -->
       <v-card v-else variant="outlined" rounded="lg" class="navy-card">
         <div class="pa-4 grid-scroll-wrapper">
           <div class="availability-grid-header">
             <div class="employee-column">Employee</div>
-            <div v-for="day in daysOfWeek" :key="day" class="day-column">
-              {{ day }}
-            </div>
+            <div v-for="day in daysOfWeek" :key="day" class="day-column">{{ day }}</div>
           </div>
 
-          <div
-            v-for="row in availabilityGrid"
-            :key="row.employeeId"
-            class="availability-grid-row"
-          >
+          <div v-for="row in availabilityGrid" :key="row.employeeId" class="availability-grid-row">
             <div class="employee-column">
               <div class="font-weight-medium">{{ row.employeeName }}</div>
             </div>
-            
             <div v-for="day in daysOfWeek" :key="day" class="day-column">
-              <div v-if="row.schedule[day].length === 0" class="unavailable">
-                Unavailable
+              <!-- ✅ CHANGED: "Unavailable" → "In Class" -->
+              <div v-if="row.schedule[day].length === 0" class="in-class">
+                <v-icon size="12" class="mr-1">mdi-school</v-icon>
+                In Class
               </div>
               <div
                 v-else
@@ -276,7 +263,6 @@ const handleDelete = async () => {
             </div>
           </div>
 
-          <!-- Empty state -->
           <div v-if="availabilityGrid.length === 0" class="text-center pa-6">
             <v-icon size="48" class="mb-2 text-grey">mdi-calendar-clock</v-icon>
             <div class="text-body-2 text-grey">No availability data</div>
@@ -284,9 +270,8 @@ const handleDelete = async () => {
         </div>
       </v-card>
 
-      <!-- Info Alert -->
       <v-alert type="info" variant="tonal" class="mt-4" color="#4361EE">
-        <strong>Tip:</strong> Click "Add Availability" to set hours for an employee, or use the edit/delete icons on each time slot.
+        <strong>Tip:</strong> "In Class" means no availability is set for that day. Click "Add Availability" to set hours.
       </v-alert>
 
       <!-- Add Dialog -->
@@ -338,27 +323,15 @@ const handleDelete = async () => {
       </v-dialog>
     </v-container>
 
-    <v-snackbar
-      v-model="snackbar"
-      :color="snackbarColor"
-      timeout="3000"
-      location="bottom right"
-    >
+    <v-snackbar v-model="snackbar" :color="snackbarColor" timeout="3000" location="bottom right">
       {{ snackbarMessage }}
     </v-snackbar>
   </EmployerLayout>
 </template>
 
 <style scoped>
-.navy-text {
-  color: #12086F !important;
-}
-
-.navy-card {
-  border-color: #e0e0e0;
-  box-shadow: 0 1px 3px rgba(18, 8, 111, 0.05);
-}
-
+.navy-text { color: #12086F !important; }
+.navy-card { border-color: #e0e0e0; box-shadow: 0 1px 3px rgba(18, 8, 111, 0.05); }
 .availability-grid-header,
 .availability-grid-row {
   display: grid;
@@ -366,7 +339,6 @@ const handleDelete = async () => {
   gap: 8px;
   border-bottom: 1px solid #e8e8e8;
 }
-
 .availability-grid-header {
   background: linear-gradient(135deg, #12086F 0%, #2B354F 100%);
   color: white;
@@ -376,40 +348,18 @@ const handleDelete = async () => {
   border-bottom: 2px solid #12086F;
   border-radius: 8px 8px 0 0;
 }
-
-.availability-grid-row {
-  padding: 12px 8px;
-  transition: background 0.15s;
-}
-
-.availability-grid-row:hover {
-  background: #fafafa;
-}
-
-.employee-column,
-.day-column {
+.availability-grid-row { padding: 12px 8px; transition: background 0.15s; }
+.availability-grid-row:hover { background: #fafafa; }
+.employee-column, .day-column {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
   min-height: 50px;
 }
-
-.employee-column {
-  font-weight: 500;
-  padding-right: 12px;
-  border-right: 1px solid #e8e8e8;
-}
-
-.day-column {
-  padding: 0 8px;
-}
-
-.grid-scroll-wrapper {
-  overflow-x: auto;
-  min-width: 0;
-}
-
+.employee-column { font-weight: 500; padding-right: 12px; border-right: 1px solid #e8e8e8; }
+.day-column { padding: 0 8px; }
+.grid-scroll-wrapper { overflow-x: auto; min-width: 0; }
 .available-slot {
   background: #e8f5e9;
   color: #2e7d32;
@@ -423,19 +373,18 @@ const handleDelete = async () => {
   align-items: center;
   justify-content: space-between;
 }
-
-.available-slot .slot-actions {
-  display: none;
-  margin-left: 2px;
-}
-
-.available-slot:hover .slot-actions {
-  display: inline-flex;
-}
-
-.unavailable {
-  color: #999;
-  font-size: 12px;
+.available-slot .slot-actions { display: none; margin-left: 2px; }
+.available-slot:hover .slot-actions { display: inline-flex; }
+/* ✅ NEW: In Class style - replaces Unavailable */
+.in-class {
+  color: #5c6bc0;
+  font-size: 11px;
   font-style: italic;
+  display: flex;
+  align-items: center;
+  background: #f3f4fb;
+  padding: 3px 6px;
+  border-radius: 4px;
+  border-left: 3px solid #9fa8da;
 }
 </style>
