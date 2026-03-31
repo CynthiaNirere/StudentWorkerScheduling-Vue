@@ -1,7 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Utils from "./config/utils";
 
-// ─── IMPORTS ──────────────────────────────────────────────────────────────
 import Landing from "./views/Landing.vue";
 import GuestDashboard from "./views/GuestDashboard.vue";
 import GuestSchedule from "./views/GuestSchedule.vue";
@@ -22,6 +21,10 @@ import EmployeeAvailability from "./views/EmployeeAvailabiliy.vue";
 import EmployeeSchedule from "./views/EmployeeSchedule.vue";
 import EmployeeProfile from "./views/EmployeeProfile.vue";
 import EmployeeSettings from "./views/EmployeeSettings.vue";
+import EmployeeTimeRequests from "./views/EmployeeTimeRequests.vue";
+import EmployeeTimeCards from "./views/EmployeeTimeCards.vue";
+import EmployeeTasks from "./views/EmployeeTasks.vue";
+import EmployeeMessages from "./views/EmployeeMessages.vue";
 import BusinessAreaSelect from "./views/BusinessAreaSelect.vue";
 import EmployerDashboard from "./views/EmployerDashboard.vue";
 import EmployerSchedule from "./views/EmployerSchedule.vue";
@@ -34,17 +37,14 @@ import EmployerProfile from "./views/EmployerProfile.vue";
 import TemplateManagement from "./views/TemplateManagement.vue";
 import EmployerAlerts from "./views/EmployerAlerts.vue";
 import EmployerMessages from "./views/EmployerMessages.vue";
+import EmployerSettings from "./views/EmployerSettings.vue";
+import EmployerTimeCards from "./views/EmployerTimeCards.vue";
 import Workplace from "./views/Workplace.vue";
 import Profile from "./views/Profile.vue";
 
-import EmployerSettings from "./views/EmployerSettings.vue";
-import EmployerTimeCards from "./views/EmployerTimeCards.vue";
-
-// ─── ROUTER ───────────────────────────────────────────────────────────────
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    // ─── LANDING & GUEST ───────────────────────────────────────────────
     { path: "/", name: "landing", component: Landing, meta: { requiresAuth: false } },
     { path: "/guest", name: "guestDashboard", component: GuestDashboard, meta: { requiresAuth: false } },
     { path: "/guest/schedule", name: "guestSchedule", component: GuestSchedule, meta: { requiresAuth: false } },
@@ -55,28 +55,23 @@ const router = createRouter({
     { path: "/guest/tasks", name: "guestTasks", component: GuestTasks, meta: { requiresAuth: false } },
     { path: "/guest/alerts", name: "guestAlerts", component: GuestAlerts, meta: { requiresAuth: false } },
     { path: "/guest/messages", name: "guestMessages", component: GuestMessages, meta: { requiresAuth: false } },
-
-    // ─── AUTH ──────────────────────────────────────────────────────────
+    { path: "/guest/templates", name: "guestTemplates", component: GuestTemplate, meta: { requiresAuth: false } },
     { path: "/signup", name: "signup", component: SignUp, meta: { requiresAuth: false } },
     { path: "/login", name: "login", component: Login, meta: { requiresAuth: false } },
     { path: "/role-select", name: "roleSelect", component: RoleSelect, meta: { requiresAuth: true } },
-
-    // ─── SHARED ────────────────────────────────────────────────────────
     { path: "/workplace", name: "workplace", component: Workplace, meta: { requiresAuth: true } },
     { path: "/profile", name: "profile", component: Profile, meta: { requiresAuth: true } },
-
-    // ─── ADMIN ─────────────────────────────────────────────────────────
     { path: "/admin", name: "adminViewDashboard", component: AdminViewDashboard, meta: { requiresAuth: true, requiresAdmin: true } },
-
-    // ─── EMPLOYEE ──────────────────────────────────────────────────────
     { path: "/employee", redirect: "/employee/dashboard" },
     { path: "/employee/dashboard", name: "employeeDashboard", component: EmployeeDashboard, meta: { requiresAuth: true } },
     { path: "/employee/availability", name: "employeeAvailability", component: EmployeeAvailability, meta: { requiresAuth: true } },
     { path: "/employee/schedule", name: "employeeSchedule", component: EmployeeSchedule, meta: { requiresAuth: true } },
     { path: "/employee/profile", name: "employeeProfile", component: EmployeeProfile, meta: { requiresAuth: true } },
     { path: "/employee/settings", name: "employeeSettings", component: EmployeeSettings, meta: { requiresAuth: true } },
-
-    // ─── EMPLOYER ──────────────────────────────────────────────────────
+    { path: "/employee/time-requests", name: "employeeTimeRequests", component: EmployeeTimeRequests, meta: { requiresAuth: true } },
+    { path: "/employee/time-cards", name: "employeeTimeCards", component: EmployeeTimeCards, meta: { requiresAuth: true } },
+    { path: "/employee/tasks", name: "employeeTasks", component: EmployeeTasks, meta: { requiresAuth: true } },
+    { path: "/employee/messages", name: "employeeMessages", component: EmployeeMessages, meta: { requiresAuth: true } },
     { path: "/business-area-select", name: "businessAreaSelect", component: BusinessAreaSelect, meta: { requiresAuth: true } },
     { path: "/employer", redirect: "/employer/dashboard" },
     { path: "/employer/dashboard", name: "employerDashboard", component: EmployerDashboard, meta: { requiresAuth: true } },
@@ -90,14 +85,8 @@ const router = createRouter({
     { path: "/employer/messages", name: "employerMessages", component: EmployerMessages, meta: { requiresAuth: true } },
     { path: "/employer/profile", name: "employerProfile", component: EmployerProfile, meta: { requiresAuth: true } },
     { path: "/employer/templates", name: "employerTemplates", component: TemplateManagement, meta: { requiresAuth: true } },
-    // ✅ NEW ROUTES
     { path: "/employer/settings", name: "employerSettings", component: EmployerSettings, meta: { requiresAuth: true } },
     { path: "/employer/time-cards", name: "employerTimeCards", component: EmployerTimeCards, meta: { requiresAuth: true } },
-
-    // ─── GUEST TEMPLATE ────────────────────────────────────────────────
-    { path: "/guest/templates", name: "guestTemplates", component: GuestTemplate, meta: { requiresAuth: false } },
-
-    // ─── CATCH ALL ─────────────────────────────────────────────────────
     { path: "/:pathMatch(.*)*", redirect: "/" },
   ],
 });
@@ -106,7 +95,6 @@ router.beforeEach((to, from, next) => {
   const user = Utils.getStore("user");
   const isGuest = localStorage.getItem("isGuest") === "true";
   const requiresAuth = to.meta.requiresAuth;
-
   if (to.name?.startsWith("guest") && isGuest) { next(); return; }
   if (requiresAuth && !user) { next({ name: "login" }); return; }
   next();

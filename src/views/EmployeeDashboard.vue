@@ -1,181 +1,26 @@
+
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import Utils from '../config/utils.js';
-import { useNotifications } from '../composables/useNotifications.js';
+import EmployeeService from '../services/employeeServices.js';
+import EmployeeLayout from '../components/EmployeeLayout.vue';
 
 const router = useRouter();
-const rail = ref(true);
+const user   = ref(null);
+const loading = ref(true);
+
+// ── DATA ──────────────────────────────────────────────────────────────────
+const myShifts       = ref([]);
+const myTasks        = ref([]);
+const pendingTimeOff = ref([]);
+const pendingSwaps   = ref([]);
+
+// ── CLOCK STATE ───────────────────────────────────────────────────────────
 const currentTime = ref('');
 const currentDate = ref('');
-const user = ref(null);
-const showNotifications = ref(false);
-const businessArea = ref('The Brew');
-
-// ─── TASKS ────────────────────────────────────────────────────────────────
-const todaysTasks = ref([
-  { id: 1, title: 'Restock supplies', dueTime: 'Due end of shift', completed: false },
-  { id: 2, title: 'Clean equipment', dueTime: 'Due end of shift', completed: false }
-]);
-
-const allTasksCompleted = computed(() => {
-  return todaysTasks.value.length > 0 && todaysTasks.value.every(t => t.completed);
-});
-
-const submitTasks = () => {
-  showSnackbar('Tasks submitted successfully!', 'success');
-};
-
-const toggleTask = (taskId) => {
-  const task = todaysTasks.value.find(t => t.id === taskId);
-  if (task) task.completed = !task.completed;
-};
-
-// ─── LATE BUFFER & TODAY'S SCHEDULE ──────────────────────────────────────
-const LATE_BUFFER_MINUTES = 15;
-
-// Today's scheduled shifts — in production these come from the API
-const todayScheduledShifts = ref([
-  { id: 1, label: 'Morning Shift', start: '09:00', end: '13:00', display: '9:00 AM – 1:00 PM' },
-  { id: 2, label: 'Evening Shift', start: '17:00', end: '21:00', display: '5:00 PM – 9:00 PM' }
-]);
-
-const clockInBlocked = ref(false);
-const clockInBlockMessage = ref('');
-
-// ─── SHIFT SESSIONS ───────────────────────────────────────────────────────
-const shiftSessions = ref([]);
-
-const currentShift = computed(() => shiftSessions.value.find(s => s.status === 'checked-in'));
-const completedShifts = computed(() => shiftSessions.value.filter(s => s.status === 'checked-out'));
-const totalHoursThisWeek = computed(() =>
-  completedShifts.value.reduce((sum, shift) => sum + parseFloat(shift.totalHours || 0), 0).toFixed(1)
-);
-
-const maxAllowedClockIns = computed(() => todayScheduledShifts.value.length);
-const allShiftsDone = computed(() =>
-  completedShifts.value.length >= maxAllowedClockIns.value && !currentShift.value
-);
-const nextScheduledShift = computed(() =>
-  todayScheduledShifts.value[completedShifts.value.length] || null
-);
-
-const checkIn = () => {
-  if (allShiftsDone.value) return;
-
-  const scheduled = nextScheduledShift.value;
-  if (scheduled) {
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-    const [startH, startM] = scheduled.start.split(':').map(Number);
-    const startMinutes = startH * 60 + startM;
-
-    if (currentMinutes < startMinutes) {
-      showSnackbar('You have clocked in early. Your manager has been notified.', 'warning');
-    }
-
-    if (currentMinutes > startMinutes + LATE_BUFFER_MINUTES) {
-      clockInBlocked.value = true;
-      clockInBlockMessage.value =
-        `You are outside the allowed clock-in window for your ${scheduled.label}. This has been flagged for your supervisor.`;
-      return;
-    }
-  }
-
-  clockInBlocked.value = false;
-  clockInBlockMessage.value = '';
-
-  const now = new Date();
-  const shiftNumber = shiftSessions.value.length + 1;
-  shiftSessions.value.push({
-    id: shiftNumber,
-    label: scheduled?.label || `Shift #${shiftNumber}`,
-    checkInTime: now.getTime(),
-    checkOutTime: null,
-    totalHours: 0,
-    status: 'checked-in'
-  });
-};
-
-const checkOut = (shiftId) => {
-  const shift = shiftSessions.value.find(s => s.id === shiftId);
-  if (shift) {
-    const now = new Date();
-    shift.checkOutTime = now.getTime();
-    shift.status = 'checked-out';
-    shift.totalHours = calculateTotalHours(shift.checkInTime, shift.checkOutTime);
-    clockInBlocked.value = false;
-    clockInBlockMessage.value = '';
-  }
-};
-
-// ─── NOTIFICATIONS ────────────────────────────────────────────────────────
-const { notifications, unreadCount, urgentNotifications, takenShifts, dismissNotification, handleNotificationAction } = useNotifications();
-
-const viewAllNotifications = () => { showNotifications.value = true; };
-
-
-// ─── SNACKBAR ─────────────────────────────────────────────────────────────
-const snackbar      = ref(false);
-const snackbarMsg   = ref('');
-const snackbarColor = ref('success');
-const showSnackbar  = (msg, color = 'success') => {
-  snackbarMsg.value   = msg;
-  snackbarColor.value = color;
-  snackbar.value      = true;
-};
-
-// ─── SCHEDULE & STATUS ────────────────────────────────────────────────────
-const scheduleStatus = ref({
-  status: 'approved',
-  message: 'Your schedule has been approved',
-  color: 'success',
-  icon: 'mdi-check-circle'
-});
-
-const pendingRequests = ref([
-  { id: 1, type: 'Time Off Request', date: 'March 10-12, 2026', status: 'pending', submitDate: 'Submitted 3 days ago' },
-  { id: 2, type: 'Shift Swap', date: 'Thursday March 5', status: 'approved', submitDate: 'Approved 1 day ago' }
-]);
-
-const calendarShifts = ref([
-  { date: '2026-02-16', employee: 'You', time: '9:00 AM - 5:00 PM', status: 'confirmed' },
-  { date: '2026-02-18', employee: 'You', time: '2:00 PM - 10:00 PM', status: 'confirmed' },
-  { date: '2026-02-19', employee: 'You', time: '9:00 AM - 1:00 PM', status: 'available' },
-]);
-
-const nextShift = computed(() => {
-  const upcoming = calendarShifts.value.find(
-    s => s.employee === 'You' && s.status === 'confirmed' && new Date(s.date) > new Date()
-  );
-  if (upcoming) {
-    const date = new Date(upcoming.date);
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    if (date.toDateString() === tomorrow.toDateString()) {
-      return upcoming.time.split(' - ')[0] + ' Tomorrow';
-    }
-    return upcoming.time.split(' - ')[0] + ' ' + date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  }
-  return 'No upcoming shifts';
-});
-
-// ─── USER INFO ────────────────────────────────────────────────────────────
-const userGreeting = computed(() => user.value?.fName || 'Employee');
-const userInitials = computed(() =>
-  (user.value?.fName?.[0] || '') + (user.value?.lName?.[0] || '') || 'E'
-);
-
-// ─── UTILITY FUNCTIONS ────────────────────────────────────────────────────
-const formatTime = (timestamp) => {
-  if (!timestamp) return '--:--';
-  return new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-};
-
-const calculateTotalHours = (checkIn, checkOut) => {
-  if (checkIn && checkOut) return ((checkOut - checkIn) / (1000 * 60 * 60)).toFixed(2);
-  return 0;
-};
+const activeClockRecord = ref(null);
+const clockLoading = ref(false);
 
 const updateTime = () => {
   const now = new Date();
@@ -183,773 +28,445 @@ const updateTime = () => {
   currentDate.value = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 };
 
-const getStatusChipColor = (status) => {
-  switch (status) {
-    case 'pending': return '#f57c00';
-    case 'approved': return '#2e7d32';
-    case 'needs-changes': return '#d32f2f';
-    default: return 'grey';
-  }
-};
+// ── WEEK NAVIGATION ───────────────────────────────────────────────────────
+const viewMode = ref('week'); // 'day' | 'week'
+const selectedWeek = ref(new Date());
 
-const logout = () => {
-  Utils.setStore('user', null);
-  router.push('/login');
-};
+const weekDays = computed(() => {
+  const sunday = getSunday(selectedWeek.value);
+  const today = new Date().toISOString().split('T')[0];
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(sunday);
+    d.setDate(sunday.getDate() + i);
+    const ds = d.toISOString().split('T')[0];
+    const dayShifts = myShifts.value.filter(s => {
+      const st = new Date(Number(s.shiftTime || s.shift_time));
+      return st.toISOString().split('T')[0] === ds;
+    }).sort((a, b) => (a.startTime || a.start_time) - (b.startTime || b.start_time));
+    return {
+      label: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][i],
+      full: ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][i],
+      dateNum: d.getDate(),
+      month: d.toLocaleDateString('en-US', { month: 'short' }),
+      dateString: ds,
+      isToday: ds === today,
+      shifts: dayShifts,
+    };
+  });
+});
 
-// ─── LIFECYCLE ────────────────────────────────────────────────────────────
-onMounted(() => {
+const todayDay = computed(() => {
+  const today = new Date().toISOString().split('T')[0];
+  return weekDays.value.find(d => d.dateString === today) || weekDays.value[0];
+});
+
+const displayDays = computed(() =>
+  viewMode.value === 'day' ? [todayDay.value] : weekDays.value
+);
+
+const weekLabel = computed(() => {
+  const days = weekDays.value;
+  const s = days[0];
+  const e = days[6];
+  if (s.month === e.month) return `${s.month} ${s.dateNum} – ${e.dateNum}, ${s.dateNum < 10 ? new Date().getFullYear() : new Date().getFullYear()}`;
+  return `${s.month} ${s.dateNum} – ${e.month} ${e.dateNum}`;
+});
+
+// ── COMPUTED ──────────────────────────────────────────────────────────────
+const userGreeting = computed(() => user.value?.fName || user.value?.first_name || 'there');
+
+const pendingCount = computed(() => pendingTimeOff.value.length + pendingSwaps.value.length);
+
+const assignedTasks = computed(() =>
+  myTasks.value.filter(t => {
+    const assignedTo = t.assignedTo || t.assigned_to;
+    const userId = user.value?.user_id || user.value?.userId;
+    return assignedTo === userId || !assignedTo;
+  }).slice(0, 3)
+);
+
+const nextShift = computed(() => {
+  const now = Date.now();
+  const upcoming = myShifts.value
+    .filter(s => Number(s.shiftTime || s.shift_time) > now)
+    .sort((a, b) => Number(a.shiftTime || a.shift_time) - Number(b.shiftTime || b.shift_time));
+  if (!upcoming.length) return null;
+  const s = upcoming[0];
+  const d = new Date(Number(s.shiftTime || s.shift_time));
+  return { shift: s, dateLabel: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) };
+});
+
+// ── DATA LOADING ──────────────────────────────────────────────────────────
+onMounted(async () => {
   user.value = Utils.getStore('user');
   updateTime();
   setInterval(updateTime, 1000);
+  await Promise.all([loadShifts(), loadTasks(), loadRequests()]);
+  loading.value = false;
 });
+
+const loadShifts = async () => {
+  try {
+    const res = await EmployeeService.getMyShifts();
+    const all = Array.isArray(res.data) ? res.data : [];
+    const userId = user.value?.user_id || user.value?.userId;
+    myShifts.value = all.filter(s => (s.user_id || s.userId) === userId);
+  } catch (err) { console.error('Shifts error:', err); }
+};
+
+const loadTasks = async () => {
+  try {
+    const res = await EmployeeService.getMyTaskLists();
+    myTasks.value = Array.isArray(res.data) ? res.data : [];
+  } catch (err) { console.error('Tasks error:', err); }
+};
+
+const loadRequests = async () => {
+  try {
+    const [toRes, swapRes] = await Promise.all([
+      EmployeeService.getMyTimeOffRequests(),
+      EmployeeService.getMySwapRequests(),
+    ]);
+    const userId = user.value?.user_id || user.value?.userId;
+    const allTo = Array.isArray(toRes.data) ? toRes.data : [];
+    const allSwaps = Array.isArray(swapRes.data) ? swapRes.data : [];
+    pendingTimeOff.value = allTo.filter(r => {
+      const rUserId = r.user_id || r.userId;
+      return rUserId === userId && r.status === 'pending';
+    });
+    pendingSwaps.value = allSwaps.filter(s => {
+      const reqUserId = s.swapUser?.requestingUser?.id;
+      return reqUserId === userId && (s.status === 'pending' || s.status === 'accepted');
+    });
+  } catch (err) { console.error('Requests error:', err); }
+};
+
+// ── CLOCK ACTIONS ─────────────────────────────────────────────────────────
+const handleClockIn = async () => {
+  const todayShifts = todayDay.value.shifts;
+  if (!todayShifts.length) {
+    snackMsg.value = 'No shifts scheduled for today';
+    snackColor.value = 'error';
+    snackbar.value = true;
+    return;
+  }
+  clockLoading.value = true;
+  try {
+    const shiftId = todayShifts[0].shift_id || todayShifts[0].id;
+    const res = await EmployeeService.clockIn({ shiftId });
+    activeClockRecord.value = res.data;
+    snackMsg.value = 'Clocked in successfully!';
+    snackColor.value = 'success';
+    snackbar.value = true;
+  } catch (err) {
+    snackMsg.value = err.response?.data?.message || 'Error clocking in';
+    snackColor.value = 'error';
+    snackbar.value = true;
+  } finally { clockLoading.value = false; }
+};
+
+const handleClockOut = async () => {
+  if (!activeClockRecord.value) return;
+  clockLoading.value = true;
+  try {
+    const id = activeClockRecord.value.id || activeClockRecord.value.clock_id;
+    await EmployeeService.clockOut(id);
+    activeClockRecord.value = null;
+    snackMsg.value = 'Clocked out successfully!';
+    snackColor.value = 'success';
+    snackbar.value = true;
+  } catch (err) {
+    snackMsg.value = 'Error clocking out';
+    snackColor.value = 'error';
+    snackbar.value = true;
+  } finally { clockLoading.value = false; }
+};
+
+// ── HELPERS ───────────────────────────────────────────────────────────────
+const getSunday = (date) => {
+  const d = new Date(date);
+  d.setDate(d.getDate() - d.getDay());
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+const formatTime = (minutes) => {
+  if (!minutes && minutes !== 0) return '';
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hour = h % 12 || 12;
+  return `${hour}:${String(m).padStart(2, '0')}${ampm}`;
+};
+
+const statusColor = (s) => ({ pending: '#f57c00', approved: '#2e7d32', denied: '#d32f2f' }[s] || 'grey');
+
+const snackbar   = ref(false);
+const snackMsg   = ref('');
+const snackColor = ref('success');
 </script>
 
 <template>
-  <v-app>
-    <!-- ── Sidebar Navigation ───────────────────────────────────────────── -->
-    <v-navigation-drawer
-      :rail="rail"
-      @mouseenter="rail = false"
-      @mouseleave="rail = true"
-      permanent
-      width="280"
-      class="employee-sidebar"
-    >
+  <EmployeeLayout>
+    <v-container fluid class="pa-6">
+
       <!-- Header -->
-      <div class="sidebar-header d-flex align-center pa-4" style="min-height: 64px; background: rgba(0,0,0,0.15);">
-        <template v-if="!rail">
-          <div>
-            <h2 class="text-h6 font-weight-bold text-white mb-0">ShiftBoard</h2>
-            <p class="text-caption text-white mb-0" style="opacity: 0.8">{{ businessArea }}</p>
-          </div>
-        </template>
-        <v-icon v-else size="32" color="white">mdi-calendar-clock</v-icon>
+      <div class="mb-5">
+        <h1 class="text-h4 font-weight-bold navy-text">Dashboard</h1>
+        <p class="text-body-2 text-grey">Hi, {{ userGreeting }}! Here's your overview.</p>
       </div>
 
-      <v-divider style="border-color: rgba(255,255,255,0.2)" />
-
-      <v-list nav class="px-2 mt-2">
-        <v-list-item
-          prepend-icon="mdi-view-dashboard"
-          title="Dashboard"
-          active
-          rounded="lg"
-          class="mb-1"
-        />
-        <v-list-item
-          prepend-icon="mdi-clock-outline"
-          title="My Availability"
-          rounded="lg"
-          class="mb-1"
-          @click="router.push({ name: 'employeeAvailability' })"
-        />
-        <v-list-item
-          prepend-icon="mdi-calendar-month"
-          title="Team Schedule"
-          rounded="lg"
-          class="mb-1"
-          @click="router.push({ name: 'employeeSchedule' })"
-        />
-        <v-list-item
-          prepend-icon="mdi-account-circle-outline"
-          title="Profile"
-          rounded="lg"
-          class="mb-1"
-          @click="router.push({ name: 'employeeProfile' })"
-        />
-        <v-list-item prepend-icon="mdi-cog-outline" title="Settings" rounded="lg" class="mb-1"
-          @click="router.push({ name: 'employeeSettings' })" />
-      </v-list>
-    </v-navigation-drawer>
-
-    <!-- ── App Bar ───────────────────────────────────────────────────────── -->
-    <v-app-bar color="white" elevation="0" style="border-bottom: 1px solid #e0e0e0;" density="compact">
-      <v-spacer />
-
-      <!-- Notification Bell -->
-      <v-menu location="bottom" v-model="showNotifications">
-        <template v-slot:activator="{ props }">
-          <v-btn v-bind="props" icon class="mr-1">
-            <v-badge :content="unreadCount" :model-value="unreadCount > 0" color="error">
-              <v-icon>mdi-bell</v-icon>
-            </v-badge>
-          </v-btn>
-        </template>
-        <v-card min-width="400" max-width="500" style="max-height: 500px; overflow-y: auto;">
-          <v-card-title class="text-h6 font-weight-bold pa-4">Notifications</v-card-title>
-          <v-divider />
-          <div v-if="notifications.length === 0" class="text-center pa-6">
-            <p class="text-grey">No notifications</p>
-          </div>
-          <div v-else>
-            <div
-              v-for="notification in notifications"
-              :key="notification.id"
-              class="pa-4"
-              style="border-bottom: 1px solid #f0f0f0;"
-            >
-              <div class="d-flex ga-3">
-                <v-icon color="primary" size="large">{{ notification.icon }}</v-icon>
-                <div class="flex-grow-1">
-                  <div class="d-flex justify-space-between align-start mb-1">
-                    <p class="text-body-2 font-weight-bold mb-0">{{ notification.type }}</p>
-                    <v-btn icon size="x-small" variant="text" @click="dismissNotification(notification.id)">
-                      <v-icon size="small">mdi-close</v-icon>
-                    </v-btn>
-                  </div>
-                  <p class="text-body-2 mb-1">{{ notification.message }}</p>
-                  <p class="text-caption text-grey mb-2">{{ notification.timestamp }}</p>
-                  <v-btn
-                    v-if="notification.action"
-                    size="small"
-                    color="primary"
-                    variant="flat"
-                    @click="handleNotificationAction(notification.id)"
-                  >
-                    {{ notification.action }}
-                  </v-btn>
-                </div>
-              </div>
-            </div>
-          </div>
-        </v-card>
-      </v-menu>
-
-      <!-- Profile Dropdown -->
-      <v-menu location="bottom end">
-        <template v-slot:activator="{ props }">
-          <v-btn v-bind="props" icon size="small" class="mr-2">
-            <v-avatar size="36" color="#12086F" class="text-caption font-weight-bold text-white">
-              {{ userInitials }}
-            </v-avatar>
-          </v-btn>
-        </template>
-        <v-card min-width="200">
-          <v-card-text class="pa-4">
-            <div class="text-center mb-3">
-              <v-avatar size="48" color="#12086F" class="text-caption font-weight-bold text-white mb-2">
-                {{ userInitials }}
-              </v-avatar>
-              <p class="text-body-2 font-weight-bold mb-0">{{ userGreeting }} {{ user?.lName || '' }}</p>
-              <p class="text-caption text-grey">{{ user?.email }}</p>
-            </div>
-            <v-divider class="mb-2" />
-            <v-list density="compact" class="pa-0">
-              <v-list-item prepend-icon="mdi-account" title="Profile" @click="router.push({ name: 'employeeProfile' })" />
-              <v-list-item
-                prepend-icon="mdi-logout"
-                title="Sign Out"
-                class="text-error"
-                @click="logout"
-              />
-            </v-list>
-          </v-card-text>
-        </v-card>
-      </v-menu>
-    </v-app-bar>
-
-    <!-- ── Main Content ──────────────────────────────────────────────────── -->
-    <v-main style="background: #f5f5f5;">
-
-      <!-- Urgent Banner -->
-      <div v-if="urgentNotifications.length > 0" class="urgent-banner pa-3">
-        <div class="d-flex align-center ga-2">
-          <v-icon color="primary" size="small">mdi-alert</v-icon>
-          <p class="text-body-2 mb-0 flex-grow-1">
-            <strong>{{ urgentNotifications[0].type }}:</strong> {{ urgentNotifications[0].message }}
-          </p>
-          <v-btn size="small" variant="text" @click="viewAllNotifications">View All</v-btn>
-        </div>
+      <div v-if="loading" class="text-center py-12">
+        <v-progress-circular indeterminate color="#12086F" size="48" />
       </div>
 
-      <v-container fluid class="pa-6">
-        <!-- Page Title -->
-        <div class="mb-6">
-          <h1 class="text-h4 font-weight-bold navy-text mb-1">Dashboard</h1>
-          <p class="text-body-2 text-grey">Hi, {{ userGreeting }}! • {{ businessArea }}</p>
-        </div>
+      <template v-else>
+        <v-row>
+          <!-- ── LEFT: Clock + Tasks ──────────────────────────────────── -->
+          <v-col cols="12" lg="4">
 
-        <v-row align="start">
-          <!-- ── LEFT: Clock In/Out + Tasks ──────────────────────────────── -->
-          <v-col cols="12" lg="4" xl="3">
-
-            <!-- Clock In/Out Card -->
-            <v-card variant="outlined" rounded="lg" class="navy-card mb-6">
-              <v-card-text class="pa-6">
-                <!-- Current Time -->
-                <div class="text-center mb-5">
-                  <p class="text-caption text-grey mb-2">Current Time</p>
-                  <div class="clock-display">
-                    <p class="text-h3 font-weight-bold mb-0">{{ currentTime }}</p>
+            <!-- Clock Card -->
+            <v-card variant="outlined" rounded="lg" class="navy-card mb-4">
+              <v-card-text class="pa-5">
+                <div class="text-center mb-4">
+                  <p class="text-caption text-grey mb-1">Current Time</p>
+                  <div class="clock-display pa-4 rounded-lg mb-2">
+                    <p class="text-h4 font-weight-bold text-white mb-0">{{ currentTime }}</p>
                   </div>
-                  <p class="text-body-2 text-grey mt-3 mb-0">{{ currentDate }}</p>
+                  <p class="text-caption text-grey">{{ currentDate }}</p>
                 </div>
 
-                <v-divider class="my-4" />
+                <v-divider class="my-3" />
 
-                <!-- Today's Scheduled Shifts -->
-                <div class="shift-info mb-4">
-                  <p class="text-subtitle-2 font-weight-bold mb-2">Today's Schedule</p>
-                  <div
-                    v-for="(s, i) in todayScheduledShifts"
-                    :key="s.id"
-                    class="d-flex align-center justify-space-between mb-1"
-                  >
-                    <div class="d-flex align-center ga-2">
-                      <v-icon size="14" :color="completedShifts.length > i ? 'success' : (currentShift && completedShifts.length === i ? 'warning' : '#12086F')">
-                        {{ completedShifts.length > i ? 'mdi-check-circle' : (currentShift && completedShifts.length === i ? 'mdi-clock-fast' : 'mdi-clock-outline') }}
-                      </v-icon>
-                      <span class="text-body-2 font-weight-medium">{{ s.label }}</span>
-                    </div>
-                    <span class="text-caption text-grey">{{ s.display }}</span>
-                  </div>
-                  <p class="text-caption text-grey mt-1 mb-0">@ {{ businessArea }}</p>
-                </div>
-
-                <v-divider class="my-4" />
-
-                <!-- Late Block Alert -->
-                <div v-if="clockInBlocked" class="late-block-alert mb-4">
-                  <div class="d-flex align-start ga-2">
-                    <v-icon color="error" size="18" style="margin-top: 2px;">mdi-alert-circle</v-icon>
-                    <div class="flex-grow-1">
-                      <p class="text-body-2 font-weight-bold text-error mb-1">Clock-In Blocked</p>
-                      <p class="text-body-2 mb-0">{{ clockInBlockMessage }}</p>
-                    </div>
-                    <v-btn icon size="x-small" variant="text" @click="clockInBlocked = false">
-                      <v-icon size="small">mdi-close</v-icon>
-                    </v-btn>
-                  </div>
-                </div>
-
-                <!-- Active Shift -->
-                <div v-if="currentShift" class="active-shift mb-4">
-                  <div class="d-flex justify-space-between align-center mb-3">
-                    <p class="text-body-2 font-weight-bold mb-0">Shift #{{ currentShift.id }} — Active</p>
-                    <v-chip color="success" size="small" variant="tonal">In Progress</v-chip>
-                  </div>
-                  <v-row dense class="mb-3">
-                    <v-col cols="6" class="text-center">
-                      <p class="text-caption text-grey mb-1">Check In</p>
-                      <p class="text-body-2 font-weight-bold mb-0">{{ formatTime(currentShift.checkInTime) }}</p>
-                    </v-col>
-                    <v-col cols="6" class="text-center">
-                      <p class="text-caption text-grey mb-1">Duration</p>
-                      <p class="text-body-2 font-weight-bold text-primary mb-0">Running...</p>
-                    </v-col>
-                  </v-row>
-                  <v-btn block color="#12086F" variant="flat" @click="checkOut(currentShift.id)">
-                    Check Out
-                  </v-btn>
-                </div>
-
-                <!-- Completed Shifts -->
-                <div v-if="completedShifts.length > 0" class="mb-4">
-                  <div class="d-flex justify-space-between align-center mb-3">
-                    <p class="text-body-2 font-weight-bold mb-0">Today's Progress</p>
-                    <div class="text-right">
-                      <p class="text-caption text-grey mb-0">Total Today</p>
-                      <p class="text-subtitle-2 font-weight-bold text-success mb-0">{{ totalHoursThisWeek }}h</p>
-                    </div>
-                  </div>
-                  <div v-for="(shift, index) in completedShifts" :key="shift.id" class="completed-shift-card mb-2">
-                    <div class="d-flex justify-space-between align-center mb-1">
-                      <div class="d-flex align-center ga-1">
-                        <v-icon size="14" color="success">mdi-check-circle</v-icon>
-                        <p class="text-body-2 font-weight-bold mb-0">{{ shift.label }}</p>
-                      </div>
-                      <v-chip color="success" size="small" variant="tonal">
-                        {{ index === 0 ? 'First Shift Done' : index === 1 ? 'Second Shift Done' : 'Done' }}
-                      </v-chip>
-                    </div>
-                    <v-row dense>
-                      <v-col cols="4" class="text-center">
-                        <p class="text-caption text-grey mb-0">In</p>
-                        <p class="text-caption font-weight-bold mb-0">{{ formatTime(shift.checkInTime) }}</p>
-                      </v-col>
-                      <v-col cols="4" class="text-center">
-                        <p class="text-caption text-grey mb-0">Out</p>
-                        <p class="text-caption font-weight-bold mb-0">{{ formatTime(shift.checkOutTime) }}</p>
-                      </v-col>
-                      <v-col cols="4" class="text-center">
-                        <p class="text-caption text-grey mb-0">Hours</p>
-                        <p class="text-caption font-weight-bold text-success mb-0">{{ shift.totalHours }}h</p>
-                      </v-col>
-                    </v-row>
-                  </div>
-                </div>
-
-                <!-- All Shifts Done Banner -->
-                <div
-                  v-if="allShiftsDone"
-                  class="text-center pa-4 mb-2"
-                  style="background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0;"
-                >
-                  <v-icon color="success" size="28" class="mb-2">mdi-check-circle</v-icon>
-                  <p class="text-body-2 font-weight-bold text-success mb-1">All shifts completed for today!</p>
-                  <p class="text-caption text-grey mb-0">{{ totalHoursThisWeek }}h total worked</p>
-                </div>
-
-                <!-- Next Shift (upcoming from calendar, only when no more today's shifts pending) -->
-                <div
-                  v-if="!currentShift && completedShifts.length > 0 && allShiftsDone"
-                  class="text-center mb-4 pa-3"
-                  style="background: #f0f7ff; border-radius: 8px;"
-                >
+                <!-- Next shift -->
+                <div v-if="nextShift" class="text-center mb-4 pa-3 rounded-lg" style="background:#f0f4ff;">
                   <p class="text-caption text-grey mb-1">Next Shift</p>
-                  <p class="text-subtitle-2 font-weight-bold text-primary mb-0">{{ nextShift }}</p>
+                  <p class="text-body-2 font-weight-bold navy-text mb-0">
+                    {{ nextShift.dateLabel }} · {{ formatTime(nextShift.shift.startTime || nextShift.shift.start_time) }}
+                  </p>
                 </div>
 
-                <!-- Check In Button — hidden once all today's shifts are done -->
+                <!-- Clock in/out -->
                 <v-btn
-                  v-if="!currentShift && !allShiftsDone"
-                  block
-                  color="#12086F"
-                  variant="flat"
-                  size="large"
-                  @click="checkIn"
+                  v-if="!activeClockRecord"
+                  block color="#12086F" variant="flat" size="large"
+                  :loading="clockLoading"
+                  @click="handleClockIn"
                 >
-                  {{ nextScheduledShift ? `Clock In — ${nextScheduledShift.label}` : `Start Shift #${shiftSessions.length + 1}` }}
+                  <v-icon start>mdi-login</v-icon>Clock In
                 </v-btn>
+                <div v-else>
+                  <v-alert type="success" variant="tonal" density="compact" class="mb-3">
+                    <v-icon start>mdi-clock-fast</v-icon>
+                    Shift in progress
+                  </v-alert>
+                  <v-btn block color="error" variant="flat" :loading="clockLoading" @click="handleClockOut">
+                    <v-icon start>mdi-logout</v-icon>Clock Out
+                  </v-btn>
+                </div>
               </v-card-text>
             </v-card>
 
-            <!-- Tasks Card -->
+            <!-- Tasks preview -->
             <v-card variant="outlined" rounded="lg" class="navy-card">
-              <v-card-title class="text-h6 font-weight-bold pa-4 d-flex align-center ga-2">
-                <v-icon>mdi-checkbox-marked-circle-outline</v-icon>
-                Today's Tasks
+              <v-card-title class="text-body-1 font-weight-bold pa-4 d-flex align-center justify-space-between navy-text">
+                <span><v-icon start size="18">mdi-checkbox-marked-circle-outline</v-icon>My Tasks</span>
+                <v-btn size="x-small" variant="tonal" color="#12086F" @click="router.push({ name: 'employeeTasks' })">View All</v-btn>
               </v-card-title>
               <v-divider />
               <v-card-text class="pa-4">
-                <div v-if="todaysTasks.length === 0" class="text-center py-4">
-                  <p class="text-grey text-body-2">No tasks assigned</p>
+                <div v-if="assignedTasks.length === 0" class="text-center py-4">
+                  <v-icon size="40" color="grey-lighten-2" class="mb-2">mdi-clipboard-check-outline</v-icon>
+                  <p class="text-caption text-grey">No tasks assigned</p>
                 </div>
-                <div v-for="task in todaysTasks" :key="task.id" class="mb-2">
-                  <v-checkbox
-                    :model-value="task.completed"
-                    @update:model-value="toggleTask(task.id)"
-                    hide-details
-                    color="#12086F"
-                    density="compact"
-                  >
-                    <template #label>
-                      <div class="ml-2">
-                        <p :class="['text-body-2 mb-0', { 'text-decoration-line-through text-grey': task.completed }]">
-                          {{ task.title }}
-                        </p>
-                        <p class="text-caption text-grey mb-0">{{ task.dueTime }}</p>
-                      </div>
-                    </template>
-                  </v-checkbox>
+                <div v-for="task in assignedTasks" :key="task.tasklist_id || task.id" class="task-row pa-2 mb-2 rounded">
+                  <div class="d-flex align-center ga-2">
+                    <v-icon size="16" :color="task.priority === 'urgent' ? 'error' : task.priority === 'high' ? 'warning' : '#12086F'">
+                      mdi-flag
+                    </v-icon>
+                    <span class="text-body-2 font-weight-medium">{{ task.title }}</span>
+                  </div>
                 </div>
-              </v-card-text>
-              <v-divider />
-              <v-card-actions class="pa-4">
-                <v-btn
-                  block
-                  :color="allTasksCompleted ? 'success' : 'grey'"
-                  :variant="allTasksCompleted ? 'flat' : 'outlined'"
-                  :disabled="!allTasksCompleted"
-                  @click="submitTasks"
-                >
-                  Submit Completed Tasks
+                <v-btn v-if="assignedTasks.length > 0" block variant="tonal" color="#12086F" size="small" class="mt-2"
+                  @click="router.push({ name: 'employeeTasks' })">
+                  Go to Tasks
                 </v-btn>
-              </v-card-actions>
+              </v-card-text>
             </v-card>
           </v-col>
 
-          <!-- ── RIGHT: Calendar + Pending Requests ──────────────────────── -->
-          <v-col cols="12" lg="8" xl="9">
+          <!-- ── RIGHT: Schedule + Pending Requests ─────────────────── -->
+          <v-col cols="12" lg="8">
 
-            <!-- Schedule Card -->
+            <!-- Schedule -->
+            <v-card variant="outlined" rounded="lg" class="navy-card mb-4">
+              <v-card-title class="pa-4 d-flex align-center justify-space-between">
+                <span class="text-body-1 font-weight-bold navy-text">
+                  <v-icon start size="18">mdi-calendar-week</v-icon>
+                  {{ viewMode === 'week' ? 'This Week\'s Schedule' : 'Today\'s Schedule' }}
+                </span>
+                <div class="d-flex ga-2 align-center">
+                  <!-- ✅ Day/Week toggle - no approved chip -->
+                  <v-btn-toggle v-model="viewMode" color="#12086F" variant="outlined" mandatory divided density="compact">
+                    <v-btn value="day" size="small">
+                      <v-icon size="14" class="mr-1">mdi-calendar-today</v-icon>Day
+                    </v-btn>
+                    <v-btn value="week" size="small">
+                      <v-icon size="14" class="mr-1">mdi-calendar-week</v-icon>Week
+                    </v-btn>
+                  </v-btn-toggle>
+                  <v-btn size="small" variant="text" color="#4361EE" @click="router.push({ name: 'employeeSchedule' })">
+                    Full Schedule
+                  </v-btn>
+                </div>
+              </v-card-title>
+              <v-divider />
+              <v-card-text class="pa-3">
+                <div class="schedule-grid" :style="{ gridTemplateColumns: `repeat(${displayDays.length}, 1fr)` }">
+                  <!-- Headers -->
+                  <div
+                    v-for="day in displayDays"
+                    :key="'h-' + day.dateString"
+                    class="sched-header"
+                    :class="{ 'sched-header--today': day.isToday }"
+                  >
+                    <span class="day-label">{{ day.label }}</span>
+                    <span class="day-num">{{ day.dateNum }}</span>
+                    <span class="day-month">{{ day.month }}</span>
+                  </div>
+                  <!-- Bodies -->
+                  <div
+                    v-for="day in displayDays"
+                    :key="'b-' + day.dateString"
+                    class="sched-body"
+                    :class="{ 'sched-body--today': day.isToday }"
+                  >
+                    <div v-if="day.shifts.length === 0" class="no-shift-text">No shifts</div>
+                    <div v-for="s in day.shifts" :key="s.shift_id || s.id" class="shift-pill">
+                      <div class="shift-pill-time">{{ formatTime(s.startTime || s.start_time) }}</div>
+                      <div class="shift-pill-end text-caption">– {{ formatTime(s.endTime || s.end_time) }}</div>
+                    </div>
+                  </div>
+                </div>
+              </v-card-text>
+            </v-card>
+
+            <!-- Pending Requests — click redirects to Time Requests page -->
             <v-card variant="outlined" rounded="lg" class="navy-card">
-              <v-card-title class="d-flex justify-space-between align-center pa-4">
-                <span class="text-h6 font-weight-bold">This Week's Schedule Preview</span>
-                <div class="d-flex align-center ga-3">
-                  <v-chip :color="scheduleStatus.color" size="small" variant="tonal">
-                    <v-icon start size="small">{{ scheduleStatus.icon }}</v-icon>
-                    {{ scheduleStatus.status === 'approved' ? 'Approved' : 'Pending' }}
-                  </v-chip>
-                  <v-btn variant="text" size="small" color="#4361EE" @click="router.push({ name: 'employeeSchedule' })">View Full Schedule</v-btn>
-                </div>
+              <v-card-title class="pa-4 d-flex align-center justify-space-between">
+                <span class="text-body-1 font-weight-bold navy-text">
+                  <v-icon start size="18">mdi-clock-alert</v-icon>
+                  Pending Requests
+                </span>
+                <v-chip v-if="pendingCount > 0" size="x-small" color="#f57c00" variant="tonal">{{ pendingCount }}</v-chip>
               </v-card-title>
               <v-divider />
               <v-card-text class="pa-4">
-                <div class="calendar-scroll">
-                  <div class="calendar-grid">
-
-                    <!-- Calendar Header -->
-                    <div class="calendar-header">
-                      <div v-for="(day, i) in ['MON','TUE','WED','THU','FRI','SAT','SUN']" :key="day" class="calendar-day-header">
-                        <span class="day-header-name">{{ day }}</span>
-                        <span class="day-header-number">{{ [16,17,18,19,20,21,22][i] }}</span>
-                      </div>
-                    </div>
-
-                    <!-- Calendar Body -->
-                    <div class="calendar-body">
-                      <!-- MON -->
-                      <div class="calendar-day">
-                        <div class="shifts-container">
-                          <div class="shift-box">
-                            <div class="shift-time">9AM–5PM</div>
-                            <div class="shift-person">You</div>
-                          </div>
-                          <div class="shift-box">
-                            <div class="shift-time">2PM–10PM</div>
-                            <div class="shift-person">Alex M.</div>
-                          </div>
-                          <div class="shift-box">
-                            <div class="shift-time">10AM–6PM</div>
-                            <div class="shift-person">Sam W.</div>
-                          </div>
-                        </div>
-
-                      </div>
-
-                      <!-- TUE -->
-                      <div class="calendar-day">
-                        <div class="shifts-container">
-                          <div
-                            v-for="(s, i) in takenShifts.filter(s => s.day === 'TUE')"
-                            :key="'taken-tue-' + i"
-                            class="shift-box"
-                          >
-                            <div class="shift-time">{{ s.time }}</div>
-                            <div class="shift-person">You (cover)</div>
-                          </div>
-                          <div v-if="takenShifts.filter(s => s.day === 'TUE').length === 0" class="shift-box shift-off">
-                            <div class="shift-person">You</div>
-                            <div class="shift-status-text">Day Off</div>
+                <div v-if="pendingCount === 0" class="text-center py-6">
+                  <v-icon size="48" color="grey-lighten-2" class="mb-2">mdi-check-circle-outline</v-icon>
+                  <p class="text-body-2 text-grey">No pending requests</p>
+                </div>
+                <div v-else>
+                  <div
+                    v-for="req in pendingTimeOff"
+                    :key="'to-' + (req.request_id || req.id)"
+                    class="request-row pa-3 mb-2 rounded cursor-pointer"
+                    @click="router.push({ name: 'employeeTimeRequests' })"
+                  >
+                    <div class="d-flex align-center justify-space-between">
+                      <div class="d-flex align-center ga-2">
+                        <v-icon size="16" color="#4361EE">mdi-calendar-remove</v-icon>
+                        <div>
+                          <div class="text-body-2 font-weight-medium">Time Off Request</div>
+                          <div class="text-caption text-grey">
+                            {{ new Date(Number(req.start_date || req.startDate)).toLocaleDateString() }}
                           </div>
                         </div>
                       </div>
-
-                      <!-- WED -->
-                      <div class="calendar-day">
-                        <div class="shifts-container">
-                          <div class="shift-box">
-                            <div class="shift-time">2PM–10PM</div>
-                            <div class="shift-person">You</div>
-                          </div>
-                          <div class="shift-box">
-                            <div class="shift-time">9AM–5PM</div>
-                            <div class="shift-person">Jordan L.</div>
-                            <div class="shift-status-text">Pending Swap</div>
-                          </div>
-                        </div>
-
-                      </div>
-
-                      <!-- THU -->
-                      <div class="calendar-day">
-                        <div class="shifts-container">
-                          <div class="shift-box">
-                            <div class="shift-time">9AM–1PM</div>
-                            <div class="shift-person">You</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <!-- FRI -->
-                      <div class="calendar-day">
-                        <div class="shifts-container">
-                          <div class="shift-box">
-                            <div class="shift-time">10AM–6PM</div>
-                            <div class="shift-person">You</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <!-- SAT -->
-                      <div class="calendar-day">
-                        <p class="no-shifts-text">No shifts</p>
-
-                      </div>
-
-                      <!-- SUN -->
-                      <div class="calendar-day">
-                        <p class="no-shifts-text">No shifts</p>
-
-                      </div>
+                      <v-chip :color="statusColor(req.status)" size="x-small" variant="tonal">{{ req.status }}</v-chip>
                     </div>
                   </div>
+                  <div
+                    v-for="swap in pendingSwaps"
+                    :key="'sw-' + (swap.swap_id || swap.id)"
+                    class="request-row pa-3 mb-2 rounded cursor-pointer"
+                    @click="router.push({ name: 'employeeTimeRequests' })"
+                  >
+                    <div class="d-flex align-center justify-space-between">
+                      <div class="d-flex align-center ga-2">
+                        <v-icon size="16" color="#f57c00">mdi-swap-horizontal</v-icon>
+                        <div>
+                          <div class="text-body-2 font-weight-medium">Shift Swap Request</div>
+                          <div class="text-caption text-grey">{{ swap.status }}</div>
+                        </div>
+                      </div>
+                      <v-chip :color="statusColor(swap.status)" size="x-small" variant="tonal">{{ swap.status }}</v-chip>
+                    </div>
+                  </div>
+                  <v-btn block variant="tonal" color="#12086F" size="small" class="mt-2"
+                    @click="router.push({ name: 'employeeTimeRequests' })">
+                    Manage All Requests
+                  </v-btn>
                 </div>
               </v-card-text>
             </v-card>
-
-            <!-- Pending Requests Card -->
-            <v-card variant="outlined" rounded="lg" class="navy-card mt-6">
-              <v-card-title class="text-h6 font-weight-bold pa-4 d-flex align-center ga-2">
-                <v-icon>mdi-clock-alert</v-icon>
-                Pending Requests
-              </v-card-title>
-              <v-divider />
-              <v-card-text class="pa-4">
-                <div v-if="pendingRequests.length === 0" class="text-center py-4">
-                  <p class="text-grey text-body-2">No pending requests</p>
-                </div>
-                <div v-else class="compact-rect-list">
-                  <div v-for="request in pendingRequests" :key="request.id" class="compact-rect">
-                    <div class="compact-rect-left">
-                      <p class="compact-title">{{ request.type }}</p>
-                      <p class="compact-sub">{{ request.date }}</p>
-                      <p class="compact-meta">{{ request.submitDate }}</p>
-                    </div>
-                    <div class="compact-rect-right">
-                      <v-chip :color="getStatusChipColor(request.status)" variant="tonal" size="small">
-                        {{ request.status }}
-                      </v-chip>
-                    </div>
-                  </div>
-                </div>
-              </v-card-text>
-            </v-card>
-
           </v-col>
         </v-row>
-      </v-container>
-    </v-main>
-    <v-snackbar v-model="snackbar" :color="snackbarColor" timeout="3000" location="bottom right">
-      {{ snackbarMsg }}
-    </v-snackbar>
+      </template>
+    </v-container>
 
-  </v-app>
+    <v-snackbar v-model="snackbar" :color="snackColor" timeout="3000" location="bottom right">
+      {{ snackMsg }}
+    </v-snackbar>
+  </EmployeeLayout>
 </template>
 
 <style scoped>
-/* ── Sidebar ────────────────────────────────────────────────────────────── */
-.employee-sidebar {
-  background: linear-gradient(180deg, #12086F 0%, #2B354F 100%) !important;
-}
+.navy-text { color: #12086F !important; }
+.navy-card { border-color: #e0e0e0; box-shadow: 0 1px 3px rgba(18,8,111,0.05); }
+.clock-display { background: linear-gradient(135deg, #12086F 0%, #1c10a8 100%); }
 
-.employee-sidebar :deep(.v-list-item__prepend .v-icon) {
-  color: white !important;
-  opacity: 1 !important;
-}
-
-.employee-sidebar :deep(.v-list-item-title) {
-  color: white !important;
-}
-
-.employee-sidebar :deep(.v-list-item) {
-  transition: all 0.2s;
-}
-
-.employee-sidebar :deep(.v-list-item:hover) {
-  background-color: rgba(255, 255, 255, 0.1) !important;
-}
-
-.employee-sidebar :deep(.v-list-item--active) {
-  background-color: rgba(255, 255, 255, 0.14) !important;
-}
-
-/* ── Utilities ──────────────────────────────────────────────────────────── */
-.navy-text {
-  color: #12086F !important;
-}
-
-.navy-card {
-  border-color: #e0e0e0 !important;
-  box-shadow: 0 1px 3px rgba(18, 8, 111, 0.05) !important;
-}
-
-/* ── Urgent Banner ──────────────────────────────────────────────────────── */
-.urgent-banner {
-  background-color: #eef0fb;
-  border-bottom: 1px solid #c5cae9;
-}
-
-/* ── Clock Display ──────────────────────────────────────────────────────── */
-.clock-display {
-  padding: 20px;
-  background: linear-gradient(135deg, #12086f 0%, #1c10a8 100%);
-  border-radius: 12px;
-  margin: 8px 0;
-  color: white;
-}
-
-/* ── Shift Cards (inside clock panel) ──────────────────────────────────── */
-.shift-info {
-  padding: 12px;
-  background-color: #f5f5f5;
-  border-radius: 8px;
-}
-
-.completed-shift-card {
-  padding: 12px;
-  background-color: #f9f9f9;
-  border-radius: 8px;
-  border-left: 3px solid #12086f;
-}
-
-.active-shift {
-  padding: 16px;
-  background-color: #f0f7f4;
-  border-radius: 8px;
-  border-left: 4px solid #4caf50;
-}
-
-/* ── Pending Requests ───────────────────────────────────────────────────── */
-.compact-rect-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.compact-rect {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  background: #fafafa;
-  padding: 16px;
-  min-height: 80px;
-  transition: all 0.2s;
-}
-
-.compact-rect:hover {
+.schedule-grid {
+  display: grid;
+  gap: 4px;
   background: #f5f5f5;
-  box-shadow: 0 2px 8px rgba(18, 8, 111, 0.08);
-  transform: translateY(-1px);
-}
-
-.compact-rect-left { flex: 1; min-width: 0; }
-.compact-title { margin: 0 0 6px; font-weight: 700; font-size: 1rem; color: #222; }
-.compact-sub { margin: 0 0 4px; font-size: 0.875rem; color: #555; }
-.compact-meta { margin: 0; font-size: 0.75rem; color: #999; font-style: italic; }
-.compact-rect-right { flex-shrink: 0; margin-left: 16px; }
-
-/* ── Calendar ───────────────────────────────────────────────────────────── */
-.calendar-scroll {
-  width: 100%;
-  overflow-x: auto;
-  padding-bottom: 8px;
-}
-
-.calendar-scroll::-webkit-scrollbar { height: 6px; }
-.calendar-scroll::-webkit-scrollbar-thumb { background: #cfcfcf; border-radius: 999px; }
-.calendar-scroll::-webkit-scrollbar-track { background: transparent; }
-
-.calendar-grid {
-  min-width: 700px;
-  border: 1px solid #e0e0e0;
+  padding: 6px;
   border-radius: 8px;
-  overflow: hidden;
-  background: #e0e0e0;
 }
-
-.calendar-header {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 1px;
-}
-
-.calendar-day-header {
-  background: linear-gradient(135deg, #12086F 0%, #2B354F 100%);
-  padding: 10px 8px 8px;
+.sched-header {
+  background: linear-gradient(135deg, #12086F, #2B354F);
+  color: white;
+  padding: 8px 4px;
   text-align: center;
+  border-radius: 6px 6px 0 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
 }
-
-.day-header-name {
-  font-weight: 700;
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.85);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.day-header-number {
-  font-size: 1.75rem;
-  font-weight: 800;
-  color: rgba(255, 255, 255, 0.18);
-  line-height: 1;
-}
-
-.calendar-body {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 1px;
-  background: #e0e0e0;
-}
-
-.calendar-day {
+.sched-header--today { background: linear-gradient(135deg, #4361EE, #5B73F0); }
+.day-label { font-size: 10px; font-weight: 700; opacity: 0.85; text-transform: uppercase; }
+.day-num { font-size: 18px; font-weight: 800; }
+.day-month { font-size: 10px; opacity: 0.7; }
+.sched-body {
   background: white;
-  padding: 8px;
-  min-height: 200px;
+  min-height: 80px;
+  padding: 6px;
+  border-radius: 0 0 6px 6px;
 }
-
-.shifts-container {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 6px;
-}
-
-.shift-box {
-  padding: 8px;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+.sched-body--today { background: #f0f4ff; }
+.no-shift-text { text-align: center; color: #9ca3af; font-size: 11px; padding: 12px 0; }
+.shift-pill {
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
   border-left: 3px solid #4361EE;
-  cursor: pointer;
-  transition: all 0.15s;
+  border-radius: 4px;
+  padding: 4px 6px;
+  margin-bottom: 4px;
 }
+.shift-pill-time { font-size: 11px; font-weight: 700; color: #12086F; }
+.shift-pill-end { color: #666; }
 
-.shift-box:hover {
-  opacity: 0.85;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(18, 8, 111, 0.1);
-}
-
-.shift-off {
-  background: #f1f5f9 !important;
-  border-left-color: #94a3b8 !important;
-}
-
-.shift-time {
-  font-weight: 700;
-  color: #1e293b;
-  margin-bottom: 2px;
-}
-
-.shift-person {
-  color: #475569;
-  font-size: 0.7rem;
-}
-
-.shift-status-text {
-  font-style: italic;
-  font-size: 0.65rem;
-  color: #64748b;
-  margin-top: 2px;
-}
-
-.no-shifts-text {
-  text-align: center;
-  color: #9ca3af;
-  font-size: 0.75rem;
-  margin: 4px 0;
-  padding: 4px 0;
-}
-
-.gap-3 { gap: 12px; }
-
-/* ── Late Block Alert ───────────────────────────────────────────────────── */
-.late-block-alert {
-  padding: 14px;
-  background-color: #fff5f5;
-  border: 1px solid #fca5a5;
-  border-left: 4px solid #ef4444;
-  border-radius: 8px;
-}
-
-
+.task-row { background: #f9f9f9; border-left: 3px solid #12086F; }
+.request-row { background: #fafafa; border: 1px solid #e0e0e0; cursor: pointer; transition: all 0.15s; }
+.request-row:hover { background: #f0f4ff; border-color: #12086F; }
+.cursor-pointer { cursor: pointer; }
 </style>
