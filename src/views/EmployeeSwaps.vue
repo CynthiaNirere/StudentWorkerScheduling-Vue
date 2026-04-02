@@ -17,6 +17,10 @@ const selectedSwap = ref(null);
 const showAcceptDialog = ref(false);
 const swapToAccept = ref(null);
 
+const showCreateDialog = ref(false);
+const submitting = ref(false);
+const swapForm = ref({ shiftId: '', reason: '' });
+
 const snackbar = ref(false);
 const snackMsg = ref("");
 const snackColor = ref("success");
@@ -88,6 +92,18 @@ const swapsWithDetails = computed(() =>
 const availableCount = computed(() => availableSwaps.value.length);
 const myCount = computed(() => mySwapRequests.value.length);
 
+const myShiftOptions = computed(() =>
+  myShifts.value.map((s) => {
+    const d = new Date(Number(s.shiftTime || s.shift_time));
+    const start = formatTime(s.startTime || s.start_time);
+    const end = formatTime(s.endTime || s.end_time);
+    return {
+      title: `${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${start} – ${end}`,
+      value: s.shift_id || s.id,
+    };
+  })
+);
+
 onMounted(async () => {
   user.value = Utils.getStore("user");
   await loadData();
@@ -139,6 +155,33 @@ const confirmAccept = async () => {
     processing.value = false;
     showAcceptDialog.value = false;
     swapToAccept.value = null;
+  }
+};
+
+const openCreateDialog = () => {
+  swapForm.value = { shiftId: '', reason: '' };
+  showCreateDialog.value = true;
+};
+
+const submitSwapRequest = async () => {
+  if (!swapForm.value.shiftId) {
+    showSnackbar('Please select a shift', 'error');
+    return;
+  }
+  submitting.value = true;
+  try {
+    await EmployeeService.createSwapRequest({
+      originalShiftId: swapForm.value.shiftId,
+      reason: swapForm.value.reason || null,
+    });
+    showSnackbar('Shift swap request submitted!', 'success');
+    showCreateDialog.value = false;
+    window.dispatchEvent(new Event('notifications-updated'));
+    await loadData();
+  } catch (err) {
+    showSnackbar(err.response?.data?.message || 'Error submitting swap request', 'error');
+  } finally {
+    submitting.value = false;
   }
 };
 
@@ -206,7 +249,7 @@ const showSnackbar = (msg, color = "success") => {
           color="#12086F"
           variant="flat"
           prepend-icon="mdi-plus"
-          :to="{ name: 'employeeTimeRequests' }"
+          @click="openCreateDialog"
         >
           Request a Swap
         </v-btn>
@@ -406,6 +449,48 @@ const showSnackbar = (msg, color = "success") => {
           </v-btn>
           <v-spacer />
           <v-btn variant="text" @click="showDetailsDialog = false">Close</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Create Swap Dialog -->
+    <v-dialog v-model="showCreateDialog" max-width="500">
+      <v-card rounded="lg">
+        <v-card-title class="pa-5 pb-4 navy-text font-weight-bold">
+          <v-icon start>mdi-swap-horizontal</v-icon>
+          Request Shift Swap
+        </v-card-title>
+        <v-divider />
+        <v-card-text class="pa-5">
+          <v-select
+            v-model="swapForm.shiftId"
+            :items="myShiftOptions"
+            label="Select Shift to Swap *"
+            variant="outlined"
+            density="compact"
+            class="mb-3"
+            color="#12086F"
+            :no-data-text="'No upcoming shifts found'"
+          />
+          <v-textarea
+            v-model="swapForm.reason"
+            label="Reason (optional)"
+            variant="outlined"
+            density="compact"
+            rows="2"
+            color="#12086F"
+          />
+          <v-alert type="info" variant="tonal" density="compact" color="#4361EE" class="mt-3">
+            Your coworkers will see this swap and can accept it. A manager will then approve or reject.
+          </v-alert>
+        </v-card-text>
+        <v-divider />
+        <v-card-actions class="pa-4">
+          <v-spacer />
+          <v-btn variant="text" @click="showCreateDialog = false">Cancel</v-btn>
+          <v-btn color="#12086F" variant="flat" :loading="submitting" @click="submitSwapRequest">
+            Submit Request
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
