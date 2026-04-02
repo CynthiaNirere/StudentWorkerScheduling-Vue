@@ -83,6 +83,8 @@ onMounted(() => {
           :to="{ name: 'employeeAvailability' }" color="white" class="nav-item" rounded="lg" />
         <v-list-item prepend-icon="mdi-calendar-clock" title="Time Requests"
           :to="{ name: 'employeeTimeRequests' }" color="white" class="nav-item" rounded="lg" />
+        <v-list-item prepend-icon="mdi-swap-horizontal" title="Shift Swaps"
+          :to="{ name: 'employeeSwaps' }" color="white" class="nav-item" rounded="lg" />
         <v-list-item prepend-icon="mdi-checkbox-marked-circle-outline" title="My Tasks"
           :to="{ name: 'employeeTasks' }" color="white" class="nav-item" rounded="lg" />
         <v-list-item prepend-icon="mdi-message-text" title="Messages"
