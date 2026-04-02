@@ -83,6 +83,8 @@ onMounted(() => {
           :to="{ name: 'employeeAvailability' }" color="white" class="nav-item" rounded="lg" />
         <v-list-item prepend-icon="mdi-calendar-clock" title="Time Requests"
           :to="{ name: 'employeeTimeRequests' }" color="white" class="nav-item" rounded="lg" />
+        <v-list-item prepend-icon="mdi-swap-horizontal" title="Shift Swaps"
+          :to="{ name: 'employeeSwaps' }" color="white" class="nav-item" rounded="lg" />
         <v-list-item prepend-icon="mdi-checkbox-marked-circle-outline" title="My Tasks"
           :to="{ name: 'employeeTasks' }" color="white" class="nav-item" rounded="lg" />
         <v-list-item prepend-icon="mdi-message-text" title="Messages"
@@ -165,7 +167,7 @@ onMounted(() => {
               <v-divider class="my-2" />
               <v-list density="compact" class="pa-0">
                 <v-list-item prepend-icon="mdi-account" title="Profile" :to="{ name: 'employeeProfile' }" />
-                <!-- ✅ Settings removed from here — use sidebar -->
+                <!-- Settings removed from here — use sidebar -->
                 <v-list-item prepend-icon="mdi-logout" title="Sign Out" @click="logout" class="text-error" />
               </v-list>
             </v-card-text>

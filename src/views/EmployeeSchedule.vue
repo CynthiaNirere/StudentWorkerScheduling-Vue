@@ -194,7 +194,7 @@ const getShiftBorderColor = (shift) => ['#1976D2','#2e7d32','#f57c00','#ff6f00',
                   color="#7209B7"
                   class="mt-1 pa-0"
                   style="font-size:10px; height:auto;"
-                  @click="router.push({ name: 'employeeTimeRequests' })"
+                  @click="router.push({ name: 'employeeSwaps' })"
                 >
                   Request Swap
                 </v-btn>

@@ -25,6 +25,7 @@ import EmployeeTimeRequests from "./views/EmployeeTimeRequests.vue";
 import EmployeeTimeCards from "./views/EmployeeTimeCards.vue";
 import EmployeeTasks from "./views/EmployeeTasks.vue";
 import EmployeeMessages from "./views/EmployeeMessages.vue";
+import EmployeeSwaps from "./views/EmployeeSwaps.vue";
 import BusinessAreaSelect from "./views/BusinessAreaSelect.vue";
 import EmployerDashboard from "./views/EmployerDashboard.vue";
 import EmployerSchedule from "./views/EmployerSchedule.vue";
@@ -72,6 +73,7 @@ const router = createRouter({
     { path: "/employee/time-cards", name: "employeeTimeCards", component: EmployeeTimeCards, meta: { requiresAuth: true } },
     { path: "/employee/tasks", name: "employeeTasks", component: EmployeeTasks, meta: { requiresAuth: true } },
     { path: "/employee/messages", name: "employeeMessages", component: EmployeeMessages, meta: { requiresAuth: true } },
+    { path: "/employee/swaps", name: "employeeSwaps", component: EmployeeSwaps, meta: { requiresAuth: true } },
     { path: "/business-area-select", name: "businessAreaSelect", component: BusinessAreaSelect, meta: { requiresAuth: true } },
     { path: "/employer", redirect: "/employer/dashboard" },
     { path: "/employer/dashboard", name: "employerDashboard", component: EmployerDashboard, meta: { requiresAuth: true } },
