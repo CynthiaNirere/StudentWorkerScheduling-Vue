@@ -13,6 +13,8 @@ const selectedTab = ref('inbox');
 const showComposeDialog = ref(false);
 const composing = ref(false);
 const composeForm = ref({ subject: '', message: '' });
+const managerId = ref(null);
+const managerName = ref('your manager');
 
 const snackbar   = ref(false);
 const snackMsg   = ref('');
@@ -25,8 +27,23 @@ const unreadCount = computed(() => inbox.value.filter(m => !m.is_read).length);
 // ── LIFECYCLE ─────────────────────────────────────────────────────────────
 onMounted(async () => {
   user.value = Utils.getStore('user');
-  await loadMessages();
+  await Promise.all([loadMessages(), loadManager()]);
 });
+
+const loadManager = async () => {
+  try {
+    const res = await EmployeeService.getAllEmployees();
+    const all = Array.isArray(res.data) ? res.data : [];
+    const currentUserId = user.value?.user_id || user.value?.userId;
+    const employer = all.find(u => u.role === 'employer' && (u.user_id || u.userId) !== currentUserId);
+    if (employer) {
+      managerId.value = employer.user_id || employer.userId;
+      managerName.value = `${employer.fName || employer.first_name || ''} ${employer.lName || employer.last_name || ''}`.trim() || 'your manager';
+    }
+  } catch (err) {
+    console.error('Error loading manager:', err);
+  }
+};
 
 const loadMessages = async () => {
   loading.value = true;
@@ -74,11 +91,16 @@ const sendMessage = async () => {
   }
   composing.value = true;
   try {
+    if (!managerId.value) {
+      showSnackbar('Could not find your manager. Please try again.', 'error');
+      composing.value = false;
+      return;
+    }
     await EmployeeService.sendMessage({
       subject: composeForm.value.subject || 'Message',
       message: composeForm.value.message,
       messageType: 'direct',
-      // recipientId intentionally left null — goes to employer/manager
+      recipientId: managerId.value,
     });
     showSnackbar('Message sent!', 'success');
     showComposeDialog.value = false;
@@ -191,7 +213,7 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
         <v-divider />
         <v-card-text class="pa-5">
           <v-alert type="info" variant="tonal" density="compact" color="#4361EE" class="mb-4">
-            Your message will be sent to your manager.
+            Your message will be sent to {{ managerName }}.
           </v-alert>
           <v-text-field
             v-model="composeForm.subject"
