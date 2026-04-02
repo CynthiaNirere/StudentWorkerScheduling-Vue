@@ -26,6 +26,7 @@ import EmployeeTimeCards from "./views/EmployeeTimeCards.vue";
 import EmployeeTasks from "./views/EmployeeTasks.vue";
 import EmployeeMessages from "./views/EmployeeMessages.vue";
 import EmployeeSwaps from "./views/EmployeeSwaps.vue";
+import EmployeeHub from "./views/EmployeeHub.vue";
 import BusinessAreaSelect from "./views/BusinessAreaSelect.vue";
 import EmployerDashboard from "./views/EmployerDashboard.vue";
 import EmployerSchedule from "./views/EmployerSchedule.vue";
@@ -64,6 +65,7 @@ const router = createRouter({
     { path: "/profile", name: "profile", component: Profile, meta: { requiresAuth: true } },
     { path: "/admin", name: "adminViewDashboard", component: AdminViewDashboard, meta: { requiresAuth: true, requiresAdmin: true } },
     { path: "/employee", redirect: "/employee/dashboard" },
+    { path: "/employee/hub", name: "employeeHub", component: EmployeeHub, meta: { requiresAuth: true } },
     { path: "/employee/dashboard", name: "employeeDashboard", component: EmployeeDashboard, meta: { requiresAuth: true } },
     { path: "/employee/availability", name: "employeeAvailability", component: EmployeeAvailability, meta: { requiresAuth: true } },
     { path: "/employee/schedule", name: "employeeSchedule", component: EmployeeSchedule, meta: { requiresAuth: true } },
