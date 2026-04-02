@@ -165,7 +165,7 @@ onMounted(() => {
               <v-divider class="my-2" />
               <v-list density="compact" class="pa-0">
                 <v-list-item prepend-icon="mdi-account" title="Profile" :to="{ name: 'employeeProfile' }" />
-                <!-- ✅ Settings removed from here — use sidebar -->
+                <!-- Settings removed from here — use sidebar -->
                 <v-list-item prepend-icon="mdi-logout" title="Sign Out" @click="logout" class="text-error" />
               </v-list>
             </v-card-text>
