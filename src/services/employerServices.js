@@ -1,7 +1,7 @@
 import apiClient from "./services.js";
 import Utils from "../config/utils.js";
 
-// ✅ SIMPLIFIED: services.js interceptor handles auth headers
+// services.js interceptor handles auth headers
 // This only adds demo header for guest mode
 const addDemoHeader = (config = {}) => {
   const isGuest = localStorage.getItem('isGuest') === 'true';
