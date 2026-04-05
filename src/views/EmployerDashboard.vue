@@ -15,59 +15,6 @@ const pendingSwaps = ref([]);
 const pendingTimeOff = ref([]);
 const employees = ref([]);
 
-const criticalAlerts = computed(() => {
-  const alerts = [];
-  if (schedulePublished.value) {
-    weekDays.value.forEach(day => {
-      if (day.shifts.length === 0 && !day.isFuture) {
-        alerts.push({
-          id: `no-shifts-${day.short}`,
-          type: 'error',
-          icon: 'mdi-alert-circle',
-          title: 'No Coverage',
-          message: `${day.full} (${day.monthShort} ${day.dateNum}) has no scheduled shifts`,
-          action: 'Add Shifts',
-          route: { name: 'employerSchedule' }
-        });
-      }
-    });
-  }
-  if (!schedulePublished.value && weeklySchedule.value.length > 0) {
-    alerts.push({
-      id: 'unpublished-schedule',
-      type: 'warning',
-      icon: 'mdi-calendar-alert',
-      title: 'Schedule Not Published',
-      message: "This week's schedule is still in draft. Publish it so employees can see their shifts.",
-      action: 'Publish Now',
-      route: { name: 'employerSchedule' }
-    });
-  }
-  if (pendingSwaps.value.length > 0) {
-    alerts.push({
-      id: 'pending-swaps',
-      type: 'info',
-      icon: 'mdi-swap-horizontal',
-      title: 'Shift Cover Requests',
-      message: `${pendingSwaps.value.length} shift cover request${pendingSwaps.value.length > 1 ? 's' : ''} awaiting review`,
-      action: 'Review',
-      route: { name: 'employerSwaps' }
-    });
-  }
-  if (pendingTimeOff.value.length > 0) {
-    alerts.push({
-      id: 'pending-timeoff',
-      type: 'info',
-      icon: 'mdi-calendar-remove',
-      title: 'Time Off Requests',
-      message: `${pendingTimeOff.value.length} time off request${pendingTimeOff.value.length > 1 ? 's' : ''} pending approval`,
-      action: 'Review',
-      route: { name: 'employerTimeOff' }
-    });
-  }
-  return alerts;
-});
-
 const weekDays = computed(() => {
   const days = [
     { short: 'SUN', full: 'Sunday' }, { short: 'MON', full: 'Monday' },
@@ -139,7 +86,6 @@ const loadEmployees = async () => {
   } catch (err) { console.error('Error loading employees:', err); }
 };
 
-const navigateToAlert = (alert) => { if (alert.route) router.push(alert.route); };
 const manageSchedule = () => router.push({ name: 'employerSchedule' });
 const addEmployee = () => router.push({ name: 'employerEmployees' });
 const viewTemplates = () => router.push({ name: 'employerTemplates' });
@@ -160,7 +106,6 @@ const formatShiftTime = (minutes) => {
   return `${hour}:${String(m).padStart(2, '0')}${ampm}`;
 };
 
-const getAlertColor = (type) => ({ error: '#d32f2f', warning: '#f57c00', info: '#4361EE', success: '#2e7d32' }[type] || '#4361EE');
 </script>
 
 <template>
@@ -177,41 +122,6 @@ const getAlertColor = (type) => ({ error: '#d32f2f', warning: '#f57c00', info: '
       </div>
 
       <template v-else>
-        <!-- Critical Alerts -->
-        <v-card v-if="criticalAlerts.length > 0" variant="outlined" rounded="lg" class="mb-6 alert-card">
-          <v-card-title class="pa-4 d-flex align-center">
-            <v-icon color="#d32f2f" class="mr-2">mdi-alert</v-icon>
-            <span class="text-h6 font-weight-bold">Needs Attention</span>
-            <v-spacer />
-            <v-chip size="small" color="error" variant="flat">{{ criticalAlerts.length }}</v-chip>
-          </v-card-title>
-          <v-divider />
-          <v-card-text class="pa-0">
-            <v-list density="compact">
-              <v-list-item
-                v-for="alert in criticalAlerts"
-                :key="alert.id"
-                class="alert-item"
-                @click="navigateToAlert(alert)"
-              >
-                <template #prepend>
-                  <v-avatar :color="getAlertColor(alert.type)" size="40">
-                    <v-icon color="white">{{ alert.icon }}</v-icon>
-                  </v-avatar>
-                </template>
-                <v-list-item-title class="font-weight-bold">{{ alert.title }}</v-list-item-title>
-                <v-list-item-subtitle>{{ alert.message }}</v-list-item-subtitle>
-                <template #append>
-                  <v-btn size="small" :color="getAlertColor(alert.type)" variant="tonal">
-                    {{ alert.action }}
-                    <v-icon end size="small">mdi-arrow-right</v-icon>
-                  </v-btn>
-                </template>
-              </v-list-item>
-            </v-list>
-          </v-card-text>
-        </v-card>
-
         <!-- Quick Actions -->
         <v-row class="mb-6">
           <v-col cols="12" sm="4">
@@ -278,9 +188,6 @@ const getAlertColor = (type) => ({ error: '#d32f2f', warning: '#f57c00', info: '
 <style scoped>
 .navy-text { color: #12086F !important; }
 .navy-card { border-color: #e0e0e0; box-shadow: 0 1px 3px rgba(18, 8, 111, 0.05); }
-.alert-card { border-left: 4px solid #d32f2f; }
-.alert-item { cursor: pointer; transition: background 0.2s; }
-.alert-item:hover { background: #f5f5f5; }
 .schedule-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; background: #f5f5f5; padding: 8px; border-radius: 8px; }
 .schedule-column { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.2s; }
 .schedule-column:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
