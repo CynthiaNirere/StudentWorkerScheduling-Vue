@@ -20,6 +20,15 @@ const rail         = ref(true);
 const showNotifications = ref(false);
 const pendingSwaps    = ref([]);
 const pendingTimeOff  = ref([]);
+const unreadMsgCount  = ref(0);
+
+const loadUnreadMsgCount = async () => {
+  if (props.isGuest) return;
+  try {
+    const res = await EmployerService.getUnreadMessageCount();
+    unreadMsgCount.value = res.data?.unreadCount || 0;
+  } catch (e) { /* silent */ }
+};
 
 const sidebarGradient = computed(() =>
   theme.global.name.value === 'dark'
@@ -94,12 +103,11 @@ onMounted(async () => {
     } catch { businessArea.value = 'My Workplace'; }
   }
 
-  // ✅ Load saved theme (respects both employee and employer preference keys)
   const savedTheme = localStorage.getItem('themePreference') || localStorage.getItem('theme');
   if (savedTheme) theme.global.name.value = savedTheme;
 
-  await loadPendingRequests();
-  refreshInterval = setInterval(loadPendingRequests, 30000);
+  await Promise.all([loadPendingRequests(), loadUnreadMsgCount()]);
+  refreshInterval = setInterval(() => { loadPendingRequests(); loadUnreadMsgCount(); }, 15000);
   window.addEventListener('notifications-updated', loadPendingRequests);
 });
 
@@ -187,7 +195,11 @@ const logout = () => {
           color="white" class="nav-item" rounded="lg" />
         <v-list-item prepend-icon="mdi-message-text" title="Messages"
           :to="isGuest ? { name: 'guestMessages' } : { name: 'employerMessages' }"
-          color="white" class="nav-item" rounded="lg" />
+          color="white" class="nav-item" rounded="lg">
+          <template #append v-if="unreadMsgCount > 0">
+            <v-badge :content="unreadMsgCount" color="#f57c00" inline />
+          </template>
+        </v-list-item>
         <v-list-item prepend-icon="mdi-checkbox-marked-circle-outline" title="Tasks"
           :to="isGuest ? { name: 'guestTasks' } : { name: 'employerTasks' }"
           color="white" class="nav-item" rounded="lg" />
@@ -244,7 +256,7 @@ const logout = () => {
           </v-card>
         </v-menu>
 
-        <!-- Account menu — ✅ Settings REMOVED, only Profile + Sign Out -->
+        <!-- Account menu -->
         <v-menu location="bottom end">
           <template #activator="{ props: menuProps }">
             <v-btn v-bind="menuProps" icon variant="text">
@@ -266,7 +278,6 @@ const logout = () => {
               <v-divider class="my-2" />
               <v-list density="compact" class="pa-0">
                 <v-list-item v-if="!isGuest" prepend-icon="mdi-account" title="Profile" :to="{ name: 'employerProfile' }" />
-                <!-- ✅ Settings removed — use sidebar -->
                 <v-list-item
                   prepend-icon="mdi-logout"
                   :title="isGuest ? 'Exit Guest Mode' : 'Sign Out'"

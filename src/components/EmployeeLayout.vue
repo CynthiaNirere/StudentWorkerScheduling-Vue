@@ -1,9 +1,10 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTheme } from 'vuetify';
 import Utils from '../config/utils.js';
 import { useNotifications } from '../composables/useNotifications.js';
+import EmployeeService from '../services/employeeServices.js';
 
 const router = useRouter();
 const theme  = useTheme();
@@ -12,6 +13,16 @@ const rail   = ref(true);
 const showNotifications = ref(false);
 
 const { notifications, unreadCount, dismissNotification, handleNotificationAction } = useNotifications();
+
+const unreadMsgCount = ref(0);
+let msgPollInterval = null;
+
+const loadUnreadMsgCount = async () => {
+  try {
+    const res = await EmployeeService.getUnreadMessageCount();
+    unreadMsgCount.value = res.data?.unreadCount || 0;
+  } catch (e) { /* silent */ }
+};
 
 const sidebarGradient = computed(() =>
   theme.global.name.value === 'dark'
@@ -45,10 +56,16 @@ const goToNotificationPage = (notif) => {
   showNotifications.value = false;
 };
 
-onMounted(() => {
+onMounted(async () => {
   user.value = Utils.getStore('user');
   const savedTheme = localStorage.getItem('themePreference') || localStorage.getItem('theme');
   if (savedTheme) theme.global.name.value = savedTheme;
+  await loadUnreadMsgCount();
+  msgPollInterval = setInterval(loadUnreadMsgCount, 15000);
+});
+
+onUnmounted(() => {
+  if (msgPollInterval) clearInterval(msgPollInterval);
 });
 </script>
 
@@ -88,7 +105,11 @@ onMounted(() => {
         <v-list-item prepend-icon="mdi-checkbox-marked-circle-outline" title="My Tasks"
           :to="{ name: 'employeeTasks' }" color="white" class="nav-item" rounded="lg" />
         <v-list-item prepend-icon="mdi-message-text" title="Messages"
-          :to="{ name: 'employeeMessages' }" color="white" class="nav-item" rounded="lg" />
+          :to="{ name: 'employeeMessages' }" color="white" class="nav-item" rounded="lg">
+          <template #append v-if="unreadMsgCount > 0">
+            <v-badge :content="unreadMsgCount" color="#f57c00" inline />
+          </template>
+        </v-list-item>
         <v-list-item prepend-icon="mdi-credit-card-clock-outline" title="Time Cards"
           :to="{ name: 'employeeTimeCards' }" color="white" class="nav-item" rounded="lg" />
         <v-list-item prepend-icon="mdi-account-circle-outline" title="Profile"
@@ -146,7 +167,7 @@ onMounted(() => {
           </v-card>
         </v-menu>
 
-        <!-- Account menu — ✅ Settings REMOVED, only Profile + Sign Out -->
+        <!-- Account menu -->
         <v-menu location="bottom end">
           <template #activator="{ props: menuProps }">
             <v-btn v-bind="menuProps" icon variant="text">
@@ -167,7 +188,6 @@ onMounted(() => {
               <v-divider class="my-2" />
               <v-list density="compact" class="pa-0">
                 <v-list-item prepend-icon="mdi-account" title="Profile" :to="{ name: 'employeeProfile' }" />
-                <!-- Settings removed from here — use sidebar -->
                 <v-list-item prepend-icon="mdi-logout" title="Sign Out" @click="logout" class="text-error" />
               </v-list>
             </v-card-text>
