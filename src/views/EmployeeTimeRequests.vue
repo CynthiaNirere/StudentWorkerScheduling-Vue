@@ -123,8 +123,13 @@ const submitRequest = async () => {
         showSnackbar('Start and end date are required', 'error');
         return;
       }
+      const today = new Date(); today.setHours(0, 0, 0, 0);
       const start = new Date(timeOffForm.value.startDate).getTime();
       const end   = new Date(timeOffForm.value.endDate).getTime();
+      if (start < today.getTime()) {
+        showSnackbar('Start date cannot be in the past', 'error');
+        return;
+      }
       await EmployeeService.createTimeOffRequest({ startDate: start, endDate: end, reason: timeOffForm.value.reason || null });
       showSnackbar('Time off request submitted!', 'success');
     } else {
@@ -189,27 +194,11 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
       <div class="d-flex align-center justify-space-between mb-5">
         <div>
           <h1 class="text-h4 font-weight-bold navy-text">Time Requests</h1>
-          <p class="text-body-2 text-grey">Manage your time off and shift swap requests</p>
+          <p class="text-body-2 text-grey">Manage your time off requests</p>
         </div>
-        <!-- ✅ Split button dropdown to choose request type -->
-        <v-menu location="bottom end">
-          <template #activator="{ props }">
-            <v-btn color="#12086F" variant="flat" prepend-icon="mdi-plus" v-bind="props">
-              New Request
-              <v-icon end>mdi-chevron-down</v-icon>
-            </v-btn>
-          </template>
-          <v-list density="compact">
-            <v-list-item prepend-icon="mdi-calendar-remove" @click="openDialog('timeoff')">
-              <v-list-item-title>Request Time Off</v-list-item-title>
-              <v-list-item-subtitle>Days off, vacation, sick leave</v-list-item-subtitle>
-            </v-list-item>
-            <v-list-item prepend-icon="mdi-swap-horizontal" @click="openDialog('swap')">
-              <v-list-item-title>Request Shift Swap</v-list-item-title>
-              <v-list-item-subtitle>Trade or drop a shift</v-list-item-subtitle>
-            </v-list-item>
-          </v-list>
-        </v-menu>
+        <v-btn color="#12086F" variant="flat" prepend-icon="mdi-plus" @click="openDialog('timeoff')">
+          New Request
+        </v-btn>
       </div>
 
       <!-- Summary chips -->
@@ -227,8 +216,6 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
         <v-tabs v-model="selectedTab" color="#12086F">
           <v-tab value="all">All<v-chip v-if="allRequests.length" size="x-small" color="#12086F" variant="tonal" class="ml-2">{{ allRequests.length }}</v-chip></v-tab>
           <v-tab value="pending">Pending<v-chip v-if="pendingCount" size="x-small" color="#f57c00" variant="tonal" class="ml-2">{{ pendingCount }}</v-chip></v-tab>
-          <v-tab value="timeoff">Time Off</v-tab>
-          <v-tab value="swap">Shift Swaps</v-tab>
         </v-tabs>
       </v-card>
 
@@ -291,17 +278,7 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
         </v-card-title>
         <v-divider />
 
-        <!-- Type selector inside dialog -->
         <v-card-text class="pa-5">
-          <v-btn-toggle v-model="requestType" color="#12086F" variant="outlined" mandatory divided class="mb-5" style="width:100%">
-            <v-btn value="timeoff" style="flex:1">
-              <v-icon start size="small">mdi-calendar-remove</v-icon>Time Off
-            </v-btn>
-            <v-btn value="swap" style="flex:1">
-              <v-icon start size="small">mdi-swap-horizontal</v-icon>Shift Swap
-            </v-btn>
-          </v-btn-toggle>
-
           <!-- Time Off form -->
           <template v-if="requestType === 'timeoff'">
             <v-text-field v-model="timeOffForm.startDate" label="Start Date *" type="date" variant="outlined" density="compact" class="mb-3" color="#12086F" />
