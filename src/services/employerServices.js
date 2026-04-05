@@ -300,24 +300,16 @@ export default {
     return apiClient.post("/messages/broadcast", messageData, addDemoHeader());
   },
 
-  getInbox() {
-    return apiClient.get("/messages/inbox", addDemoHeader());
-  },
-
-  getSentMessages() {
-    return apiClient.get("/messages/sent", addDemoHeader());
+  getConversations() {
+    return apiClient.get("/messages/conversations", addDemoHeader());
   },
 
   getUnreadMessageCount() {
     return apiClient.get("/messages/unread-count", addDemoHeader());
   },
 
-  markMessageAsRead(id) {
-    return apiClient.put(`/messages/${id}/read`, {}, addDemoHeader());
-  },
-
-  deleteMessage(id) {
-    return apiClient.delete(`/messages/${id}`, addDemoHeader());
+  getThread(messageId) {
+    return apiClient.get(`/messages/${messageId}/thread`, addDemoHeader());
   },
 
   getTaskCompletionHistory() {
