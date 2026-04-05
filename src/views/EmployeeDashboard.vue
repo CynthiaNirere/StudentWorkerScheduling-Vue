@@ -21,11 +21,35 @@ const currentTime = ref('');
 const currentDate = ref('');
 const activeClockRecord = ref(null);
 const clockLoading = ref(false);
+const clockedInAt = ref(null);
+const isWorkDevice = ref(false);
+const hoursRemaining = ref('');
+const minutesRemaining = ref(0);
 
 const updateTime = () => {
   const now = new Date();
   currentTime.value = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
   currentDate.value = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  if (activeClockRecord.value && todayDay.value?.shifts?.length) {
+    const shift = todayDay.value.shifts[0];
+    const shiftEndMinutes = shift.endTime || shift.end_time;
+    if (shiftEndMinutes != null) {
+      const shiftDate = new Date(Number(shift.shiftTime || shift.shift_time));
+      const endMs = new Date(shiftDate.getFullYear(), shiftDate.getMonth(), shiftDate.getDate(),
+        Math.floor(shiftEndMinutes / 60), shiftEndMinutes % 60, 0).getTime();
+      const diffMs = endMs - now.getTime();
+      if (diffMs > 0) {
+        const h = Math.floor(diffMs / 3600000);
+        const m = Math.floor((diffMs % 3600000) / 60000);
+        hoursRemaining.value = h > 0 ? `${h}h ${m}m` : `${m}m`;
+        minutesRemaining.value = Math.floor(diffMs / 60000);
+      } else {
+        hoursRemaining.value = '0m';
+        minutesRemaining.value = 0;
+      }
+    }
+  }
 };
 
 // ── WEEK NAVIGATION ───────────────────────────────────────────────────────
@@ -99,6 +123,7 @@ const nextShift = computed(() => {
 // ── DATA LOADING ──────────────────────────────────────────────────────────
 onMounted(async () => {
   user.value = Utils.getStore('user');
+  isWorkDevice.value = localStorage.getItem('isWorkDevice') === 'true';
   updateTime();
   setInterval(updateTime, 1000);
   await Promise.all([loadShifts(), loadTasks(), loadRequests()]);
@@ -155,6 +180,7 @@ const handleClockIn = async () => {
     const shiftId = todayShifts[0].shift_id || todayShifts[0].id;
     const res = await EmployeeService.clockIn({ shiftId });
     activeClockRecord.value = res.data;
+    clockedInAt.value = new Date();
     snackMsg.value = 'Clocked in successfully!';
     snackColor.value = 'success';
     snackbar.value = true;
@@ -172,6 +198,8 @@ const handleClockOut = async () => {
     const id = activeClockRecord.value.id || activeClockRecord.value.clock_id;
     await EmployeeService.clockOut(id);
     activeClockRecord.value = null;
+    clockedInAt.value = null;
+    hoursRemaining.value = '';
     snackMsg.value = 'Clocked out successfully!';
     snackColor.value = 'success';
     snackbar.value = true;
@@ -247,19 +275,56 @@ const snackColor = ref('success');
                 </div>
 
                 <!-- Clock in/out -->
+                <v-alert
+                  v-if="!isWorkDevice"
+                  type="warning"
+                  variant="tonal"
+                  density="compact"
+                  class="mb-3"
+                >
+                  <v-icon start size="16">mdi-laptop-off</v-icon>
+                  Clock-in is only available on a registered work device.
+                </v-alert>
                 <v-btn
                   v-if="!activeClockRecord"
                   block color="#12086F" variant="flat" size="large"
                   :loading="clockLoading"
+                  :disabled="!isWorkDevice"
                   @click="handleClockIn"
                 >
                   <v-icon start>mdi-login</v-icon>Clock In
                 </v-btn>
                 <div v-else>
-                  <v-alert type="success" variant="tonal" density="compact" class="mb-3">
-                    <v-icon start>mdi-clock-fast</v-icon>
-                    Shift in progress
-                  </v-alert>
+                  <!-- Clocked-in status card -->
+                  <div class="clocked-in-card pa-4 rounded-lg mb-3">
+                    <div class="d-flex align-center ga-2 mb-3">
+                      <v-icon color="#2e7d32" size="20">mdi-check-circle</v-icon>
+                      <span class="text-body-2 font-weight-bold" style="color:#2e7d32;">You are clocked in</span>
+                    </div>
+                    <div v-if="clockedInAt" class="info-row mb-2">
+                      <span class="text-caption text-grey">Clocked in at</span>
+                      <span class="text-body-2 font-weight-bold navy-text">
+                        {{ clockedInAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) }}
+                      </span>
+                    </div>
+                    <div v-if="todayDay.shifts.length" class="info-row mb-2">
+                      <span class="text-caption text-grey">Clock out at</span>
+                      <span class="text-body-2 font-weight-bold navy-text">
+                        {{ formatTime(todayDay.shifts[0].endTime || todayDay.shifts[0].end_time) }}
+                      </span>
+                    </div>
+                    <div v-if="hoursRemaining" class="info-row">
+                      <span class="text-caption text-grey">Time remaining</span>
+                      <v-chip
+                        size="small"
+                        :color="minutesRemaining <= 30 ? '#f57c00' : '#12086F'"
+                        variant="tonal"
+                        class="font-weight-bold"
+                      >
+                        {{ hoursRemaining }}
+                      </v-chip>
+                    </div>
+                  </div>
                   <v-btn block color="error" variant="flat" :loading="clockLoading" @click="handleClockOut">
                     <v-icon start>mdi-logout</v-icon>Clock Out
                   </v-btn>
@@ -469,4 +534,14 @@ const snackColor = ref('success');
 .request-row { background: #fafafa; border: 1px solid #e0e0e0; cursor: pointer; transition: all 0.15s; }
 .request-row:hover { background: #f0f4ff; border-color: #12086F; }
 .cursor-pointer { cursor: pointer; }
+
+.clocked-in-card {
+  background: #f1faf3;
+  border: 1px solid #a5d6a7;
+}
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 </style>
