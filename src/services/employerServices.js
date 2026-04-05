@@ -296,24 +296,16 @@ export default {
     return apiClient.post("/messages/broadcast", messageData, addDemoHeader());
   },
 
-  getInbox() {
-    return apiClient.get("/messages/inbox", addDemoHeader());
-  },
-
-  getSentMessages() {
-    return apiClient.get("/messages/sent", addDemoHeader());
+  getConversations() {
+    return apiClient.get("/messages/conversations", addDemoHeader());
   },
 
   getUnreadMessageCount() {
     return apiClient.get("/messages/unread-count", addDemoHeader());
   },
 
-  markMessageAsRead(id) {
-    return apiClient.put(`/messages/${id}/read`, {}, addDemoHeader());
-  },
-
-  deleteMessage(id) {
-    return apiClient.delete(`/messages/${id}`, addDemoHeader());
+  getThread(messageId) {
+    return apiClient.get(`/messages/${messageId}/thread`, addDemoHeader());
   },
 
   getTaskCompletionHistory() {
@@ -337,6 +329,11 @@ export default {
   },
 
   getAllLocations() {
+    return apiClient.get("/business-areas", addDemoHeader());
+  },
+
+  // ✅ NEW: Alias for business area filtering (used by EmployerEmployees.vue)
+  getBusinessAreas() {
     return apiClient.get("/business-areas", addDemoHeader());
   },
 
@@ -376,12 +373,27 @@ export default {
     return apiClient.delete(`/job-roles/${id}`, addDemoHeader());
   },
 
+ // ✅ PATCH: Replace the clock record section at the bottom of employerServices.js
+// Find these three lines:
+//   getAllClockRecords()
+//   approveClockRecord()
+// And replace the entire block with this:
+
   getAllClockRecords() {
     return apiClient.get("/clock-records", addDemoHeader());
   },
 
   approveClockRecord(id) {
     return apiClient.put(`/clock-records/${id}/approve`, {}, addDemoHeader());
+  },
+
+  rejectClockRecord(id, reason = '') {
+    return apiClient.put(`/clock-records/${id}/reject`, { reason }, addDemoHeader());
+  },
+
+  modifyClockRecord(id, data) {
+    // data: { clockInTime, clockOutTime, notes }
+    return apiClient.put(`/clock-records/${id}/modify`, data, addDemoHeader());
   },
 
 };

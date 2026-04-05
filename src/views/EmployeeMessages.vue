@@ -1,8 +1,8 @@
 <script setup>
-import { ref, computed, onMounted, nextTick } from "vue";
-import Utils from "../config/utils";
-import EmployerService from "../services/employerServices.js";
-import EmployerLayout from '../components/EmployerLayout.vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
+import Utils from '../config/utils.js';
+import EmployeeService from '../services/employeeServices.js';
+import EmployeeLayout from '../components/EmployeeLayout.vue';
 
 const user = ref(null);
 const loading = ref(false);
@@ -12,47 +12,50 @@ const threadMessages = ref([]);
 const threadLoading = ref(false);
 const replyText = ref('');
 const replying = ref(false);
-const employees = ref([]);
 
 const showComposeDialog = ref(false);
-const showBroadcastDialog = ref(false);
 const composing = ref(false);
+const composeForm = ref({ subject: '', message: '' });
+const sendTo = ref(null);
+const managerId = ref(null);
+const managerName = ref('Manager');
+const employeeIds = ref([]);
 
 const snackbar = ref(false);
-const snackbarMessage = ref("");
-const snackbarColor = ref("success");
-
-const newMessage = ref({ recipientId: [], subject: "", message: "", linkUrl: "" });
-const broadcastMessage = ref({ subject: "", message: "", linkUrl: "" });
+const snackMsg = ref('');
+const snackColor = ref('success');
 
 const currentUserId = computed(() => user.value?.user_id || user.value?.userId);
 
 onMounted(async () => {
-  user.value = Utils.getStore("user");
-  await Promise.all([loadEmployees(), loadConversations()]);
+  user.value = Utils.getStore('user');
+  await Promise.all([loadConversations(), loadUsers()]);
 });
 
-const loadEmployees = async () => {
+const loadUsers = async () => {
   try {
-    const res = await EmployerService.getAllEmployees();
+    const res = await EmployeeService.getAllEmployees();
     const all = Array.isArray(res.data) ? res.data : [];
-    employees.value = all.filter(u => {
-      const empId = u.user_id || u.userId;
-      return u.role === 'employee' && empId !== currentUserId.value;
-    });
+    const others = all.filter(u => (u.user_id || u.userId) !== currentUserId.value);
+    const mgr = others.find(u => u.role === 'employer');
+    if (mgr) {
+      managerId.value = mgr.user_id || mgr.userId;
+      managerName.value = `${mgr.fName || mgr.first_name || ''} ${mgr.lName || mgr.last_name || ''}`.trim() || 'Manager';
+    }
+    employeeIds.value = others.filter(u => u.role === 'employee').map(u => u.user_id || u.userId);
   } catch (err) {
-    console.error("Error loading employees:", err);
+    console.error('Error loading users:', err);
   }
 };
 
 const loadConversations = async () => {
   loading.value = true;
   try {
-    const res = await EmployerService.getConversations();
+    const res = await EmployeeService.getConversations();
     conversations.value = Array.isArray(res.data) ? res.data : [];
   } catch (err) {
-    console.error("Error loading conversations:", err);
-    showSnackbar("Error loading conversations", "error");
+    console.error('Error loading conversations:', err);
+    showSnackbar('Error loading conversations', 'error');
   } finally {
     loading.value = false;
   }
@@ -64,7 +67,7 @@ const openConversation = async (convo) => {
   threadMessages.value = [];
   replyText.value = '';
   try {
-    const res = await EmployerService.getThread(convo.thread_id);
+    const res = await EmployeeService.getThread(convo.thread_id);
     const original = res.data.original;
     const replies = Array.isArray(res.data.replies) ? res.data.replies : [];
     threadMessages.value = [original, ...replies];
@@ -87,34 +90,29 @@ const sendReply = async () => {
     let replyTo = null;
 
     if (original.message_type === 'broadcast') {
-      // Broadcast reply goes to ALL employees
-      const empIds = employees.value.map(e => e.user_id || e.userId);
-      if (empIds.length === 0) {
-        showSnackbar('No employees found', 'error');
-        replying.value = false;
-        return;
-      }
-      replyTo = empIds;
+      // Employee replies to broadcast sender (the manager)
+      replyTo = original.sender_id;
     } else {
       replyTo = original.sender_id === currentUserId.value
         ? original.recipient_id
         : original.sender_id;
-      if (!replyTo) replyTo = activeConvo.value.other_person?.id;
-      if (!replyTo || replyTo === currentUserId.value) {
-        showSnackbar('Could not determine recipient', 'error');
-        replying.value = false;
-        return;
-      }
     }
-    await EmployerService.sendMessage({
+
+    if (!replyTo) replyTo = activeConvo.value.other_person?.id;
+    if (!replyTo || replyTo === currentUserId.value) {
+      showSnackbar('Could not determine recipient', 'error');
+      replying.value = false;
+      return;
+    }
+    await EmployeeService.sendMessage({
       recipientId: replyTo,
       subject: `Re: ${original.subject || 'No Subject'}`,
       message: replyText.value,
-      messageType: original.message_type === 'broadcast' ? 'broadcast' : 'direct',
+      messageType: 'direct',
       parentMessageId: activeConvo.value.thread_id,
     });
     replyText.value = '';
-    const res = await EmployerService.getThread(activeConvo.value.thread_id);
+    const res = await EmployeeService.getThread(activeConvo.value.thread_id);
     const orig = res.data.original;
     const replies = Array.isArray(res.data.replies) ? res.data.replies : [];
     threadMessages.value = [orig, ...replies];
@@ -129,51 +127,38 @@ const sendReply = async () => {
   }
 };
 
-const handleSendMessage = async () => {
-  if (!newMessage.value.message || newMessage.value.recipientId.length === 0) {
-    showSnackbar("Recipient and message are required", "error");
-    return;
-  }
-  composing.value = true;
-  try {
-    await EmployerService.sendMessage({
-      recipientId: newMessage.value.recipientId,
-      subject: newMessage.value.subject || "Message",
-      message: newMessage.value.message,
-      messageType: 'direct',
-      linkUrl: newMessage.value.linkUrl || null
-    });
-    showSnackbar("Message sent!", "success");
-    showComposeDialog.value = false;
-    newMessage.value = { recipientId: [], subject: "", message: "", linkUrl: "" };
-    await loadConversations();
-  } catch (err) {
-    console.error("Error sending message:", err);
-    showSnackbar("Error sending message", "error");
-  } finally {
-    composing.value = false;
-  }
+const openCompose = (target) => {
+  sendTo.value = target;
+  composeForm.value = { subject: '', message: '' };
+  showComposeDialog.value = true;
 };
 
-const handleBroadcast = async () => {
-  if (!broadcastMessage.value.message) {
-    showSnackbar("Message is required", "error");
+const sendMessage = async () => {
+  if (!composeForm.value.message.trim()) {
+    showSnackbar('Message is required', 'error');
     return;
   }
   composing.value = true;
   try {
-    await EmployerService.broadcastMessage({
-      subject: broadcastMessage.value.subject || "Announcement",
-      message: broadcastMessage.value.message,
-      linkUrl: broadcastMessage.value.linkUrl || null
+    const recipients = sendTo.value === 'manager' ? [managerId.value] : employeeIds.value;
+    if (!recipients || recipients.length === 0) {
+      showSnackbar('No recipients found', 'error');
+      composing.value = false;
+      return;
+    }
+    await EmployeeService.sendMessage({
+      subject: composeForm.value.subject || 'Message',
+      message: composeForm.value.message,
+      messageType: 'direct',
+      recipientId: recipients,
     });
-    showSnackbar("Broadcast sent to all employees!", "success");
-    showBroadcastDialog.value = false;
-    broadcastMessage.value = { subject: "", message: "", linkUrl: "" };
+    showSnackbar('Message sent!', 'success');
+    showComposeDialog.value = false;
+    composeForm.value = { subject: '', message: '' };
+    sendTo.value = null;
     await loadConversations();
   } catch (err) {
-    console.error("Error broadcasting message:", err);
-    showSnackbar("Error broadcasting message", "error");
+    showSnackbar(err.response?.data?.message || 'Error sending message', 'error');
   } finally {
     composing.value = false;
   }
@@ -187,7 +172,8 @@ const scrollToBottom = () => {
 const formatTime = (ts) => {
   if (!ts) return '';
   const d = new Date(Number(ts));
-  const diff = Date.now() - d.getTime();
+  const now = new Date();
+  const diff = now - d;
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return 'Just now';
   if (mins < 60) return `${mins}m ago`;
@@ -203,26 +189,32 @@ const formatChatTime = (ts) => {
   return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 };
 
-const showSnackbar = (message, color = "success") => {
-  snackbarMessage.value = message;
-  snackbarColor.value = color;
-  snackbar.value = true;
-};
+const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackColor.value = color; snackbar.value = true; };
 </script>
 
 <template>
-  <EmployerLayout>
+  <EmployeeLayout>
     <div class="messaging-container">
       <!-- Conversation List (Left Panel) -->
       <div class="convo-list">
         <div class="convo-header pa-4">
-          <div class="d-flex align-center justify-space-between mb-2">
+          <div class="d-flex align-center justify-space-between">
             <h2 class="text-h6 font-weight-bold navy-text">Messages</h2>
-            <v-btn icon="mdi-plus" size="small" color="#12086F" variant="tonal" @click="showComposeDialog = true" />
+            <v-menu>
+              <template v-slot:activator="{ props }">
+                <v-btn icon="mdi-plus" size="small" color="#12086F" variant="tonal" v-bind="props" />
+              </template>
+              <v-list density="compact" nav>
+                <v-list-item prepend-icon="mdi-account-tie" @click="openCompose('manager')">
+                  <v-list-item-title>Message Manager</v-list-item-title>
+                  <template v-slot:append><v-chip size="x-small" color="#9C27B0" variant="tonal">Manager</v-chip></template>
+                </v-list-item>
+                <v-list-item prepend-icon="mdi-account-group" @click="openCompose('employees')">
+                  <v-list-item-title>Message All Employees</v-list-item-title>
+                </v-list-item>
+              </v-list>
+            </v-menu>
           </div>
-          <v-btn block size="small" color="#9C27B0" variant="tonal" prepend-icon="mdi-bullhorn" @click="showBroadcastDialog = true">
-            Broadcast
-          </v-btn>
         </div>
         <v-divider />
 
@@ -233,7 +225,7 @@ const showSnackbar = (message, color = "success") => {
         <div v-else-if="conversations.length === 0" class="text-center py-10 px-4">
           <v-icon size="48" color="grey-lighten-2" class="mb-2">mdi-message-outline</v-icon>
           <div class="text-body-2 text-grey">No conversations yet</div>
-          <v-btn size="small" color="#12086F" variant="tonal" class="mt-3" @click="showComposeDialog = true">
+          <v-btn size="small" color="#12086F" variant="tonal" class="mt-3" @click="openCompose('manager')">
             Start a conversation
           </v-btn>
         </div>
@@ -250,14 +242,20 @@ const showSnackbar = (message, color = "success") => {
             @click="openConversation(convo)"
           >
             <div class="d-flex ga-3 align-start">
-              <v-avatar :color="convo.message_type === 'broadcast' ? '#9C27B0' : '#12086F'" size="40">
+              <v-avatar
+                :color="convo.message_type === 'broadcast' ? '#9C27B0' : '#12086F'"
+                size="40"
+              >
                 <span class="text-white text-body-2 font-weight-bold">{{ convo.other_person?.initials || '?' }}</span>
               </v-avatar>
               <div class="flex-grow-1 overflow-hidden">
                 <div class="d-flex justify-space-between align-center">
-                  <span class="text-body-2 font-weight-bold text-truncate" style="max-width: 140px;">
-                    {{ convo.other_person?.name || 'Unknown' }}
-                  </span>
+                  <div class="d-flex align-center ga-1" style="min-width: 0;">
+                    <span class="text-body-2 font-weight-bold text-truncate" style="max-width: 120px;">
+                      {{ convo.other_person?.name || 'Unknown' }}
+                    </span>
+                    <v-chip v-if="convo.other_person?.role === 'employer'" size="x-small" color="#9C27B0" variant="tonal" class="flex-shrink-0">Manager</v-chip>
+                  </div>
                   <span class="text-caption text-grey flex-shrink-0">{{ formatTime(convo.last_message_time) }}</span>
                 </div>
                 <div class="text-caption font-weight-medium text-grey-darken-1 mb-1">{{ convo.subject || 'No Subject' }}</div>
@@ -265,7 +263,12 @@ const showSnackbar = (message, color = "success") => {
                   <span class="text-caption text-grey text-truncate" style="max-width: 160px;">
                     {{ convo.last_message }}
                   </span>
-                  <v-badge v-if="convo.unread_count > 0" :content="convo.unread_count" color="#f57c00" inline />
+                  <v-badge
+                    v-if="convo.unread_count > 0"
+                    :content="convo.unread_count"
+                    color="#f57c00"
+                    inline
+                  />
                 </div>
               </div>
             </div>
@@ -290,7 +293,10 @@ const showSnackbar = (message, color = "success") => {
               <span class="text-white text-body-2 font-weight-bold">{{ activeConvo.other_person?.initials || '?' }}</span>
             </v-avatar>
             <div>
-              <div class="text-body-1 font-weight-bold navy-text">{{ activeConvo.other_person?.name || 'Unknown' }}</div>
+              <div class="d-flex align-center ga-2">
+                <span class="text-body-1 font-weight-bold navy-text">{{ activeConvo.other_person?.name || 'Unknown' }}</span>
+                <v-chip v-if="activeConvo.other_person?.role === 'employer'" size="x-small" color="#9C27B0" variant="tonal">Manager</v-chip>
+              </div>
               <div class="text-caption text-grey">{{ activeConvo.subject || 'Conversation' }}</div>
             </div>
             <v-spacer />
@@ -299,7 +305,7 @@ const showSnackbar = (message, color = "success") => {
           <v-divider />
 
           <!-- Chat Messages -->
-          <div class="chat-messages pa-4">
+          <div class="chat-messages pa-4" ref="chatContainer">
             <div v-if="threadLoading" class="text-center py-8">
               <v-progress-circular indeterminate color="#12086F" size="28" />
             </div>
@@ -352,69 +358,35 @@ const showSnackbar = (message, color = "success") => {
       </div>
     </div>
 
-    <!-- Compose Message Dialog -->
-    <v-dialog v-model="showComposeDialog" max-width="560">
+    <!-- Compose Dialog -->
+    <v-dialog v-model="showComposeDialog" max-width="480">
       <v-card rounded="lg">
         <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4 navy-text">
           <v-icon start>mdi-message-plus</v-icon>New Conversation
         </v-card-title>
         <v-divider />
         <v-card-text class="pa-5">
-          <v-select
-            v-model="newMessage.recipientId"
-            :items="employees"
-            :item-title="(e) => `${e.fName || e.first_name} ${e.lName || e.last_name}`"
-            :item-value="(e) => e.user_id || e.userId"
-            label="To *"
-            variant="outlined"
-            density="compact"
-            multiple
-            chips
-            closable-chips
-            class="mb-3"
-            color="#12086F"
-          />
-          <v-text-field v-model="newMessage.subject" label="Subject" variant="outlined" density="compact" class="mb-3" placeholder="Optional" color="#12086F" />
-          <v-textarea v-model="newMessage.message" label="Message *" variant="outlined" density="compact" rows="3" class="mb-3" color="#12086F" />
-          <v-text-field v-model="newMessage.linkUrl" label="Link (optional)" variant="outlined" density="compact" placeholder="https://..." color="#12086F" />
+          <v-alert variant="tonal" density="compact" class="mb-4" :color="sendTo === 'manager' ? '#9C27B0' : '#4361EE'">
+            <template v-slot:prepend>
+              <v-icon>{{ sendTo === 'manager' ? 'mdi-account-tie' : 'mdi-account-group' }}</v-icon>
+            </template>
+            <span v-if="sendTo === 'manager'">To: <strong>{{ managerName }}</strong> <v-chip size="x-small" color="#9C27B0" variant="tonal" class="ml-1">Manager</v-chip></span>
+            <span v-else>To: <strong>All Employees</strong></span>
+          </v-alert>
+          <v-text-field v-model="composeForm.subject" label="Subject (optional)" variant="outlined" density="compact" class="mb-3" color="#12086F" />
+          <v-textarea v-model="composeForm.message" label="Message *" variant="outlined" density="compact" rows="3" color="#12086F" autofocus />
         </v-card-text>
         <v-divider />
         <v-card-actions class="pa-4">
           <v-spacer />
           <v-btn variant="text" @click="showComposeDialog = false">Cancel</v-btn>
-          <v-btn color="#12086F" variant="flat" :loading="composing" @click="handleSendMessage">Send</v-btn>
+          <v-btn color="#12086F" variant="flat" :loading="composing" @click="sendMessage">Send</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
 
-    <!-- Broadcast Dialog -->
-    <v-dialog v-model="showBroadcastDialog" max-width="560">
-      <v-card rounded="lg">
-        <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4 navy-text">
-          <v-icon start>mdi-bullhorn</v-icon>Broadcast to All Employees
-        </v-card-title>
-        <v-divider />
-        <v-card-text class="pa-5">
-          <v-alert type="info" variant="tonal" density="compact" color="#9C27B0" class="mb-4">
-            This message will be sent to all {{ employees.length }} employees
-          </v-alert>
-          <v-text-field v-model="broadcastMessage.subject" label="Subject" variant="outlined" density="compact" class="mb-3" placeholder="Announcement" color="#9C27B0" />
-          <v-textarea v-model="broadcastMessage.message" label="Message *" variant="outlined" density="compact" rows="3" class="mb-3" color="#9C27B0" />
-          <v-text-field v-model="broadcastMessage.linkUrl" label="Link (optional)" variant="outlined" density="compact" placeholder="https://..." color="#9C27B0" />
-        </v-card-text>
-        <v-divider />
-        <v-card-actions class="pa-4">
-          <v-spacer />
-          <v-btn variant="text" @click="showBroadcastDialog = false">Cancel</v-btn>
-          <v-btn color="#9C27B0" variant="flat" :loading="composing" @click="handleBroadcast">Send Broadcast</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <v-snackbar v-model="snackbar" :color="snackbarColor" timeout="3000" location="bottom right">
-      {{ snackbarMessage }}
-    </v-snackbar>
-  </EmployerLayout>
+    <v-snackbar v-model="snackbar" :color="snackColor" timeout="3000" location="bottom right">{{ snackMsg }}</v-snackbar>
+  </EmployeeLayout>
 </template>
 
 <style scoped>
@@ -436,7 +408,9 @@ const showSnackbar = (message, color = "success") => {
   overflow: hidden;
 }
 
-.convo-header { background: white; }
+.convo-header {
+  background: white;
+}
 
 .convo-items {
   overflow-y: auto;
@@ -449,14 +423,18 @@ const showSnackbar = (message, color = "success") => {
   transition: background 0.15s;
 }
 
-.convo-item:hover { background: #f5f5ff; }
+.convo-item:hover {
+  background: #f5f5ff;
+}
 
 .convo-active {
   background: #ede7f6 !important;
   border-left: 3px solid #12086F;
 }
 
-.convo-unread { background: #fff8f0; }
+.convo-unread {
+  background: #fff8f0;
+}
 
 .chat-panel {
   flex: 1;
@@ -466,7 +444,9 @@ const showSnackbar = (message, color = "success") => {
   overflow: hidden;
 }
 
-.chat-header { background: white; }
+.chat-header {
+  background: white;
+}
 
 .chat-messages {
   flex: 1;
@@ -494,5 +474,7 @@ const showSnackbar = (message, color = "success") => {
   border-bottom-left-radius: 4px;
 }
 
-.chat-input { background: white; }
+.chat-input {
+  background: white;
+}
 </style>

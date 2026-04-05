@@ -54,7 +54,11 @@ const swapsWithDetails = computed(() => {
       shiftDate,
       shiftTime,
       requestingEmployee: swap.requestingUserName || "Unknown",
-      acceptingEmployee: swap.acceptingUserName || "Pending",
+      acceptingEmployee: swap.acceptingUserName
+        ? swap.acceptingUserName
+        : swap.status === 'rejected'
+          ? 'Rejected'
+          : 'Pending',
     };
   });
 });
@@ -160,6 +164,17 @@ const getStatusColor = (status) => {
   return colors[status] || '#9e9e9e';
 };
 
+const getStatusLabel = (status) => {
+  const labels = {
+    pending: 'Pending',
+    accepted: 'Awaiting Approval',
+    approved: 'Approved',
+    rejected: 'Rejected',
+    cancelled: 'Cancelled',
+  };
+  return labels[status] || status;
+};
+
 const formatShiftTime = (minutes) => {
   if (minutes === undefined || minutes === null) return "";
   const h = Math.floor(minutes / 60);
@@ -229,7 +244,7 @@ const showSnackbar = (message, color = "success") => {
                 size="small"
                 variant="tonal"
               >
-                {{ item.status }}
+                {{ getStatusLabel(item.status) }}
               </v-chip>
             </template>
 
@@ -241,24 +256,24 @@ const showSnackbar = (message, color = "success") => {
                 color="#4361EE"
                 @click="openDetailsDialog(item)"
               />
-              <template v-if="item.status === 'pending' || item.status === 'accepted'">
-                <v-btn
-                  icon="mdi-check"
-                  size="small"
-                  variant="plain"
-                  color="#2e7d32"
-                  @click="openApproveDialog(item)"
-                  :loading="processing"
-                />
-                <v-btn
-                  icon="mdi-close"
-                  size="small"
-                  variant="plain"
-                  color="#d32f2f"
-                  @click="openRejectDialog(item)"
-                  :loading="processing"
-                />
-              </template>
+              <v-btn
+                v-if="item.status === 'accepted'"
+                icon="mdi-check"
+                size="small"
+                variant="plain"
+                color="#2e7d32"
+                @click="openApproveDialog(item)"
+                :loading="processing"
+              />
+              <v-btn
+                v-if="item.status === 'pending' || item.status === 'accepted'"
+                icon="mdi-close"
+                size="small"
+                variant="plain"
+                color="#d32f2f"
+                @click="openRejectDialog(item)"
+                :loading="processing"
+              />
             </template>
 
             <template #no-data>
@@ -334,7 +349,7 @@ const showSnackbar = (message, color = "success") => {
           <div class="mb-3">
             <div class="text-caption text-grey">Status</div>
             <v-chip :color="getStatusColor(selectedSwap.status)" size="small" variant="tonal">
-              {{ selectedSwap.status }}
+              {{ getStatusLabel(selectedSwap.status) }}
             </v-chip>
           </div>
           <div class="mb-3">
@@ -346,24 +361,24 @@ const showSnackbar = (message, color = "success") => {
         </v-card-text>
         <v-divider />
         <v-card-actions class="pa-4">
-          <template v-if="selectedSwap.status === 'pending' || selectedSwap.status === 'accepted'">
-            <v-btn
-              variant="tonal"
-              color="#2e7d32"
-              @click="openApproveDialog(selectedSwap); showDetailsDialog = false"
-              :loading="processing"
-            >
-              Approve
-            </v-btn>
-            <v-btn
-              variant="tonal"
-              color="#d32f2f"
-              @click="openRejectDialog(selectedSwap); showDetailsDialog = false"
-              :loading="processing"
-            >
-              Reject
-            </v-btn>
-          </template>
+          <v-btn
+            v-if="selectedSwap.status === 'accepted'"
+            variant="tonal"
+            color="#2e7d32"
+            @click="openApproveDialog(selectedSwap); showDetailsDialog = false"
+            :loading="processing"
+          >
+            Approve
+          </v-btn>
+          <v-btn
+            v-if="selectedSwap.status === 'pending' || selectedSwap.status === 'accepted'"
+            variant="tonal"
+            color="#d32f2f"
+            @click="openRejectDialog(selectedSwap); showDetailsDialog = false"
+            :loading="processing"
+          >
+            Reject
+          </v-btn>
           <v-spacer />
           <v-btn variant="text" @click="showDetailsDialog = false">Close</v-btn>
         </v-card-actions>

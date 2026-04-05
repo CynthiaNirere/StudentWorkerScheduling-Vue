@@ -12,11 +12,19 @@ const templates = ref([]);
 const loading = ref(false);
 const showDeleteDialog = ref(false);
 const showApplyDialog = ref(false);
+const showEditDialog = ref(false);
 const templateToDelete = ref(null);
 const templateToApply = ref(null);
+const templateToEdit = ref(null);
 const applyWeekStart = ref("");
 const deleting = ref(false);
 const applying = ref(false);
+const editing = ref(false);
+
+const editForm = ref({
+  name: "",
+  description: ""
+});
 
 const snackbar = ref(false);
 const snackbarMessage = ref("");
@@ -63,6 +71,40 @@ const confirmDelete = async () => {
   }
 };
 
+const openEditDialog = (template) => {
+  templateToEdit.value = template;
+  editForm.value = {
+    name: template.name,
+    description: template.description || ""
+  };
+  showEditDialog.value = true;
+};
+
+const handleEditTemplate = async () => {
+  if (!editForm.value.name) {
+    showSnackbar("Template name is required", "error");
+    return;
+  }
+
+  editing.value = true;
+  try {
+    const templateId = templateToEdit.value.id || templateToEdit.value.template_id;
+    await EmployerService.updateTemplate(templateId, {
+      name: editForm.value.name,
+      description: editForm.value.description
+    });
+    
+    showSnackbar("Template updated successfully!", "success");
+    showEditDialog.value = false;
+    await loadTemplates();
+  } catch (err) {
+    console.error('Edit template error:', err);
+    showSnackbar("Error updating template", "error");
+  } finally {
+    editing.value = false;
+  }
+};
+
 const openApplyDialog = (template) => {
   templateToApply.value = template;
   const today = new Date();
@@ -85,19 +127,11 @@ const handleApplyTemplate = async () => {
     const startTimestamp = weekStart.getTime();
     
     const templateId = templateToApply.value.id || templateToApply.value.template_id;
-    const res = await EmployerService.applyTemplate(templateId, startTimestamp);
+    await EmployerService.applyTemplate(templateId, startTimestamp);
     
-    if (res.data && res.data.shifts) {
-      const shiftsToCreate = res.data.shifts;
-      
-      for (const shift of shiftsToCreate) {
-        await EmployerService.createShift(shift);
-      }
-      
-      showSnackbar(`${shiftsToCreate.length} shifts created successfully!`, "success");
-      showApplyDialog.value = false;
-      router.push({ name: 'employerSchedule' });
-    }
+    showSnackbar("Template applied successfully! Shifts created.", "success");
+    showApplyDialog.value = false;
+    router.push({ name: 'employerSchedule' });
   } catch (err) {
     console.error('Apply template error:', err);
     showSnackbar("Error applying template", "error");
@@ -111,9 +145,21 @@ const formatDate = (timestamp) => {
   return new Date(Number(timestamp)).toLocaleDateString();
 };
 
+// ✅ FIXED: Properly parse JSON string to get shift count
 const getShiftCount = (template) => {
   if (!template.template_data && !template.templateData) return 0;
-  const data = template.template_data || template.templateData;
+  let data = template.template_data || template.templateData;
+  
+  // Parse JSON string if needed
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data);
+    } catch (err) {
+      console.error('Error parsing template data:', err);
+      return 0;
+    }
+  }
+  
   return Array.isArray(data) ? data.length : 0;
 };
 
@@ -162,7 +208,7 @@ const goToSchedule = () => {
                 <v-card-title class="d-flex align-center justify-space-between pa-4 pb-3">
                   <div class="text-body-1 font-weight-bold navy-text">{{ template.name }}</div>
                   <v-menu>
-                    <template #activator="{ props }">
+                    <template v-slot:activator="{ props }">
                       <v-btn icon="mdi-dots-vertical" size="small" variant="plain" v-bind="props" />
                     </template>
                     <v-list density="compact">
@@ -172,6 +218,13 @@ const goToSchedule = () => {
                           Apply to Week
                         </v-list-item-title>
                       </v-list-item>
+                      <v-list-item @click="openEditDialog(template)">
+                        <v-list-item-title>
+                          <v-icon size="small" class="mr-2">mdi-pencil</v-icon>
+                          Edit Name/Description
+                        </v-list-item-title>
+                      </v-list-item>
+                      <v-divider />
                       <v-list-item @click="openDeleteDialog(template)">
                         <v-list-item-title class="text-error">
                           <v-icon size="small" class="mr-2">mdi-delete</v-icon>
@@ -187,6 +240,9 @@ const goToSchedule = () => {
                 <v-card-text class="pa-4">
                   <div v-if="template.description" class="text-body-2 mb-3">
                     {{ template.description }}
+                  </div>
+                  <div v-else class="text-body-2 text-grey mb-3 font-italic">
+                    No description
                   </div>
                   
                   <div class="d-flex flex-wrap ga-2 mb-3">
@@ -220,6 +276,7 @@ const goToSchedule = () => {
                 <li>Templates save the structure of your weekly schedule</li>
                 <li>Click "Apply Template" to create shifts for any week</li>
                 <li>Shifts are created as drafts - you can edit before publishing</li>
+                <li>Edit templates to rename or update their descriptions</li>
                 <li>Great for recurring weekly schedules!</li>
               </ul>
             </div>
@@ -227,6 +284,39 @@ const goToSchedule = () => {
         </v-card-text>
       </v-card>
     </v-container>
+
+    <v-dialog v-model="showEditDialog" max-width="500">
+      <v-card rounded="lg">
+        <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4 navy-text">Edit Template</v-card-title>
+        <v-divider />
+        <v-card-text class="pa-5">
+          <v-text-field
+            v-model="editForm.name"
+            label="Template Name *"
+            variant="outlined"
+            density="compact"
+            class="mb-3"
+            color="#12086F"
+          />
+          <v-textarea
+            v-model="editForm.description"
+            label="Description (optional)"
+            variant="outlined"
+            density="compact"
+            rows="3"
+            color="#12086F"
+          />
+        </v-card-text>
+        <v-divider />
+        <v-card-actions class="pa-4">
+          <v-spacer />
+          <v-btn variant="text" @click="showEditDialog = false">Cancel</v-btn>
+          <v-btn color="#12086F" variant="flat" :loading="editing" @click="handleEditTemplate">
+            Save Changes
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <v-dialog v-model="showApplyDialog" max-width="500">
       <v-card rounded="lg">
@@ -239,7 +329,16 @@ const goToSchedule = () => {
             <div class="text-caption text-grey">{{ getShiftCount(templateToApply) }} shifts will be created</div>
           </div>
           
-          <v-text-field v-model="applyWeekStart" label="Week Start Date (Sunday) *" type="date" variant="outlined" density="compact" color="#12086F" hint="Select the Sunday to start the week" persistent-hint />
+          <v-text-field 
+            v-model="applyWeekStart" 
+            label="Week Start Date (Sunday) *" 
+            type="date" 
+            variant="outlined" 
+            density="compact" 
+            color="#12086F" 
+            hint="Select the Sunday to start the week" 
+            persistent-hint 
+          />
           
           <v-alert type="info" variant="tonal" density="compact" class="mt-4">
             Shifts will be created for the full week starting from this date. All shifts will be created as drafts.
