@@ -33,8 +33,8 @@ const snackbar = ref(false);
 const snackbarMessage = ref("");
 const snackbarColor = ref("success");
 
-const newEmployee = ref({ first_name: "", last_name: "", email: "", phone_number: "", job_role: "" });
-const editForm = ref({ first_name: "", last_name: "", email: "", phone_number: "", job_role: "" });
+const newEmployee = ref({ first_name: "", last_name: "", email: "", phone_number: "", job_roles: [] });
+const editForm = ref({ first_name: "", last_name: "", email: "", phone_number: "", job_roles: [] });
 
 const headers = [
   { title: "Name", key: "name", sortable: true },
@@ -164,6 +164,20 @@ const handleSetPrimary = async (roleId) => {
   } catch { showSnackbar("Error setting primary role", "error"); }
 };
 
+const resolveOrCreateRole = async (roleName) => {
+  const existing = jobRoles.value.find(r => r.title.toLowerCase() === roleName.toLowerCase());
+  if (existing) return existing.job_role_id;
+  try {
+    const res = await EmployerService.createJobRole({ title: roleName, location_id: user.value?.work_location });
+    const created = res.data;
+    jobRoles.value.push(created);
+    return created.job_role_id;
+  } catch (err) {
+    console.error(`Error creating role "${roleName}":`, err);
+    return null;
+  }
+};
+
 const handleAddEmployee = async () => {
   if (!newEmployee.value.first_name || !newEmployee.value.email) {
     showSnackbar("First name and email are required", "error"); return;
@@ -173,15 +187,17 @@ const handleAddEmployee = async () => {
     const res = await EmployerService.createEmployee({ ...newEmployee.value, role: 'employee', work_location: user.value?.work_location });
     const createdUser = res.data?.user || res.data;
     const newUserId = createdUser?.user_id || createdUser?.userId;
-    if (newEmployee.value.job_role && newUserId) {
-      const matchedRole = jobRoles.value.find(r => r.title === newEmployee.value.job_role);
-      if (matchedRole) {
-        try { await EmployerService.addRoleToUser(newUserId, { jobRoleId: matchedRole.job_role_id, isPrimary: true }); } catch {}
+    if (newUserId && newEmployee.value.job_roles.length > 0) {
+      for (let i = 0; i < newEmployee.value.job_roles.length; i++) {
+        const roleId = await resolveOrCreateRole(newEmployee.value.job_roles[i]);
+        if (roleId) {
+          try { await EmployerService.addRoleToUser(newUserId, { jobRoleId: roleId, isPrimary: i === 0 }); } catch {}
+        }
       }
     }
     showSnackbar("Employee added successfully!", "success");
     showAddDialog.value = false;
-    newEmployee.value = { first_name: "", last_name: "", email: "", phone_number: "", job_role: "" };
+    newEmployee.value = { first_name: "", last_name: "", email: "", phone_number: "", job_roles: [] };
     await loadEmployees();
   } catch { showSnackbar("Error adding employee", "error"); }
   finally { saving.value = false; }
@@ -194,7 +210,7 @@ const openEditDialog = (employee) => {
     last_name: employee.lName || employee.last_name || "",
     email: employee.email || "",
     phone_number: employee.phone_number || "",
-    job_role: employee.job_role || "",
+    job_roles: (employee.jobRoles || []).map(r => r.role_title),
   };
   showEditDialog.value = true;
 };
@@ -207,12 +223,27 @@ const handleEditEmployee = async () => {
   try {
     const empId = selectedEmployee.value.user_id || selectedEmployee.value.userId;
     await EmployerService.updateEmployee(empId, editForm.value);
-    if (editForm.value.job_role) {
-      const matchedRole = jobRoles.value.find(r => r.title === editForm.value.job_role);
-      if (matchedRole) {
-        try { await EmployerService.addRoleToUser(empId, { jobRoleId: matchedRole.job_role_id, isPrimary: true }); } catch {}
+
+    const currentRoles = selectedEmployee.value.jobRoles || [];
+    const currentTitles = currentRoles.map(r => r.role_title);
+    const desiredTitles = editForm.value.job_roles || [];
+
+    const toRemove = currentRoles.filter(r => !desiredTitles.includes(r.role_title));
+    const toAdd = desiredTitles.filter(t => !currentTitles.includes(t));
+
+    for (const role of toRemove) {
+      if (currentRoles.length - toRemove.length + toAdd.length > 0) {
+        try { await EmployerService.removeRoleFromUser(empId, role.job_role_id); } catch {}
       }
     }
+    for (let i = 0; i < toAdd.length; i++) {
+      const roleId = await resolveOrCreateRole(toAdd[i]);
+      if (roleId) {
+        const isPrimary = currentRoles.length === 0 && toRemove.length === 0 && i === 0;
+        try { await EmployerService.addRoleToUser(empId, { jobRoleId: roleId, isPrimary }); } catch {}
+      }
+    }
+
     showSnackbar("Employee updated successfully!", "success");
     showEditDialog.value = false;
     await loadEmployees();
@@ -251,7 +282,6 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
         </v-btn>
       </div>
 
-      <!-- ✅ Business area filter REMOVED — search only -->
       <v-card variant="outlined" rounded="lg" class="navy-card">
         <v-card-text class="pa-0">
           <v-data-table :headers="headers" :items="employeesWithName" :search="search" :loading="loading" items-per-page="10">
@@ -303,7 +333,7 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
           </v-row>
           <v-text-field v-model="newEmployee.email" label="Email *" type="email" variant="outlined" density="compact" class="mb-3" color="#12086F" />
           <v-text-field v-model="newEmployee.phone_number" label="Phone Number" variant="outlined" density="compact" class="mb-3" color="#12086F" />
-          <v-autocomplete v-model="newEmployee.job_role" :items="jobRoleSuggestions" label="Job Role" variant="outlined" density="compact" hint="You can add multiple roles after creating the employee" persistent-hint color="#12086F" clearable :loading="loadingRoles" />
+          <v-combobox v-model="newEmployee.job_roles" :items="jobRoleSuggestions" label="Job Roles" variant="outlined" density="compact" multiple chips closable-chips hint="Select existing roles or type to create new ones" persistent-hint color="#12086F" clearable :loading="loadingRoles" />
         </v-card-text>
         <v-divider />
         <v-card-actions class="pa-4">
@@ -326,7 +356,7 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
           </v-row>
           <v-text-field v-model="editForm.email" label="Email *" type="email" variant="outlined" density="compact" class="mb-3" color="#12086F" />
           <v-text-field v-model="editForm.phone_number" label="Phone Number" variant="outlined" density="compact" class="mb-3" color="#12086F" />
-          <v-autocomplete v-model="editForm.job_role" :items="jobRoleSuggestions" label="Job Role" variant="outlined" density="compact" hint="Use 'Manage Roles' for multiple roles" persistent-hint color="#12086F" clearable :loading="loadingRoles" />
+          <v-combobox v-model="editForm.job_roles" :items="jobRoleSuggestions" label="Job Roles" variant="outlined" density="compact" multiple chips closable-chips hint="Select existing roles or type to create new ones" persistent-hint color="#12086F" clearable :loading="loadingRoles" />
         </v-card-text>
         <v-divider />
         <v-card-actions class="pa-4">
