@@ -10,31 +10,30 @@ import AuthServices from '../services/authServices'
 const router = useRouter()
 
 const user = ref(null)
-const employees = ref([])
+const managers = ref([]) // ✅ CHANGED: Renamed from employees to managers
 const businessAreas = ref([])
 const currentBusinessArea = ref(null)
 const loading = ref(true)
 const error = ref(null)
 const successMessage = ref(null)
 
-const showAddEmployeeDialog = ref(false)
-const showEditEmployeeDialog = ref(false)  // ✅ ADDED
+const showAddManagerDialog = ref(false) // ✅ CHANGED
+const showEditManagerDialog = ref(false) // ✅ CHANGED
 const showDeleteDialog = ref(false)
 const showChangeBusinessAreaDialog = ref(false)
-const employeeToDelete = ref(null)
-const employeeToEdit = ref(null)  // ✅ ADDED
+const managerToDelete = ref(null) // ✅ CHANGED
+const managerToEdit = ref(null) // ✅ CHANGED
 
-const newEmployee = ref({
+const newManager = ref({ // ✅ CHANGED
   firstName: '',
   lastName: '',
   email: '',
   phoneNumber: '',
-  role: 'employee',
+  role: 'employer', // ✅ CHANGED: Default to employer
   workLocation: null
 })
 
-// ✅ ADDED
-const editEmployee = ref({
+const editManager = ref({ // ✅ CHANGED
   userId: '',
   firstName: '',
   lastName: '',
@@ -44,7 +43,7 @@ const editEmployee = ref({
   workLocation: null
 })
 
-const employeeCount = computed(() => employees.value.length)
+const managerCount = computed(() => managers.value.length) // ✅ CHANGED
 
 const showSuccess = (message) => {
   successMessage.value = message
@@ -58,191 +57,205 @@ const loadBusinessAreas = async () => {
     const response = await businessAreaServices.getAll()
     businessAreas.value = response.data
     
-    // Set default business area if exists
-    if (businessAreas.value.length > 0) {
-      currentBusinessArea.value = businessAreas.value[0]
-      await loadEmployees()
+    // Check if workplace is selected
+    if (!currentBusinessArea.value && businessAreas.value.length > 0) {
+      // No workplace selected, redirect to workplace selection
+      router.push({ name: 'workplace' })
+      return
+    }
+    
+    // If workplace is selected, load managers
+    if (currentBusinessArea.value) {
+      await loadManagers()
     }
   } catch (err) {
     console.error("❌ Error loading business areas:", err)
     error.value = 'Unable to load business areas. Please try again.'
+  } finally {
+    loading.value = false
   }
 }
 
-const loadEmployees = async () => {
+const loadManagers = async () => { // ✅ CHANGED: Renamed function
   try {
     loading.value = true
     error.value = null
     
     const response = await adminServices.getAllUsers()
-    console.log("✅ Employees loaded:", response.data)
+    console.log("✅ All users loaded:", response.data)
     
-    // Filter employees by current business area if set
-    employees.value = response.data.filter(emp => {
-      if (!currentBusinessArea.value) return true
-      return emp.work_location === currentBusinessArea.value.location_id
+    // ✅ CHANGED: Filter for employers/managers only in current business area
+    managers.value = response.data.filter(user => {
+      const isEmployer = user.role === 'employer'
+      const isInCurrentLocation = currentBusinessArea.value 
+        ? user.work_location === currentBusinessArea.value.location_id 
+        : true
+      
+      return isEmployer && isInCurrentLocation
     })
     
+    console.log("✅ Managers filtered:", managers.value)
+    
   } catch (err) {
-    console.error("❌ Error loading employees:", err)
+    console.error("❌ Error loading managers:", err)
     if (err.response?.status === 401) {
       error.value = 'Session expired. Please log in again.'
       setTimeout(() => router.push('/login'), 2000)
     } else {
-      error.value = 'Unable to load employees. Please try again.'
+      error.value = 'Unable to load managers. Please try again.'
     }
   } finally {
     loading.value = false
   }
 }
 
-const openAddEmployeeDialog = () => {
-  showAddEmployeeDialog.value = true
-  newEmployee.value = {
+const openAddManagerDialog = () => { // ✅ CHANGED
+  showAddManagerDialog.value = true
+  newManager.value = {
     firstName: '',
     lastName: '',
     email: '',
     phoneNumber: '',
-    role: 'employee',
+    role: 'employer', // ✅ Always employer
     workLocation: currentBusinessArea.value?.location_id || null
   }
 }
 
-const closeAddEmployeeDialog = () => {
-  showAddEmployeeDialog.value = false
+const closeAddManagerDialog = () => { // ✅ CHANGED
+  showAddManagerDialog.value = false
 }
 
-const openEditEmployeeDialog = (employee) => {
-  console.log("✏️ Opening edit dialog for employee:", employee)
-  employeeToEdit.value = employee
-  editEmployee.value = {
-    userId: employee.user_id,
-    firstName: employee.first_name,
-    lastName: employee.last_name,
-    email: employee.email,
-    phoneNumber: employee.phone_number || '',
-    role: employee.role,
-    workLocation: employee.work_location
+const openEditManagerDialog = (manager) => { // ✅ CHANGED
+  console.log("✏️ Opening edit dialog for manager:", manager)
+  managerToEdit.value = manager
+  editManager.value = {
+    userId: manager.user_id,
+    firstName: manager.first_name,
+    lastName: manager.last_name,
+    email: manager.email,
+    phoneNumber: manager.phone_number || '',
+    role: manager.role,
+    workLocation: manager.work_location
   }
-  showEditEmployeeDialog.value = true
+  showEditManagerDialog.value = true
 }
 
-const closeEditEmployeeDialog = () => {
-  showEditEmployeeDialog.value = false
-  employeeToEdit.value = null
+const closeEditManagerDialog = () => { // ✅ CHANGED
+  showEditManagerDialog.value = false
+  managerToEdit.value = null
 }
 
-const saveEditEmployee = async () => {
-  if (!editEmployee.value.firstName || !editEmployee.value.lastName || !editEmployee.value.email) {
+const saveEditManager = async () => { // ✅ CHANGED
+  if (!editManager.value.firstName || !editManager.value.lastName || !editManager.value.email) {
     error.value = 'Please fill in all required fields'
     return
   }
 
   try {
-    const employeeData = {
-      first_name: editEmployee.value.firstName,
-      last_name: editEmployee.value.lastName,
-      email: editEmployee.value.email,
-      phone_number: editEmployee.value.phoneNumber,
-      role: editEmployee.value.role,
-      work_location: editEmployee.value.workLocation
+    const managerData = {
+      first_name: editManager.value.firstName,
+      last_name: editManager.value.lastName,
+      email: editManager.value.email,
+      phone_number: editManager.value.phoneNumber,
+      role: editManager.value.role,
+      work_location: editManager.value.workLocation
     }
 
-    console.log("✏️ Updating employee:", editEmployee.value.userId, employeeData)
-    const response = await adminServices.updateUser(editEmployee.value.userId, employeeData)
-    console.log("✅ Employee updated:", response.data)
+    console.log("✏️ Updating manager:", editManager.value.userId, managerData)
+    const response = await adminServices.updateUser(editManager.value.userId, managerData)
+    console.log("✅ Manager updated:", response.data)
     
-    const index = employees.value.findIndex(e => e.user_id === editEmployee.value.userId)
+    const index = managers.value.findIndex(m => m.user_id === editManager.value.userId)
     if (index !== -1) {
-      employees.value[index] = {
-        ...employees.value[index],
-        first_name: editEmployee.value.firstName,
-        last_name: editEmployee.value.lastName,
-        email: editEmployee.value.email,
-        phone_number: editEmployee.value.phoneNumber,
-        role: editEmployee.value.role,
-        work_location: editEmployee.value.workLocation
+      managers.value[index] = {
+        ...managers.value[index],
+        first_name: editManager.value.firstName,
+        last_name: editManager.value.lastName,
+        email: editManager.value.email,
+        phone_number: editManager.value.phoneNumber,
+        role: editManager.value.role,
+        work_location: editManager.value.workLocation
       }
     }
     
-    closeEditEmployeeDialog()
-    showSuccess('Employee updated successfully')
+    closeEditManagerDialog()
+    showSuccess('Manager updated successfully')
   } catch (err) {
-    console.error("❌ Error updating employee:", err)
+    console.error("❌ Error updating manager:", err)
     if (err.response?.status === 401) {
       error.value = 'Session expired. Please log in again.'
       setTimeout(() => router.push('/login'), 2000)
     } else if (err.response?.status === 400) {
       error.value = 'Email already exists. Please use a different email.'
     } else {
-      error.value = err.response?.data?.message || 'Unable to update employee. Please try again.'
+      error.value = err.response?.data?.message || 'Unable to update manager. Please try again.'
     }
   }
 }
 
-const addEmployee = async () => {
-  if (!newEmployee.value.firstName || !newEmployee.value.lastName || !newEmployee.value.email) {
+const addManager = async () => { // ✅ CHANGED
+  if (!newManager.value.firstName || !newManager.value.lastName || !newManager.value.email) {
     error.value = 'Please fill in all required fields'
     return
   }
 
   try {
-    const employeeData = {
-      first_name: newEmployee.value.firstName,
-      last_name: newEmployee.value.lastName,
-      email: newEmployee.value.email,
-      phone_number: newEmployee.value.phoneNumber,
-      role: newEmployee.value.role,
-      work_location: newEmployee.value.workLocation
+    const managerData = {
+      first_name: newManager.value.firstName,
+      last_name: newManager.value.lastName,
+      email: newManager.value.email,
+      phone_number: newManager.value.phoneNumber,
+      role: 'employer', // ✅ ALWAYS employer
+      work_location: newManager.value.workLocation
     }
 
-    console.log("📝 Creating employee:", employeeData)
-    const response = await adminServices.createUser(employeeData)
-    console.log("✅ Employee created:", response.data)
+    console.log("📝 Creating manager:", managerData)
+    const response = await adminServices.createUser(managerData)
+    console.log("✅ Manager created:", response.data)
     
-    employees.value.push(response.data)
+    managers.value.push(response.data)
     
-    closeAddEmployeeDialog()
-    showSuccess('Employee added successfully')
+    closeAddManagerDialog()
+    showSuccess('Manager added successfully')
   } catch (err) {
-    console.error("❌ Error creating employee:", err)
+    console.error("❌ Error creating manager:", err)
     if (err.response?.status === 401) {
       error.value = 'Session expired. Please log in again.'
       setTimeout(() => router.push('/login'), 2000)
     } else if (err.response?.status === 400) {
       error.value = 'Email already exists. Please use a different email.'
     } else {
-      error.value = err.response?.data?.message || 'Unable to add employee. Please try again.'
+      error.value = err.response?.data?.message || 'Unable to add manager. Please try again.'
     }
   }
 }
 
-const confirmDeleteEmployee = (employee) => {
-  console.log("🗑️ Confirming delete for employee:", employee)
-  employeeToDelete.value = employee
+const confirmDeleteManager = (manager) => { // ✅ CHANGED
+  console.log("🗑️ Confirming delete for manager:", manager)
+  managerToDelete.value = manager
   showDeleteDialog.value = true
 }
 
-const deleteEmployee = async () => {
-  if (!employeeToDelete.value) return
+const deleteManager = async () => { // ✅ CHANGED
+  if (!managerToDelete.value) return
 
   try {
-    console.log("🗑️ Deleting employee:", employeeToDelete.value.user_id)
+    console.log("🗑️ Deleting manager:", managerToDelete.value.user_id)
     
-    await adminServices.deleteUser(employeeToDelete.value.user_id)
-    employees.value = employees.value.filter(e => e.user_id !== employeeToDelete.value.user_id)
+    await adminServices.deleteUser(managerToDelete.value.user_id)
+    managers.value = managers.value.filter(m => m.user_id !== managerToDelete.value.user_id)
     showDeleteDialog.value = false
-    employeeToDelete.value = null
+    managerToDelete.value = null
     
-    console.log("✅ Employee deleted")
-    showSuccess('Employee deleted successfully')
+    console.log("✅ Manager deleted")
+    showSuccess('Manager deleted successfully')
   } catch (err) {
-    console.error("❌ Error deleting employee:", err)
+    console.error("❌ Error deleting manager:", err)
     if (err.response?.status === 401) {
       error.value = 'Session expired. Please log in again.'
       setTimeout(() => router.push('/login'), 2000)
     } else {
-      error.value = 'Unable to delete employee. Please try again.'
+      error.value = 'Unable to delete manager. Please try again.'
     }
   }
 }
@@ -253,18 +266,15 @@ const openChangeBusinessAreaDialog = () => {
 
 const changeBusinessArea = async (businessArea) => {
   currentBusinessArea.value = businessArea
+  // Save to localStorage
+  localStorage.setItem('selectedWorkplace', JSON.stringify(businessArea))
   showChangeBusinessAreaDialog.value = false
-  await loadEmployees()
+  await loadManagers()
   showSuccess(`Switched to ${businessArea.name}`)
 }
 
 const getStatusColor = (role) => {
-  switch(role) {
-    case 'admin': return 'error'
-    case 'employer': return 'secondary'
-    case 'employee': return 'success'
-    default: return 'grey'
-  }
+  return 'secondary' // ✅ All managers get secondary color
 }
 
 const getStatusText = (role) => {
@@ -307,6 +317,15 @@ onMounted(async () => {
     error.value = 'Access denied. Admin role required.'
     setTimeout(() => router.push('/login'), 2000)
   } else {
+    // Check if a workplace is already selected
+    const savedWorkplace = localStorage.getItem('selectedWorkplace')
+    if (savedWorkplace) {
+      try {
+        currentBusinessArea.value = JSON.parse(savedWorkplace)
+      } catch (e) {
+        console.error('Error parsing saved workplace:', e)
+      }
+    }
     await loadBusinessAreas()
   }
 })
@@ -372,16 +391,16 @@ onMounted(async () => {
       </v-alert>
 
       <!-- Business Area Name -->
-      <div class="mb-6">
-        <h2 class="text-h5 font-weight-medium">{{ currentBusinessArea?.name || 'The Brew' }}</h2>
+      <div class="mb-6" v-if="currentBusinessArea">
+        <h2 class="text-h5 font-weight-medium">{{ currentBusinessArea.name }}</h2>
       </div>
 
       <!-- Quick Actions -->
-      <div class="mb-6">
+      <div class="mb-6" v-if="currentBusinessArea">
         <h3 class="text-subtitle-1 font-weight-medium mb-3">Quick Actions:</h3>
         <div class="d-flex gap-3">
-          <v-btn color="primary" @click="openAddEmployeeDialog">
-            Add New Employee
+          <v-btn color="primary" @click="openAddManagerDialog">
+            Add New Manager
           </v-btn>
           <v-btn variant="outlined" color="primary" @click="openChangeBusinessAreaDialog">
             Change Business Area
@@ -389,38 +408,45 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Employees Table -->
-      <v-card elevation="2">
+      <!-- Managers Table -->
+      <v-card elevation="2" v-if="currentBusinessArea">
+        <v-card-title class="bg-primary text-white">
+          <v-icon start>mdi-account-tie</v-icon>
+          Managers
+        </v-card-title>
+        
         <div v-if="loading" class="text-center py-12">
           <v-progress-circular indeterminate color="primary"></v-progress-circular>
-          <p class="mt-4">Loading employees...</p>
+          <p class="mt-4">Loading managers...</p>
         </div>
 
         <v-table v-else>
           <thead>
             <tr>
               <th class="text-left font-weight-bold">NAME</th>
-              <th class="text-left font-weight-bold">ROLE</th>
+              <th class="text-left font-weight-bold">EMAIL</th>
+              <th class="text-left font-weight-bold">PHONE</th>
               <th class="text-left font-weight-bold">STATUS</th>
               <th class="text-left font-weight-bold">ACTIONS</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-if="employees.length === 0">
-              <td colspan="4" class="text-center py-8 text-medium-emphasis">
-                No employees found. Click "Add New Employee" to get started!
+            <tr v-if="managers.length === 0">
+              <td colspan="5" class="text-center py-8 text-medium-emphasis">
+                No managers found. Click "Add New Manager" to get started!
               </td>
             </tr>
-            <tr v-for="employee in employees" :key="employee.user_id">
-              <td>{{ employee.first_name }} {{ employee.last_name }}</td>
-              <td class="text-capitalize">{{ employee.role }}</td>
+            <tr v-for="manager in managers" :key="manager.user_id">
+              <td>{{ manager.first_name }} {{ manager.last_name }}</td>
+              <td>{{ manager.email }}</td>
+              <td>{{ manager.phone_number || 'N/A' }}</td>
               <td>
                 <v-chip 
-                  :color="getStatusColor(employee.role)" 
+                  :color="getStatusColor(manager.role)" 
                   size="small"
                   variant="tonal"
                 >
-                  {{ getStatusText(employee.role) }}
+                  {{ getStatusText(manager.role) }}
                 </v-chip>
               </td>
               <td>
@@ -429,7 +455,7 @@ onMounted(async () => {
                   size="small"
                   color="primary"
                   class="mr-2"
-                  @click="openEditEmployeeDialog(employee)"
+                  @click="openEditManagerDialog(manager)"
                 >
                   Edit
                 </v-btn>
@@ -437,7 +463,7 @@ onMounted(async () => {
                   variant="outlined" 
                   size="small" 
                   color="error"
-                  @click="confirmDeleteEmployee(employee)"
+                  @click="confirmDeleteManager(manager)"
                 >
                   Delete
                 </v-btn>
@@ -447,13 +473,13 @@ onMounted(async () => {
         </v-table>
       </v-card>
 
-      <!-- Add Employee Dialog -->
-      <v-dialog v-model="showAddEmployeeDialog" max-width="600px" persistent>
+      <!-- Add Manager Dialog -->
+      <v-dialog v-model="showAddManagerDialog" max-width="600px" persistent>
         <v-card>
           <v-card-title class="bg-primary text-white">
             <div class="d-flex justify-space-between align-center">
-              <span class="text-h5">Add New Employee</span>
-              <v-btn icon variant="text" color="white" @click="closeAddEmployeeDialog">
+              <span class="text-h5">Add New Manager</span>
+              <v-btn icon variant="text" color="white" @click="closeAddManagerDialog">
                 <v-icon>mdi-close</v-icon>
               </v-btn>
             </div>
@@ -464,7 +490,7 @@ onMounted(async () => {
               <v-row>
                 <v-col cols="6">
                   <v-text-field
-                    v-model="newEmployee.firstName"
+                    v-model="newManager.firstName"
                     label="First Name *"
                     variant="outlined"
                     required
@@ -472,7 +498,7 @@ onMounted(async () => {
                 </v-col>
                 <v-col cols="6">
                   <v-text-field
-                    v-model="newEmployee.lastName"
+                    v-model="newManager.lastName"
                     label="Last Name *"
                     variant="outlined"
                     required
@@ -481,7 +507,7 @@ onMounted(async () => {
               </v-row>
 
               <v-text-field
-                v-model="newEmployee.email"
+                v-model="newManager.email"
                 label="Email *"
                 type="email"
                 variant="outlined"
@@ -489,51 +515,44 @@ onMounted(async () => {
               ></v-text-field>
 
               <v-text-field
-                v-model="newEmployee.phoneNumber"
+                v-model="newManager.phoneNumber"
                 label="Phone Number"
                 variant="outlined"
               ></v-text-field>
 
               <v-select
-                v-model="newEmployee.role"
-                label="Role *"
-                :items="['admin', 'employee', 'employer']"
-                variant="outlined"
-                required
-              ></v-select>
-
-              <v-select
-                v-model="newEmployee.workLocation"
-                label="Work Location"
+                v-model="newManager.workLocation"
+                label="Work Location *"
                 :items="businessAreas"
                 item-title="name"
                 item-value="location_id"
                 variant="outlined"
+                required
               ></v-select>
             </v-form>
           </v-card-text>
 
           <v-card-actions>
             <v-spacer></v-spacer>
-            <v-btn variant="text" @click="closeAddEmployeeDialog">Cancel</v-btn>
+            <v-btn variant="text" @click="closeAddManagerDialog">Cancel</v-btn>
             <v-btn 
               color="primary" 
-              @click="addEmployee"
-              :disabled="!newEmployee.firstName || !newEmployee.lastName || !newEmployee.email"
+              @click="addManager"
+              :disabled="!newManager.firstName || !newManager.lastName || !newManager.email || !newManager.workLocation"
             >
-              Add Employee
+              Add Manager
             </v-btn>
           </v-card-actions>
         </v-card>
       </v-dialog>
 
-      <!-- Edit Employee Dialog -->
-      <v-dialog v-model="showEditEmployeeDialog" max-width="600px" persistent>
+      <!-- Edit Manager Dialog -->
+      <v-dialog v-model="showEditManagerDialog" max-width="600px" persistent>
         <v-card>
           <v-card-title class="bg-primary text-white">
             <div class="d-flex justify-space-between align-center">
-              <span class="text-h5">Edit Employee</span>
-              <v-btn icon variant="text" color="white" @click="closeEditEmployeeDialog">
+              <span class="text-h5">Edit Manager</span>
+              <v-btn icon variant="text" color="white" @click="closeEditManagerDialog">
                 <v-icon>mdi-close</v-icon>
               </v-btn>
             </div>
@@ -544,7 +563,7 @@ onMounted(async () => {
               <v-row>
                 <v-col cols="6">
                   <v-text-field
-                    v-model="editEmployee.firstName"
+                    v-model="editManager.firstName"
                     label="First Name *"
                     variant="outlined"
                     required
@@ -552,7 +571,7 @@ onMounted(async () => {
                 </v-col>
                 <v-col cols="6">
                   <v-text-field
-                    v-model="editEmployee.lastName"
+                    v-model="editManager.lastName"
                     label="Last Name *"
                     variant="outlined"
                     required
@@ -561,7 +580,7 @@ onMounted(async () => {
               </v-row>
 
               <v-text-field
-                v-model="editEmployee.email"
+                v-model="editManager.email"
                 label="Email *"
                 type="email"
                 variant="outlined"
@@ -569,21 +588,13 @@ onMounted(async () => {
               ></v-text-field>
 
               <v-text-field
-                v-model="editEmployee.phoneNumber"
+                v-model="editManager.phoneNumber"
                 label="Phone Number"
                 variant="outlined"
               ></v-text-field>
 
               <v-select
-                v-model="editEmployee.role"
-                label="Role *"
-                :items="['admin', 'employee', 'employer']"
-                variant="outlined"
-                required
-              ></v-select>
-
-              <v-select
-                v-model="editEmployee.workLocation"
+                v-model="editManager.workLocation"
                 label="Work Location"
                 :items="businessAreas"
                 item-title="name"
@@ -595,11 +606,11 @@ onMounted(async () => {
 
           <v-card-actions>
             <v-spacer></v-spacer>
-            <v-btn variant="text" @click="closeEditEmployeeDialog">Cancel</v-btn>
+            <v-btn variant="text" @click="closeEditManagerDialog">Cancel</v-btn>
             <v-btn 
               color="primary" 
-              @click="saveEditEmployee"
-              :disabled="!editEmployee.firstName || !editEmployee.lastName || !editEmployee.email"
+              @click="saveEditManager"
+              :disabled="!editManager.firstName || !editManager.lastName || !editManager.email"
             >
               Save Changes
             </v-btn>
@@ -607,20 +618,20 @@ onMounted(async () => {
         </v-card>
       </v-dialog>
 
-      <!-- Delete Employee Dialog -->
+      <!-- Delete Manager Dialog -->
       <v-dialog v-model="showDeleteDialog" max-width="500px">
         <v-card>
           <v-card-title class="bg-error text-white d-flex align-center">
             <v-icon color="white" class="mr-2">mdi-alert-circle</v-icon>
-            Delete Employee
+            Delete Manager
           </v-card-title>
 
           <v-card-text class="pt-6">
-            <div v-if="employeeToDelete" class="text-center">
+            <div v-if="managerToDelete" class="text-center">
               <v-icon size="64" color="error" class="mb-4">mdi-account-remove</v-icon>
-              <p class="text-h6 mb-2">Are you sure you want to delete this employee?</p>
-              <p class="text-body-1 font-weight-bold">{{ employeeToDelete.first_name }} {{ employeeToDelete.last_name }}</p>
-              <p class="text-caption text-medium-emphasis">{{ employeeToDelete.email }}</p>
+              <p class="text-h6 mb-2">Are you sure you want to delete this manager?</p>
+              <p class="text-body-1 font-weight-bold">{{ managerToDelete.first_name }} {{ managerToDelete.last_name }}</p>
+              <p class="text-caption text-medium-emphasis">{{ managerToDelete.email }}</p>
               <v-alert type="warning" variant="tonal" class="mt-4">
                 <strong>Warning:</strong> This action cannot be undone.
               </v-alert>
@@ -629,11 +640,11 @@ onMounted(async () => {
 
           <v-card-actions class="px-6 pb-6">
             <v-spacer></v-spacer>
-            <v-btn variant="text" @click="showDeleteDialog = false; employeeToDelete = null">
+            <v-btn variant="text" @click="showDeleteDialog = false; managerToDelete = null">
               Cancel
             </v-btn>
-            <v-btn color="error" @click="deleteEmployee" prepend-icon="mdi-delete">
-              Delete Employee
+            <v-btn color="error" @click="deleteManager" prepend-icon="mdi-delete">
+              Delete Manager
             </v-btn>
           </v-card-actions>
         </v-card>

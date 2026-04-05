@@ -32,7 +32,6 @@ import EmployerTasks from "./views/EmployerTasks.vue";
 import EmployerSwaps from "./views/EmployerSwaps.vue";
 import EmployerProfile from "./views/EmployerProfile.vue";
 import TemplateManagement from "./views/TemplateManagement.vue";
-// ✅ NEW IMPORTS
 import EmployerAlerts from "./views/EmployerAlerts.vue";
 import EmployerMessages from "./views/EmployerMessages.vue";
 import Workplace from "./views/Workplace.vue";  
@@ -92,17 +91,24 @@ const router = createRouter({
       meta: { requiresAuth: false },
     },
     {
-  path: "/guest/alerts",
-  name: "guestAlerts",
-  component: GuestAlerts,
-  meta: { requiresAuth: false },
-},
-{
-  path: "/guest/messages",
-  name: "guestMessages",
-  component: GuestMessages,
-  meta: { requiresAuth: false },
-},
+      path: "/guest/alerts",
+      name: "guestAlerts",
+      component: GuestAlerts,
+      meta: { requiresAuth: false },
+    },
+    {
+      path: "/guest/messages",
+      name: "guestMessages",
+      component: GuestMessages,
+      meta: { requiresAuth: false },
+    },
+    {
+      path: "/guest/templates",
+      name: "guestTemplates",
+      component: GuestTemplate,
+      meta: { requiresAuth: false },
+    },
+    
     // ─── AUTH ROUTES ───────────────────────────────────────────────────
     {
       path: "/signup",
@@ -122,26 +128,33 @@ const router = createRouter({
       component: RoleSelect,
       meta: { requiresAuth: true },
     },
+    
     // ─── SHARED ROUTES (All Authenticated Users) ───────────────────────
-    {
-      path: "/workplace",  
-      name: "workplace",
-      component: Workplace,
-      meta: { requiresAuth: true },
-    },
     {
       path: "/profile",  
       name: "profile",
       component: Profile,
       meta: { requiresAuth: true },
     },
+    
     // ─── ADMIN ROUTES ──────────────────────────────────────────────────
     {
       path: "/admin",
-      name: "adminViewDashboard",
+      redirect: "/admin/workplace", // ✅ CHANGED: Redirect to workplace first
+    },
+    {
+      path: "/admin/workplace",  // ✅ NEW: Admin workplace selection
+      name: "workplace",
+      component: Workplace,
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: "/admin/dashboard",  // ✅ CHANGED: Renamed from adminViewDashboard
+      name: "adminDashboard",
       component: AdminViewDashboard, 
       meta: { requiresAuth: true, requiresAdmin: true },
     },
+    
     // ─── EMPLOYEE ROUTES ────────────────────────────────────────────────
     {
       path: "/employee",
@@ -177,6 +190,7 @@ const router = createRouter({
       component: EmployeeSettings,
       meta: { requiresAuth: true },
     },
+    
     // ─── EMPLOYER ROUTES ────────────────────────────────────────────────
     {
       path: "/business-area-select",
@@ -230,7 +244,6 @@ const router = createRouter({
       component: EmployerSwaps,
       meta: { requiresAuth: true },
     },
-    // NEW: ALERTS & MESSAGES ROUTES
     {
       path: "/employer/alerts",
       name: "employerAlerts",
@@ -255,12 +268,6 @@ const router = createRouter({
       component: TemplateManagement,
       meta: { requiresAuth: true },
     },
-    {
-      path: "/guest/templates",
-      name: "guestTemplates",
-      component: GuestTemplate,
-      meta: { requiresAuth: false },
-    },
     
     // ─── CATCH ALL ──────────────────────────────────────────────────────
     {
@@ -274,6 +281,7 @@ router.beforeEach((to, from, next) => {
   const user = Utils.getStore("user");
   const isGuest = localStorage.getItem("isGuest") === "true";
   const requiresAuth = to.meta.requiresAuth;
+  const requiresAdmin = to.meta.requiresAdmin;
 
   // Allow ALL guest routes when in guest mode
   if (to.name?.startsWith("guest") && isGuest) {
@@ -284,6 +292,19 @@ router.beforeEach((to, from, next) => {
   // Require authentication for protected routes
   if (requiresAuth && !user) {
     next({ name: "login" });
+    return;
+  }
+
+  // ✅ NEW: Admin role check
+  if (requiresAdmin && user?.role !== 'admin') {
+    // Not an admin, redirect based on role
+    if (user?.role === 'employer') {
+      next({ name: 'employerDashboard' });
+    } else if (user?.role === 'employee') {
+      next({ name: 'employeeDashboard' });
+    } else {
+      next({ name: 'landing' });
+    }
     return;
   }
 

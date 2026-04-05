@@ -53,10 +53,6 @@
               {{ user.role }}
             </v-chip>
             <v-divider class="my-3"></v-divider>
-            <v-btn variant="text" color="primary" block @click="router.push('/profile')">
-              <v-icon start>mdi-account-cog</v-icon>
-              View Profile
-            </v-btn>
             <v-btn variant="text" color="error" block @click="handleLogout">
               <v-icon start>mdi-logout</v-icon>
               Logout
@@ -73,23 +69,28 @@
       <v-list-item
         prepend-icon="mdi-view-dashboard"
         title="Dashboard"
-        :class="{ 'bg-accent': isActive(dashboardRoute) }"
+        :class="{ 'bg-accent': isActive('/admin/dashboard') }"
         rounded="lg"
-        @click="router.push(dashboardRoute)"
+        @click="navigateTo('/admin/dashboard')"
       />
+      
+      <!-- ✅ Only show Workplace for admin users -->
       <v-list-item
+        v-if="user?.role === 'admin'"
         prepend-icon="mdi-office-building"
         title="Workplace"
-        :class="{ 'bg-accent': isActive('/workplace') }"
+        :class="{ 'bg-accent': isActive('/admin/workplace') }"
         rounded="lg"
-        @click="router.push('/workplace')"
+        @click="navigateTo('/admin/workplace')"
       />
+      
+      <!-- ✅ Profile navigation - goes to /profile -->
       <v-list-item
         prepend-icon="mdi-account-cog"
         title="Profile"
         :class="{ 'bg-accent': isActive('/profile') }"
         rounded="lg"
-        @click="router.push('/profile')"
+        @click="navigateTo('/profile')"
       />
     </v-list>
   </v-navigation-drawer>
@@ -115,8 +116,17 @@ const userInitials = computed(() => {
   return `${first}${last}`.toUpperCase();
 });
 
-// ✅ Manual exact active check — no Vuetify router magic
-const isActive = (path) => route.path === path;
+// ✅ Check if route is active
+const isActive = (path) => {
+  return route.path === path || route.path.startsWith(path);
+};
+
+// ✅ Single navigation function - prevents logout issues
+const navigateTo = (path) => {
+  if (route.path !== path) {
+    router.push(path);
+  }
+};
 
 const handleLogout = async () => {
   try {
@@ -125,16 +135,16 @@ const handleLogout = async () => {
     console.warn('Logout error:', err);
   } finally {
     Utils.removeItem('user');
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    if (window.google && window.google.accounts) {
+      window.google.accounts.id.disableAutoSelect();
+    }
+    
     router.push({ name: 'login' });
   }
 };
-
-const dashboardRoute = computed(() => {
-  const role = user.value?.role;
-  if (role === 'admin') return '/admin';
-  if (role === 'employer') return '/employer';
-  return '/employee';
-});
 </script>
 
 <style scoped>

@@ -1,7 +1,12 @@
 <template>
   <DashboardLayout>
     <v-container fluid class="pa-6">
-      <h1 class="text-h4 font-weight-bold mb-6">Workplace</h1>
+      <div class="d-flex justify-space-between align-center mb-6">
+        <div>
+          <h1 class="text-h4 font-weight-bold">Workplace</h1>
+          <p class="text-body-2 text-medium-emphasis">Select a workplace to manage or configure settings</p>
+        </div>
+      </div>
 
       <h2 class="text-h5 mb-4">Business Areas</h2>
 
@@ -41,14 +46,27 @@
               </v-list-item>
             </v-list>
 
-            <v-btn
-              color="primary"
-              block
-              class="mt-4"
-              @click="openManageDialog(area)"
-            >
-              Manage
-            </v-btn>
+            <div class="d-flex gap-2 mt-4">
+              <!-- Select & Continue Button -->
+              <v-btn
+                color="primary"
+                variant="flat"
+                class="flex-grow-1"
+                @click="selectWorkplace(area)"
+              >
+                <v-icon start>mdi-check-circle</v-icon>
+                Select & Continue
+              </v-btn>
+              
+              <!-- Manage Settings Button -->
+              <v-btn
+                color="primary"
+                variant="outlined"
+                @click="openManageDialog(area)"
+              >
+                <v-icon>mdi-cog</v-icon>
+              </v-btn>
+            </div>
           </v-card>
         </v-col>
 
@@ -57,7 +75,7 @@
           <v-card
             elevation="2"
             class="text-center pa-6 d-flex align-center justify-center hover-card"
-            style="min-height: 300px; cursor: pointer;"
+            style="min-height: 320px; cursor: pointer;"
             @click="showAddDialog = true"
           >
             <div>
@@ -345,6 +363,21 @@ const loadEmployees = async () => {
   }
 };
 
+// ✅ NEW: Select workplace and navigate to dashboard
+const selectWorkplace = (area) => {
+  // Save selected workplace to localStorage
+  localStorage.setItem('selectedWorkplace', JSON.stringify(area));
+  
+  // Show success message
+  successMessage.value = `Selected ${area.name}. Redirecting to dashboard...`;
+  showSuccess.value = true;
+  
+  // Redirect to dashboard after a short delay
+  setTimeout(() => {
+    router.push({ name: 'adminDashboard' });
+  }, 1000);
+};
+
 const getInitials = (name) => {
   return name
     .split(' ')
@@ -512,5 +545,9 @@ onMounted(async () => {
 .hover-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 8px 16px rgba(18, 8, 111, 0.15) !important;
+}
+
+.gap-2 {
+  gap: 8px;
 }
 </style>
