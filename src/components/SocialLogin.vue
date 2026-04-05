@@ -39,19 +39,29 @@ const handleCredentialResponse = async (response) => {
       fName.value = user.value.fName;
       lName.value = user.value.lName;
       
-      // Route based on role
-      if (user.value.role === 'admin') {
+      console.log('✅ Login successful:', user.value);
+      
+      // ✅ Route based on role with guest handling
+      if (user.value.isGuest || user.value.role === 'guest') {
+        console.log('👤 Guest user detected - redirecting to guest dashboard');
+        router.push({ name: 'guestDashboard' });
+      } else if (user.value.role === 'admin') {
+        console.log('👑 Admin user - redirecting to role select');
         router.push({ name: 'roleSelect' });
       } else if (user.value.role === 'employer') {
+        console.log('🏢 Employer user - redirecting to employer dashboard');
         router.push({ name: 'employerDashboard' });
       } else if (user.value.role === 'employee') {
+        console.log('👤 Employee user - redirecting to employee dashboard');
         router.push({ name: 'employeeDashboard' });
       } else {
-        router.push({ name: 'login' });
+        // Fallback - treat unknown roles as guests
+        console.log('⚠️ Unknown role - redirecting to guest dashboard');
+        router.push({ name: 'guestDashboard' });
       }
     })
     .catch((error) => {
-      console.log("Login error:", error);
+      console.error("❌ Login error:", error);
       alert("Login failed. Please try again.");
     });
 };
