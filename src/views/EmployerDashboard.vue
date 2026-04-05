@@ -11,8 +11,6 @@ const loading = ref(true);
 
 const weeklySchedule = ref([]);
 const schedulePublished = ref(false);
-const pendingSwaps = ref([]);
-const pendingTimeOff = ref([]);
 const employees = ref([]);
 
 const weekDays = computed(() => {
@@ -50,7 +48,7 @@ onMounted(async () => {
 const loadDashboardData = async () => {
   loading.value = true;
   try {
-    await Promise.all([loadWeeklySchedule(), loadPendingRequests(), loadEmployees()]);
+    await Promise.all([loadWeeklySchedule(), loadEmployees()]);
   } finally {
     loading.value = false;
   }
@@ -66,17 +64,6 @@ const loadWeeklySchedule = async () => {
     weeklySchedule.value = allShifts;
     schedulePublished.value = allShifts.some(s => s.status === 'published');
   } catch (err) { console.error('Error loading schedule:', err); }
-};
-
-const loadPendingRequests = async () => {
-  try {
-    const [swapRes, timeOffRes] = await Promise.all([
-      EmployerService.getAllShiftSwapRequests(),
-      EmployerService.getAllTimeOffRequests()
-    ]);
-    pendingSwaps.value = (Array.isArray(swapRes.data) ? swapRes.data : []).filter(s => s.status === 'pending' || s.status === 'accepted');
-    pendingTimeOff.value = (Array.isArray(timeOffRes.data) ? timeOffRes.data : []).filter(t => t.status === 'pending');
-  } catch (err) { console.error('Error loading requests:', err); }
 };
 
 const loadEmployees = async () => {
@@ -179,7 +166,6 @@ const formatShiftTime = (minutes) => {
             </div>
           </v-card-text>
         </v-card>
-        <!-- ✅ Stat cards with icons REMOVED — info is surfaced through alerts above -->
       </template>
     </v-container>
   </EmployerLayout>

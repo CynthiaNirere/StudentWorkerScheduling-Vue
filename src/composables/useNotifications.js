@@ -7,6 +7,7 @@ export function useNotifications() {
   const router = useRouter();
   const notifications = ref([]);
   const loading = ref(false);
+  const notifPrefs = ref({ shiftReminders: true, swapRequests: true, timeOffRequests: true, scheduleChanges: true });
   let refreshInterval = null;
 
   const unreadCount = computed(() =>
@@ -17,7 +18,6 @@ export function useNotifications() {
     notifications.value.filter(n => n.urgent && !n.read)
   );
 
-  // takenShifts kept for dashboard calendar compatibility
   const takenShifts = ref([]);
 
   const loadNotifications = async () => {
@@ -28,7 +28,6 @@ export function useNotifications() {
     const items = [];
 
     try {
-      // ── System notifications ───────────────────────────────────────────
       const notifRes = await EmployeeService.getMyNotifications(userId);
       const notifs = Array.isArray(notifRes.data) ? notifRes.data : [];
 
@@ -54,7 +53,6 @@ export function useNotifications() {
     }
 
     try {
-      // ── Pending swap requests involving this employee ──────────────────
       const swapRes = await EmployeeService.getMySwapRequests();
       const swaps = Array.isArray(swapRes.data) ? swapRes.data : [];
       const userId2 = Utils.getStore('user')?.user_id || Utils.getStore('user')?.userId;
@@ -86,7 +84,6 @@ export function useNotifications() {
     }
 
     try {
-      // ── Pending time off requests ──────────────────────────────────────
       const toRes = await EmployeeService.getMyTimeOffRequests();
       const timeOffs = Array.isArray(toRes.data) ? toRes.data : [];
       const userId3 = Utils.getStore('user')?.user_id || Utils.getStore('user')?.userId;
@@ -120,8 +117,22 @@ export function useNotifications() {
       console.warn('Could not load time off notifications:', err.message);
     }
 
-    // Sort newest first
-    notifications.value = items.sort((a, b) => 0); // keep insertion order
+    // Filter by notification preferences
+    const prefs = notifPrefs.value;
+    const filtered = items.filter(item => {
+      if (item.type === 'swap' && !prefs.swapRequests) return false;
+      if (item.type === 'timeoff' && !prefs.timeOffRequests) return false;
+      if (item.type === 'notification') {
+        const cat = (item.category || '').toLowerCase();
+        if (cat.includes('swap') && !prefs.swapRequests) return false;
+        if ((cat.includes('time') || cat.includes('off')) && !prefs.timeOffRequests) return false;
+        if (cat.includes('schedule') && !prefs.scheduleChanges) return false;
+        if (cat.includes('shift') && !cat.includes('swap') && !prefs.shiftReminders) return false;
+      }
+      return true;
+    });
+
+    notifications.value = filtered;
   };
 
   const dismissNotification = async (id) => {
@@ -155,7 +166,6 @@ export function useNotifications() {
     }
   };
 
-  // ── Helpers ─────────────────────────────────────────────────────────────
   const iconForType = (type) => {
     if (!type) return 'mdi-bell';
     const t = type.toLowerCase();
@@ -179,15 +189,29 @@ export function useNotifications() {
     return `${Math.floor(hrs / 24)}d ago`;
   };
 
+  const reloadNotifPrefs = () => {
+    const saved = localStorage.getItem('notificationPreferences');
+    if (saved) {
+      try { notifPrefs.value = { ...notifPrefs.value, ...JSON.parse(saved) }; } catch {}
+    }
+    loadNotifications();
+  };
+
   onMounted(async () => {
+    const saved = localStorage.getItem('notificationPreferences');
+    if (saved) {
+      try { notifPrefs.value = { ...notifPrefs.value, ...JSON.parse(saved) }; } catch {}
+    }
     await loadNotifications();
     refreshInterval = setInterval(loadNotifications, 30000);
     window.addEventListener('notifications-updated', loadNotifications);
+    window.addEventListener('notif-prefs-updated', reloadNotifPrefs);
   });
 
   onUnmounted(() => {
     if (refreshInterval) clearInterval(refreshInterval);
     window.removeEventListener('notifications-updated', loadNotifications);
+    window.removeEventListener('notif-prefs-updated', reloadNotifPrefs);
   });
 
   return {

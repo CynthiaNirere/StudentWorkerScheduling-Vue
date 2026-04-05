@@ -7,7 +7,6 @@ import EmployerLayout from '../components/EmployerLayout.vue';
 const theme = useTheme();
 const user  = ref(null);
 
-// ✅ Dark mode as a simple switch — same as employee
 const darkMode = ref(false);
 
 const notificationPreferences = ref({
@@ -50,7 +49,6 @@ onMounted(() => {
   isWorkDevice.value = localStorage.getItem('isWorkDevice') === 'true';
 });
 
-// ✅ Instant apply on toggle — same pattern as employee
 watch(darkMode, (val) => {
   theme.global.name.value = val ? 'dark' : 'light';
   localStorage.setItem('themePreference', val ? 'dark' : 'light');
@@ -59,6 +57,7 @@ watch(darkMode, (val) => {
 
 const saveNotificationPreferences = () => {
   localStorage.setItem('notificationPreferences', JSON.stringify(notificationPreferences.value));
+  window.dispatchEvent(new CustomEvent('notif-prefs-updated'));
   showSnackbar("Notification preferences saved!", "success");
 };
 
@@ -74,7 +73,7 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
         <p class="text-body-2 text-grey">Manage your preferences and notification settings</p>
       </div>
 
-      <!-- Appearance — ✅ now a switch like employee -->
+      <!-- Appearance -->
       <v-card variant="outlined" rounded="lg" class="mb-4 navy-card">
         <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4 navy-text">
           <v-icon start>mdi-palette-outline</v-icon>Appearance
@@ -99,7 +98,7 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
         <v-divider />
         <v-card-text class="pa-5">
           <v-alert type="info" variant="tonal" density="compact" class="mb-5" color="#4361EE">
-            Preferences are saved locally. Backend integration coming soon.
+            Notification types control which alerts appear in your bell icon.
           </v-alert>
           <div class="text-subtitle-2 font-weight-bold mb-3">Channels</div>
           <v-checkbox v-model="notificationPreferences.emailNotifications" label="Email notifications" hint="Receive emails for important updates" persistent-hint color="#12086F" density="compact" class="mb-1" />
