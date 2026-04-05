@@ -1,19 +1,15 @@
 import apiClient from "./services.js";
 import Utils from "../config/utils.js";
 
-// ✅ FINAL FIX: Only use demo mode for TRUE guest sessions, never for logged-in users
+// ✅ SIMPLIFIED: services.js interceptor handles auth headers
+// This only adds demo header for guest mode
 const addDemoHeader = (config = {}) => {
-  // Check if explicitly in guest mode (not logged in at all)
   const isGuest = localStorage.getItem('isGuest') === 'true';
   const user = Utils.getStore('user');
   
-  // If user exists, NEVER use demo mode - they're logged in!
-  if (user) {
-    return config;
-  }
-  
-  // Only add demo header if explicitly guest AND no user
-  if (isGuest) {
+  // services.js already handles auth headers for logged-in users
+  // Only add demo header for guest mode (no user logged in)
+  if (isGuest && !user) {
     return {
       ...config,
       headers: {
