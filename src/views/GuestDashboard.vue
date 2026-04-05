@@ -21,13 +21,26 @@ const DEMO_USER = {
 };
 
 onMounted(async () => {
-  const isGuest = localStorage.getItem('isGuest');
-  if (!isGuest) {
-    router.push({ name: 'landing' });
+  // ✅ Check if user is guest
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  
+  if (!user.isGuest && user.role !== 'guest') {
+    // Not a guest - redirect registered users
+    if (user.role === 'admin') {
+      router.push({ name: 'workplace' });
+    } else if (user.role === 'employer') {
+      router.push({ name: 'employerDashboard' });
+    } else if (user.role === 'employee') {
+      router.push({ name: 'employeeDashboard' });
+    } else {
+      router.push({ name: 'login' });
+    }
     return;
   }
   
+  // ✅ Guest user - set up demo mode
   localStorage.setItem('user', JSON.stringify(DEMO_USER));
+  localStorage.setItem('isGuest', 'true');
   await loadWeeklySchedule();
 });
 
@@ -99,13 +112,25 @@ const formatShiftTime = (minutes) => {
 const exitGuestMode = () => {
   localStorage.removeItem('isGuest');
   localStorage.removeItem('user');
-  router.push({ name: 'landing' });
+  router.push({ name: 'login' });
 };
 </script>
 
 <template>
   <EmployerLayout :isGuest="true">
     <v-container fluid class="pa-6">
+       <!-- Guest Mode Banner -->
+      <v-alert type="info" variant="tonal" prominent class="mb-6">
+        <div class="d-flex align-center justify-space-between">
+          <div>
+            <v-icon size="large" class="mr-3">mdi-eye-outline</v-icon>
+            <strong>Guest Mode</strong> - Viewing demo schedule data
+          </div>
+          <v-btn color="primary" variant="outlined" @click="exitGuestMode">
+            Exit Guest Mode
+          </v-btn>
+        </div>
+      </v-alert>
       <!-- Header -->
       <div class="mb-8">
         <h1 class="text-h4 font-weight-bold navy-text mb-2">Dashboard</h1>
