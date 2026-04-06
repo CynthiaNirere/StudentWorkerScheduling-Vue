@@ -87,13 +87,12 @@
                 <th class="text-left font-weight-bold">NAME</th>
                 <th class="text-left font-weight-bold">EMAIL</th>
                 <th class="text-left font-weight-bold">PHONE</th>
-                <th class="text-left font-weight-bold">STATUS</th>
                 <th class="text-left font-weight-bold">ACTIONS</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="filteredManagers.length === 0">
-                <td colspan="5" class="text-center py-8 text-medium-emphasis">
+                <td colspan="4" class="text-center py-8 text-medium-emphasis">
                   <v-icon size="48" color="grey" class="mb-2">mdi-account-off</v-icon>
                   <p class="text-h6">No managers found</p>
                   <p class="text-body-2">Click "Add New Manager" to get started!</p>
@@ -103,9 +102,6 @@
                 <td class="font-weight-medium">{{ manager.first_name }} {{ manager.last_name }}</td>
                 <td>{{ manager.email }}</td>
                 <td>{{ manager.phone_number || 'N/A' }}</td>
-                <td>
-                  <v-chip color="secondary" size="small" variant="tonal">Active</v-chip>
-                </td>
                 <td>
                   <v-btn 
                     variant="outlined" 
@@ -270,11 +266,6 @@
                     • {{ getManagerCount(area.location_id) }} Managers
                   </v-list-item-title>
                 </v-list-item>
-                <v-list-item class="px-0">
-                  <v-list-item-title class="text-caption text-medium-emphasis">
-                    • Main Campus
-                  </v-list-item-title>
-                </v-list-item>
               </v-list>
 
               <div class="d-flex gap-2 mt-4">
@@ -328,123 +319,132 @@
       </v-dialog>
 
       <!-- Manage Business Area Dialog -->
-      <v-dialog v-model="showManageDialog" max-width="700px" persistent>
-        <v-card>
-          <v-card-title class="bg-primary text-white">
-            <div class="d-flex justify-space-between align-center">
-              <span class="text-h5">Manage {{ selectedArea?.name }}</span>
-              <v-btn icon variant="text" color="white" @click="closeManageDialog">
-                <v-icon>mdi-close</v-icon>
-              </v-btn>
-            </div>
-          </v-card-title>
+<v-dialog v-model="showManageDialog" max-width="700px" persistent>
+  <v-card>
+    <v-card-title class="bg-primary text-white d-flex justify-space-between align-center pa-4">
+      <span class="text-h5">Manage {{ selectedArea?.name }}</span>
+      <v-btn icon variant="text" color="white" @click="closeManageDialog">
+        <v-icon>mdi-close</v-icon>
+      </v-btn>
+    </v-card-title>
 
-          <v-card-text class="pt-4">
-            <v-tabs v-model="manageTab" color="primary">
-              <v-tab value="edit">Edit Details</v-tab>
-              <v-tab value="managers">Managers</v-tab>
-              <v-tab value="danger">Delete</v-tab>
-            </v-tabs>
+    <v-card-text class="pt-4">
+      <v-tabs v-model="manageTab" color="primary" class="mb-4">
+        <v-tab value="edit">Edit Details</v-tab>
+        <v-tab value="managers">Managers</v-tab>
+        <v-tab value="danger">Delete</v-tab>
+      </v-tabs>
 
-            <v-window v-model="manageTab" class="mt-4">
-              <v-window-item value="edit">
-                <v-form>
-                  <v-text-field v-model="editArea.name" label="Name *" variant="outlined" required></v-text-field>
-                  <v-text-field v-model="editArea.address" label="Address *" variant="outlined" required></v-text-field>
-                  <v-btn color="primary" @click="updateBusinessArea" class="mt-2">Save Changes</v-btn>
-                </v-form>
-              </v-window-item>
+      <v-window v-model="manageTab">
+        <!-- Edit Details Tab -->
+        <v-window-item value="edit">
+          <v-form class="mt-4">
+            <v-text-field
+              v-model="editArea.name"
+              label="Name *"
+              variant="outlined"
+              required
+              hint="Enter workplace name"
+              persistent-hint
+            ></v-text-field>
 
-              <v-window-item value="managers">
-                <h3 class="text-subtitle-1 font-weight-bold mb-4">Managers at {{ selectedArea?.name }}</h3>
-                
-                <v-list v-if="getManagers(selectedArea?.location_id).length > 0">
-                  <v-list-item v-for="manager in getManagers(selectedArea?.location_id)" :key="manager.user_id" class="mb-2">
-                    <template v-slot:prepend>
-                      <v-avatar color="secondary" size="40">
-                        <span class="text-white font-weight-bold">
-                          {{ manager.first_name[0] }}{{ manager.last_name[0] }}
-                        </span>
-                      </v-avatar>
-                    </template>
+            <v-text-field
+              v-model="editArea.address"
+              label="Address *"
+              variant="outlined"
+              required
+              class="mt-4"
+              hint="Enter workplace address"
+              persistent-hint
+            ></v-text-field>
 
-                    <v-list-item-title>{{ manager.first_name }} {{ manager.last_name }}</v-list-item-title>
-                    <v-list-item-subtitle>{{ manager.email }}</v-list-item-subtitle>
+            <v-btn color="primary" @click="updateBusinessArea" class="mt-6">
+              Save Changes
+            </v-btn>
+          </v-form>
+        </v-window-item>
 
-                    <template v-slot:append>
-                      <v-btn icon variant="text" color="error" @click="removeManager(manager)">
-                        <v-icon>mdi-delete</v-icon>
-                      </v-btn>
-                    </template>
-                  </v-list-item>
-                </v-list>
+        <!-- Managers Tab -->
+        <v-window-item value="managers">
+          <div class="mt-4">
+            <h3 class="text-subtitle-1 font-weight-bold mb-4">Managers at {{ selectedArea?.name }}</h3>
+            
+            <v-list v-if="getManagers(selectedArea?.location_id).length > 0">
+              <v-list-item v-for="manager in getManagers(selectedArea?.location_id)" :key="manager.user_id" class="mb-2">
+                <template v-slot:prepend>
+                  <v-avatar color="secondary" size="40">
+                    <span class="text-white font-weight-bold">
+                      {{ manager.first_name[0] }}{{ manager.last_name[0] }}
+                    </span>
+                  </v-avatar>
+                </template>
 
-                <v-alert v-else type="info" variant="tonal" class="mb-4">
-                  No managers assigned to this workplace yet.
-                </v-alert>
+                <v-list-item-title>{{ manager.first_name }} {{ manager.last_name }}</v-list-item-title>
+                <v-list-item-subtitle>{{ manager.email }}</v-list-item-subtitle>
 
-                <v-divider class="my-4"></v-divider>
+                <template v-slot:append>
+                  <v-btn icon variant="text" color="error" @click="removeManager(manager)">
+                    <v-icon>mdi-delete</v-icon>
+                  </v-btn>
+                </template>
+              </v-list-item>
+            </v-list>
 
-                <h4 class="text-subtitle-2 font-weight-bold mb-3">Assign New Manager</h4>
-                <v-select v-model="selectedManagerToAdd" :items="availableManagers" item-title="fullName" item-value="user_id" label="Select Manager" variant="outlined" density="comfortable"></v-select>
-                <v-btn color="primary" @click="assignManager" :disabled="!selectedManagerToAdd" class="mt-2">Assign Manager</v-btn>
-              </v-window-item>
+            <v-alert v-else type="info" variant="tonal" class="mb-4">
+              No managers assigned to this workplace yet.
+            </v-alert>
 
-              <v-window-item value="danger">
-                <v-alert type="warning" variant="tonal" class="mb-4">
-                  <strong>Warning:</strong> Deleting this workplace is permanent and cannot be undone.
-                </v-alert>
+            <v-divider class="my-4"></v-divider>
 
-                <v-card variant="outlined" color="error">
-                  <v-card-text>
-                    <div class="d-flex align-center justify-space-between">
-                      <div>
-                        <h3 class="text-h6 mb-1">Delete this workplace</h3>
-                        <p class="text-caption text-medium-emphasis">
-                          This will permanently delete {{ selectedArea?.name }} and all associated data.
-                        </p>
-                      </div>
-                      <v-btn color="error" @click="confirmDelete">Delete Workplace</v-btn>
-                    </div>
-                  </v-card-text>
-                </v-card>
-              </v-window-item>
-            </v-window>
-          </v-card-text>
+            <h4 class="text-subtitle-2 font-weight-bold mb-3">Assign New Manager</h4>
+            <v-select
+              v-model="selectedManagerToAdd"
+              :items="availableManagers"
+              item-title="fullName"
+              item-value="user_id"
+              label="Select Manager"
+              variant="outlined"
+              density="comfortable"
+            ></v-select>
+            <v-btn color="primary" @click="assignManager" :disabled="!selectedManagerToAdd" class="mt-2">
+              Assign Manager
+            </v-btn>
+          </div>
+        </v-window-item>
 
-          <v-card-actions>
-            <v-spacer></v-spacer>
-            <v-btn variant="text" @click="closeManageDialog">Close</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+        <!-- Danger Zone Tab -->
+        <v-window-item value="danger">
+          <div class="mt-4">
+            <v-alert type="warning" variant="tonal" class="mb-4">
+              <strong>Warning:</strong> Deleting this workplace is permanent and cannot be undone.
+            </v-alert>
 
-      <!-- Delete Confirmation Dialog -->
-      <v-dialog v-model="showDeleteDialog" max-width="500px">
-        <v-card>
-          <v-card-title class="bg-error text-white">
-            <v-icon color="white" class="mr-2">mdi-alert-circle</v-icon>
-            Delete Workplace
-          </v-card-title>
+            <v-card variant="outlined" color="error">
+              <v-card-text>
+                <div class="d-flex align-center justify-space-between">
+                  <div>
+                    <h3 class="text-h6 mb-1">Delete this workplace</h3>
+                    <p class="text-caption text-medium-emphasis">
+                      This will permanently delete {{ selectedArea?.name }} and all associated data.
+                    </p>
+                  </div>
+                  <v-btn color="error" @click="confirmDelete">
+                    Delete Workplace
+                  </v-btn>
+                </div>
+              </v-card-text>
+            </v-card>
+          </div>
+        </v-window-item>
+      </v-window>
+    </v-card-text>
 
-          <v-card-text class="pt-6">
-            <div class="text-center">
-              <v-icon size="64" color="error" class="mb-4">mdi-delete-alert</v-icon>
-              <p class="text-h6 mb-2">Are you sure you want to delete this workplace?</p>
-              <p class="text-body-1 font-weight-bold">{{ selectedArea?.name }}</p>
-              <v-alert type="error" variant="tonal" class="mt-4">
-                <strong>This action cannot be undone!</strong> All employees will be unassigned from this location.
-              </v-alert>
-            </div>
-          </v-card-text>
-
-          <v-card-actions class="px-6 pb-6">
-            <v-spacer></v-spacer>
-            <v-btn variant="text" @click="showDeleteDialog = false">Cancel</v-btn>
-            <v-btn color="error" @click="deleteBusinessArea" prepend-icon="mdi-delete">Delete Workplace</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+    <v-card-actions class="px-4 pb-4">
+      <v-spacer></v-spacer>
+      <v-btn variant="text" @click="closeManageDialog">Close</v-btn>
+    </v-card-actions>
+  </v-card>
+</v-dialog>
 
       <!-- Success Snackbar -->
       <v-snackbar v-model="showSuccess" color="success" :timeout="3000">
