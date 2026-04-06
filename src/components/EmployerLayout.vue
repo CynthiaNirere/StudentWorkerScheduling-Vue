@@ -21,6 +21,7 @@ const showNotifications = ref(false);
 const pendingSwaps    = ref([]);
 const pendingTimeOff  = ref([]);
 const unreadMsgCount  = ref(0);
+const notifPrefs      = ref({ shiftReminders: true, swapRequests: true, timeOffRequests: true, scheduleChanges: true });
 
 const loadUnreadMsgCount = async () => {
   if (props.isGuest) return;
@@ -38,7 +39,8 @@ const sidebarGradient = computed(() =>
 
 const notifications = computed(() => {
   const items = [];
-  pendingSwaps.value.forEach(swap => {
+  if (!notifPrefs.value.swapRequests && !notifPrefs.value.timeOffRequests) return items;
+  if (notifPrefs.value.swapRequests) pendingSwaps.value.forEach(swap => {
     const name = swap.requestingUserName || 'Unknown';
     const shift = swap.shift;
     let shiftInfo = '';
@@ -55,7 +57,7 @@ const notifications = computed(() => {
       color: '#f57c00',
     });
   });
-  pendingTimeOff.value.forEach(req => {
+  if (notifPrefs.value.timeOffRequests) pendingTimeOff.value.forEach(req => {
     const name = req.employeeName || 'Unknown';
     const start = new Date(Number(req.start_date || req.startDate)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const end   = new Date(Number(req.end_date   || req.endDate  )).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -106,15 +108,29 @@ onMounted(async () => {
   const savedTheme = localStorage.getItem('themePreference') || localStorage.getItem('theme');
   if (savedTheme) theme.global.name.value = savedTheme;
 
+  const savedPrefs = localStorage.getItem('notificationPreferences');
+  if (savedPrefs) {
+    try { notifPrefs.value = { ...notifPrefs.value, ...JSON.parse(savedPrefs) }; } catch {}
+  }
+
   await Promise.all([loadPendingRequests(), loadUnreadMsgCount()]);
   refreshInterval = setInterval(() => { loadPendingRequests(); loadUnreadMsgCount(); }, 15000);
   window.addEventListener('notifications-updated', loadPendingRequests);
+  window.addEventListener('notif-prefs-updated', reloadNotifPrefs);
 });
 
 onUnmounted(() => {
   if (refreshInterval) clearInterval(refreshInterval);
   window.removeEventListener('notifications-updated', loadPendingRequests);
+  window.removeEventListener('notif-prefs-updated', reloadNotifPrefs);
 });
+
+const reloadNotifPrefs = () => {
+  const saved = localStorage.getItem('notificationPreferences');
+  if (saved) {
+    try { notifPrefs.value = { ...notifPrefs.value, ...JSON.parse(saved) }; } catch {}
+  }
+};
 
 watch(() => route.path, () => { loadPendingRequests(); });
 

@@ -24,19 +24,27 @@ const apiClient = axios.create({
   },
 });
 
-// ✅ UPDATED REQUEST INTERCEPTOR - Attach auth headers
+// ✅ FIXED REQUEST INTERCEPTOR - Allow public endpoints
 apiClient.interceptors.request.use(
   (config) => {
     const isGuest = localStorage.getItem('isGuest') === 'true';
     const user = Utils.getStore("user");
     
-    // ✅ ADD DEBUG LOGGING
+    console.log('🔍 Request interceptor - URL:', config.url);
     console.log('🔍 Request interceptor - User object:', user);
     console.log('🔍 Request interceptor - isGuest:', isGuest);
     
-    // If logged-in user, add auth headers
+    // ✅ CRITICAL: Allow login/logout requests WITHOUT auth headers
+    const publicEndpoints = ['/auth/login', '/auth/logout', '/auth/register'];
+    const isPublicEndpoint = publicEndpoints.some(endpoint => config.url?.includes(endpoint));
+    
+    if (isPublicEndpoint) {
+      console.log('✅ Public endpoint - allowing request without auth headers');
+      return config;
+    }
+    
+    // For protected endpoints, add auth headers if user exists
     if (user && !isGuest) {
-      // Check for token in multiple places
       const token = user.token || 
                    localStorage.getItem('token') || 
                    localStorage.getItem('authToken');
@@ -45,12 +53,10 @@ apiClient.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
       
-      // ✅ IMPROVED: Handle different user object structures
       const userId = user.user_id || user.userId || user.id;
       const userEmail = user.email;
       const userRole = user.role;
       
-      // Only add headers if we have valid data
       if (userId && userEmail) {
         config.headers['x-user-id'] = userId;
         config.headers['x-user-email'] = userEmail;
@@ -63,20 +69,20 @@ apiClient.interceptors.request.use(
           hasToken: !!token
         });
       } else {
-        console.error('❌ Missing user ID or email!', { userId, userEmail, userRole });
+        console.warn('⚠️ Missing user ID or email for protected endpoint');
       }
     }
-    // If guest mode, add demo header
     else if (isGuest) {
       config.headers['x-demo-mode'] = 'true';
       console.log('👁️ Guest mode - demo header added');
     } else {
-      console.warn('⚠️ No user and not guest mode!');
+      console.log('ℹ️ No auth - assuming public or login request');
     }
     
     return config;
   },
   (error) => {
+    console.error('❌ Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
@@ -88,11 +94,9 @@ apiClient.interceptors.response.use(
   },
   (error) => {
     if (error.response && error.response.status === 401) {
-      // Don't redirect if in guest mode
       const isGuest = localStorage.getItem('isGuest') === 'true';
       if (!isGuest) {
         console.log('❌ 401 Unauthorized - redirecting to login');
-        // Unauthorized - clear user and redirect to login
         Utils.removeItem("user");
         Router.push({ name: "login" });
       } else {
