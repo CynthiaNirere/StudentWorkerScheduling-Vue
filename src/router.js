@@ -15,7 +15,6 @@ import GuestMessages from './views/GuestMessages.vue';
 import Login from "./views/Login.vue";
 import SignUp from "./views/SignUp.vue";
 import RoleSelect from "./views/RoleSelect.vue";
-import AdminViewDashboard from "./views/adminViewDashboard.vue";
 import EmployeeDashboard from "./views/EmployeeDashboard.vue";
 import EmployeeAvailability from "./views/EmployeeAvailabiliy.vue";
 import EmployeeSchedule from "./views/EmployeeSchedule.vue";
@@ -152,12 +151,6 @@ const router = createRouter({
       path: "/admin/workplace",
       name: "workplace",
       component: Workplace,
-      meta: { requiresAuth: true, requiresAdmin: true },
-    },
-    {
-      path: "/admin/dashboard",
-      name: "adminDashboard",
-      component: AdminViewDashboard, 
       meta: { requiresAuth: true, requiresAdmin: true },
     },
     
