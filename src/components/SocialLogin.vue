@@ -7,7 +7,7 @@ import { useRouter } from "vue-router";
 const router = useRouter();
 const fName = ref("");
 const lName = ref("");
-const user = ref({});
+const user  = ref({});
 
 const loginWithGoogle = () => {
   window.handleCredentialResponse = handleCredentialResponse;
@@ -28,40 +28,37 @@ const loginWithGoogle = () => {
 };
 
 const handleCredentialResponse = async (response) => {
-  let token = {
-    credential: response.credential,
-  };
-  
+  let token = { credential: response.credential };
+
   await AuthServices.loginUser(token)
-    .then((response) => {
-      user.value = response;
-      Utils.setStore("user", user.value);
-      fName.value = user.value.fName;
-      lName.value = user.value.lName;
-      
-      console.log('✅ Login successful:', user.value);
-      
-      // ✅ Route based on role with guest handling
-      if (user.value.isGuest || user.value.role === 'guest') {
-        console.log('👤 Guest user detected - redirecting to guest dashboard');
-        router.push({ name: 'guestDashboard' });
-      } else if (user.value.role === 'admin') {
-        console.log('👑 Admin user - redirecting to role select');
-        router.push({ name: 'roleSelect' });
-      } else if (user.value.role === 'employer') {
-        console.log('🏢 Employer user - redirecting to employer dashboard');
-        router.push({ name: 'employerDashboard' });
-      } else if (user.value.role === 'employee') {
-        console.log('👤 Employee user - redirecting to employee dashboard');
-        router.push({ name: 'employeeDashboard' });
-      } else {
-        // Fallback - treat unknown roles as guests
-        console.log('⚠️ Unknown role - redirecting to guest dashboard');
-        router.push({ name: 'guestDashboard' });
+    .then((data) => {
+      user.value = data;
+
+      // ── BEHAVIOR 1: No workplace — blocked ─────────────────────────────
+      if (data.blocked) {
+        // Fire event so Login.vue can show the blocked dialog
+        window.dispatchEvent(new CustomEvent('shiftboard-login-blocked', { detail: data }));
+        return;
       }
+
+      // ── BEHAVIOR 2: Multiple workplaces — show picker ──────────────────
+      if (data.needsWorkplaceSelect && Array.isArray(data.workplaces) && data.workplaces.length > 1) {
+        window.dispatchEvent(new CustomEvent('shiftboard-login-success', { detail: data }));
+        return;
+      }
+
+      // ── BEHAVIOR 3: Normal login — single workplace ────────────────────
+      Utils.setStore("user", data);
+      fName.value = data.fName;
+      lName.value = data.lName;
+
+      if (data.role === 'admin')    { router.push({ name: 'roleSelect' }); return; }
+      if (data.role === 'employer') { router.push({ name: 'employerDashboard' }); return; }
+      if (data.role === 'employee') { router.push({ name: 'employeeDashboard' }); return; }
+      router.push({ name: 'login' });
     })
     .catch((error) => {
-      console.error("❌ Login error:", error);
+      console.log("Login error:", error);
       alert("Login failed. Please try again.");
     });
 };
