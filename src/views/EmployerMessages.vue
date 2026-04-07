@@ -28,6 +28,8 @@ const snackbar        = ref(false);
 const snackbarMessage = ref('');
 const snackbarColor   = ref('success');
 
+const myId = computed(() => user.value?.user_id || user.value?.userId);
+
 // ── COMPUTED ──────────────────────────────────────────────────────────────
 const unreadCount = computed(() =>
   threads.value.reduce((sum, t) => sum + (t.unreadCount || 0), 0)
@@ -48,8 +50,7 @@ const loadEmployees = async () => {
   try {
     const res = await EmployerService.getAllEmployees();
     const all = Array.isArray(res.data) ? res.data : [];
-    const myId = user.value?.user_id || user.value?.userId;
-    employees.value = all.filter(u => u.role === 'employee' && (u.user_id || u.userId) !== myId);
+    employees.value = all.filter(u => u.role === 'employee' && (u.user_id || u.userId) !== myId.value);
   } catch {}
 };
 
@@ -67,9 +68,8 @@ const loadMessages = async () => {
   finally { loading.value = false; }
 };
 
-// Group messages into threads by subject + participants
 const buildThreads = (messages) => {
-  // ✅ Deduplicate by message_id first — prevents inbox+sent overlap
+  // Deduplicate by message_id — prevents inbox+sent overlap
   const seen = new Set();
   const unique = messages.filter(m => {
     if (seen.has(m.message_id)) return false;
@@ -77,9 +77,14 @@ const buildThreads = (messages) => {
     return true;
   });
 
+  const me = myId.value;
   const map = new Map();
   unique.forEach(m => {
-    const key = m.thread_id || m.subject || `msg-${m.message_id}`;
+    // Thread key: use thread_id if available, otherwise group by
+    // the pair of participants + subject so different conversations
+    // with the same subject between different people don't merge
+    const pair = [m.sender_id, m.recipient_id].filter(Boolean).sort().join('-');
+    const key  = m.thread_id || `conv-${pair}-${m.subject || 'no-subject'}`;
     if (!map.has(key)) {
       map.set(key, {
         threadKey:   key,
@@ -89,15 +94,17 @@ const buildThreads = (messages) => {
         latestAt:    0,
         unreadCount: 0,
         participants: new Set(),
+        lastMessage: null,
       });
     }
     const t = map.get(key);
     t.messages.push(m);
     const ts = Number(m.created_at || 0);
-    if (ts > t.latestAt) t.latestAt = ts;
-    if (!m.is_read && m.sender_id !== (user.value?.user_id || user.value?.userId)) t.unreadCount++;
-    if (m.sender_name)    t.participants.add(m.sender_name);
-    if (m.recipient_name) t.participants.add(m.recipient_name);
+    if (ts > t.latestAt) { t.latestAt = ts; t.lastMessage = m; }
+    if (!m.is_read && m.sender_id !== me) t.unreadCount++;
+    // Only add the OTHER person's name (like a phone — you don't see your own name)
+    if (m.sender_name && m.sender_id !== me)       t.participants.add(m.sender_name);
+    if (m.recipient_name && m.recipient_id !== me)  t.participants.add(m.recipient_name);
   });
   return [...map.values()]
     .sort((a, b) => b.latestAt - a.latestAt)
@@ -120,12 +127,11 @@ const sendReply = async () => {
   sendingReply.value = true;
   try {
     // Find the other participant to reply to
-    const myId = user.value?.user_id || user.value?.userId;
     const lastMsg = openThread.value.messages[openThread.value.messages.length - 1];
-    const recipientId = lastMsg?.sender_id !== myId ? lastMsg?.sender_id : lastMsg?.recipient_id;
+    const recipientId = lastMsg?.sender_id !== myId.value ? lastMsg?.sender_id : lastMsg?.recipient_id;
 
     await EmployerService.sendMessage({
-      recipientId:  recipientId ? [recipientId] : null,
+      recipientId,
       subject:      openThread.value.subject,
       message:      replyText.value.trim(),
       messageType:  openThread.value.type || 'direct',
@@ -200,8 +206,6 @@ const formatTimestamp = (ts) => {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
-const myId = computed(() => user.value?.user_id || user.value?.userId);
-
 const showSnackbar = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true; };
 </script>
 
@@ -261,6 +265,9 @@ const showSnackbar = (msg, color = 'success') => { snackbarMessage.value = msg; 
                       <span class="text-caption font-weight-bold navy-text text-truncate">{{ thread.subject }}</span>
                     </div>
                     <div class="text-caption text-grey text-truncate">{{ thread.participants.join(', ') || 'Team' }}</div>
+                    <div class="text-caption text-grey text-truncate" style="max-width: 200px;" v-if="thread.lastMessage">
+                      {{ thread.lastMessage.sender_id === myId ? 'You: ' : '' }}{{ thread.lastMessage.message }}
+                    </div>
                     <div class="text-caption text-grey">{{ formatTimestamp(thread.latestAt) }}</div>
                   </div>
                   <div class="d-flex flex-column align-end ga-1 ml-2">
@@ -287,7 +294,7 @@ const showSnackbar = (msg, color = 'success') => { snackbarMessage.value = msg; 
               <div class="pa-4 d-flex align-center justify-space-between" style="border-bottom:1px solid #e0e0e0;">
                 <div>
                   <div class="text-body-1 font-weight-bold navy-text">{{ openThread.subject }}</div>
-                  <div class="text-caption text-grey">{{ openThread.participants.join(', ') }}</div>
+                  <div class="text-caption text-grey">{{ openThread.participants.join(', ') || 'Team' }}</div>
                 </div>
                 <v-chip :color="openThread.type === 'broadcast' ? '#9C27B0' : '#4361EE'" size="x-small" variant="tonal">
                   {{ openThread.type === 'broadcast' ? 'Broadcast' : 'Direct' }}
@@ -304,7 +311,7 @@ const showSnackbar = (msg, color = 'success') => { snackbarMessage.value = msg; 
                 >
                   <div class="chat-bubble" :class="(msg.sender_id || msg.senderId) === myId ? 'bubble-mine' : 'bubble-theirs'">
                     <div class="text-caption font-weight-bold mb-1" :class="(msg.sender_id || msg.senderId) === myId ? 'text-white' : 'navy-text'">
-                      {{ (msg.sender_id || msg.senderId) === myId ? 'You' : (msg.sender_name || 'Employee') }}
+                      {{ msg.sender_id === myId ? 'You' : (msg.sender_name || msg.recipient_name || 'Unknown') }}
                     </div>
                     <div class="text-body-2" :class="(msg.sender_id || msg.senderId) === myId ? 'text-white' : ''">{{ msg.message }}</div>
                     <div class="text-caption mt-1 opacity-70" :class="(msg.sender_id || msg.senderId) === myId ? 'text-white' : 'text-grey'">

@@ -122,20 +122,28 @@ export default {
   },
 
   // ─── MESSAGES ─────────────────────────────────────────────────────────────
-  getConversations() {
-    return apiClient.get('/messages/conversations');
-  },
-
   sendMessage(data) {
     return apiClient.post('/messages', data);
   },
 
-  getThread(messageId) {
-    return apiClient.get(`/messages/${messageId}/thread`);
+  getInbox() {
+    return apiClient.get('/messages/inbox');
+  },
+
+  getSentMessages() {
+    return apiClient.get('/messages/sent');
   },
 
   getUnreadMessageCount() {
     return apiClient.get('/messages/unread-count');
+  },
+
+  markMessageAsRead(id) {
+    return apiClient.put(`/messages/${id}/read`, {});
+  },
+
+  deleteMessage(id) {
+    return apiClient.delete(`/messages/${id}`);
   },
 
   // ─── NOTIFICATIONS ────────────────────────────────────────────────────────
