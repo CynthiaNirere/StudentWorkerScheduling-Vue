@@ -15,7 +15,7 @@ const sendingReply   = ref(false);
 
 const showComposeDialog = ref(false);
 const composing         = ref(false);
-const composeType       = ref('manager'); // 'manager' | 'workplace'
+const composeRecipient  = ref('manager');
 const composeMessage    = ref('');
 const composeSubject    = ref('');
 
@@ -55,24 +55,50 @@ const loadMessages = async () => {
   finally { loading.value = false; }
 };
 
+const deleteThread = async (thread) => {
+  try {
+    for (const m of thread.messages) {
+      try { await EmployeeService.deleteMessage(m.message_id); } catch {}
+    }
+    if (openThread.value?.threadKey === thread.threadKey) openThread.value = null;
+    showSnackbar('Conversation deleted', 'success');
+    await loadMessages();
+  } catch { showSnackbar('Error deleting conversation', 'error'); }
+};
+
 const buildThreads = (messages) => {
+  // Deduplicate by message_id — prevents inbox+sent overlap
+  const seen = new Set();
+  const unique = messages.filter(m => {
+    if (seen.has(m.message_id)) return false;
+    seen.add(m.message_id);
+    return true;
+  });
+
+  const me = myId.value;
   const map = new Map();
-  messages.forEach(m => {
-    const key = m.thread_id || m.subject || `msg-${m.message_id}`;
+  unique.forEach(m => {
+    // Thread key: use thread_id if available, otherwise group by
+    // the pair of participants + subject so different conversations
+    // with the same subject between different people don't merge
+    const pair = [m.sender_id, m.recipient_id].filter(Boolean).sort().join('-');
+    const key  = m.thread_id || `conv-${pair}-${m.subject || 'no-subject'}`;
     if (!map.has(key)) {
       map.set(key, {
         threadKey: key, subject: m.subject || 'No Subject',
         type: m.message_type || 'direct', messages: [],
         latestAt: 0, unreadCount: 0, participants: new Set(),
+        lastMessage: null,
       });
     }
     const t = map.get(key);
     t.messages.push(m);
     const ts = Number(m.created_at || 0);
-    if (ts > t.latestAt) t.latestAt = ts;
-    if (!m.is_read && (m.sender_id || m.senderId) !== myId.value) t.unreadCount++;
-    if (m.sender_name)    t.participants.add(m.sender_name);
-    if (m.recipient_name) t.participants.add(m.recipient_name);
+    if (ts > t.latestAt) { t.latestAt = ts; t.lastMessage = m; }
+    if (!m.is_read && m.sender_id !== me) t.unreadCount++;
+    // Only add the OTHER person's name (like a phone — you don't see your own name)
+    if (m.sender_name && m.sender_id !== me)       t.participants.add(m.sender_name);
+    if (m.recipient_name && m.recipient_id !== me)  t.participants.add(m.recipient_name);
   });
   return [...map.values()]
     .sort((a, b) => b.latestAt - a.latestAt)
@@ -117,16 +143,18 @@ const sendNewMessage = async () => {
   if (!composeMessage.value.trim()) { showSnackbar('Message is required', 'error'); return; }
   composing.value = true;
   try {
+    const isBroadcast = composeRecipient.value === 'all';
     await EmployeeService.sendMessage({
       subject:     composeSubject.value || 'Message',
       message:     composeMessage.value.trim(),
-      messageType: composeType.value === 'workplace' ? 'broadcast' : 'direct',
-      recipientId: null, // null = manager (backend handles routing)
+      messageType: isBroadcast ? 'broadcast' : 'direct',
+      recipientId: null, // null = manager (backend handles routing for direct)
     });
-    showSnackbar(composeType.value === 'workplace' ? 'Message sent to your workplace!' : 'Message sent to your manager!', 'success');
+    showSnackbar(isBroadcast ? 'Message sent to all employees!' : 'Message sent to your manager!', 'success');
     showComposeDialog.value = false;
     composeMessage.value = '';
     composeSubject.value = '';
+    composeRecipient.value = 'manager';
     await loadMessages();
   } catch { showSnackbar('Error sending message', 'error'); }
   finally { composing.value = false; }
@@ -184,7 +212,7 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
                 :class="{ 'thread-active': openThread?.threadKey === thread.threadKey, 'thread-unread': thread.unreadCount > 0 }"
                 @click="openChat(thread)"
               >
-                <div class="d-flex align-start">
+                <div class="d-flex align-start justify-space-between">
                   <div class="flex-grow-1 min-width-0">
                     <div class="d-flex align-center ga-1 mb-1">
                       <v-icon size="12" :color="thread.type === 'broadcast' ? '#9C27B0' : '#4361EE'">
@@ -193,9 +221,15 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
                       <span class="text-caption font-weight-bold navy-text text-truncate">{{ thread.subject }}</span>
                     </div>
                     <div class="text-caption text-grey text-truncate">{{ thread.participants.join(', ') || 'Manager' }}</div>
+                    <div class="text-caption text-grey text-truncate" style="max-width: 200px;" v-if="thread.lastMessage">
+                      {{ thread.lastMessage.sender_id === myId ? 'You: ' : '' }}{{ thread.lastMessage.message }}
+                    </div>
                     <div class="text-caption text-grey">{{ formatTimestamp(thread.latestAt) }}</div>
                   </div>
-                  <v-badge v-if="thread.unreadCount > 0" :content="thread.unreadCount" color="#f57c00" inline class="ml-2" />
+                  <div class="d-flex flex-column align-end ga-1 ml-2">
+                    <v-badge v-if="thread.unreadCount > 0" :content="thread.unreadCount" color="#f57c00" inline />
+                    <v-btn icon="mdi-delete" size="x-small" variant="text" color="error" @click.stop="deleteThread(thread)" />
+                  </div>
                 </div>
               </div>
             </div>
@@ -214,7 +248,7 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
               <div class="pa-4 d-flex align-center justify-space-between" style="border-bottom:1px solid #e0e0e0;">
                 <div>
                   <div class="text-body-1 font-weight-bold navy-text">{{ openThread.subject }}</div>
-                  <div class="text-caption text-grey">{{ openThread.participants.join(', ') || 'Manager' }}</div>
+                  <div class="text-caption text-grey">{{ openThread.participants.join(', ') }}</div>
                 </div>
                 <v-chip :color="openThread.type === 'broadcast' ? '#9C27B0' : '#4361EE'" size="x-small" variant="tonal">
                   {{ openThread.type === 'broadcast' ? 'Broadcast' : 'Direct' }}
@@ -225,7 +259,7 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
                 <div v-for="msg in threadMessages" :key="msg.message_id" class="chat-bubble-row mb-3" :class="{ 'mine': (msg.sender_id || msg.senderId) === myId }">
                   <div class="chat-bubble" :class="(msg.sender_id || msg.senderId) === myId ? 'bubble-mine' : 'bubble-theirs'">
                     <div class="text-caption font-weight-bold mb-1" :class="(msg.sender_id || msg.senderId) === myId ? 'text-white' : 'navy-text'">
-                      {{ (msg.sender_id || msg.senderId) === myId ? 'You' : (msg.sender_name || 'Manager') }}
+                      {{ msg.sender_id === myId ? 'You' : (msg.sender_name || msg.recipient_name || 'Unknown') }}
                     </div>
                     <div class="text-body-2" :class="(msg.sender_id || msg.senderId) === myId ? 'text-white' : ''">{{ msg.message }}</div>
                     <div class="text-caption mt-1 opacity-70" :class="(msg.sender_id || msg.senderId) === myId ? 'text-white' : 'text-grey'">{{ formatTimestamp(msg.created_at) }}</div>
@@ -250,21 +284,25 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
     </v-container>
 
     <!-- Compose Dialog -->
-    <v-dialog v-model="showComposeDialog" max-width="520">
+    <v-dialog v-model="showComposeDialog" max-width="600">
       <v-card rounded="lg">
-        <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4 navy-text"><v-icon start>mdi-email-plus</v-icon>New Message</v-card-title>
+        <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4 navy-text">New Message</v-card-title>
         <v-divider />
         <v-card-text class="pa-5">
-          <div class="text-caption text-grey mb-2 font-weight-medium">Send to</div>
-          <v-btn-toggle v-model="composeType" color="#12086F" variant="outlined" mandatory divided class="mb-4" style="width:100%">
-            <v-btn value="manager" style="flex:1"><v-icon start size="small">mdi-account-tie</v-icon>My Manager</v-btn>
-            <v-btn value="workplace" style="flex:1"><v-icon start size="small">mdi-account-group</v-icon>Whole Workplace</v-btn>
-          </v-btn-toggle>
-          <v-alert v-if="composeType === 'workplace'" type="info" variant="tonal" density="compact" color="#9C27B0" class="mb-3">
-            This message will go to everyone at your workplace.
+          <v-select
+            v-model="composeRecipient"
+            :items="[
+              { title: 'My Manager', value: 'manager' },
+              { title: 'All Employees', value: 'all' },
+            ]"
+            label="Send to *"
+            variant="outlined" density="compact" class="mb-3" color="#12086F"
+          />
+          <v-alert v-if="composeRecipient === 'all'" type="info" variant="tonal" density="compact" color="#9C27B0" class="mb-3">
+            This message will be sent to all employees at your workplace.
           </v-alert>
-          <v-text-field v-model="composeSubject" label="Subject (optional)" variant="outlined" density="compact" class="mb-3" color="#12086F" />
-          <v-textarea v-model="composeMessage" label="Message *" variant="outlined" density="compact" rows="4" color="#12086F" autofocus />
+          <v-text-field v-model="composeSubject" label="Subject" variant="outlined" density="compact" class="mb-3" color="#12086F" />
+          <v-textarea v-model="composeMessage" label="Message *" variant="outlined" density="compact" rows="4" class="mb-3" color="#12086F" />
         </v-card-text>
         <v-divider />
         <v-card-actions class="pa-4">
