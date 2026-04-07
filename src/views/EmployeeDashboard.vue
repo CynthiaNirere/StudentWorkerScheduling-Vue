@@ -17,15 +17,50 @@ const pendingTimeOff = ref([]);
 const pendingSwaps   = ref([]);
 
 // ── CLOCK STATE ───────────────────────────────────────────────────────────
-const currentTime = ref('');
-const currentDate = ref('');
+const currentTime      = ref('');
+const currentDate      = ref('');
 const activeClockRecord = ref(null);
-const clockLoading = ref(false);
+const clockLoading     = ref(false);
+const isWorkDevice     = ref(false);
+const clockedInAt      = ref(null);
+const elapsedTime      = ref('00:00:00');
+const hoursRemaining   = ref('');
+const minutesRemaining = ref(0);
 
 const updateTime = () => {
   const now = new Date();
   currentTime.value = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
   currentDate.value = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  // Elapsed timer
+  if (clockedInAt.value) {
+    const diff = now - clockedInAt.value;
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    elapsedTime.value = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+
+  // Time remaining until shift end
+  if (activeClockRecord.value && todayDay.value?.shifts?.length) {
+    const shift = todayDay.value.shifts[0];
+    const endMin = shift.endTime || shift.end_time;
+    if (endMin != null) {
+      const shiftDate = new Date(Number(shift.shiftTime || shift.shift_time));
+      const endMs = new Date(shiftDate.getFullYear(), shiftDate.getMonth(), shiftDate.getDate(),
+        Math.floor(endMin / 60), endMin % 60, 0).getTime();
+      const diffMs = endMs - now.getTime();
+      if (diffMs > 0) {
+        const rh = Math.floor(diffMs / 3600000);
+        const rm = Math.floor((diffMs % 3600000) / 60000);
+        hoursRemaining.value = rh > 0 ? `${rh}h ${rm}m` : `${rm}m`;
+        minutesRemaining.value = Math.floor(diffMs / 60000);
+      } else {
+        hoursRemaining.value = '0m';
+        minutesRemaining.value = 0;
+      }
+    }
+  }
 };
 
 // ── WEEK NAVIGATION ───────────────────────────────────────────────────────
@@ -99,10 +134,15 @@ const nextShift = computed(() => {
 // ── DATA LOADING ──────────────────────────────────────────────────────────
 onMounted(async () => {
   user.value = Utils.getStore('user');
+  isWorkDevice.value = localStorage.getItem('isWorkDevice') === 'true';
   updateTime();
   setInterval(updateTime, 1000);
   await Promise.all([loadShifts(), loadTasks(), loadRequests()]);
   loading.value = false;
+  // Auto clock-in on work device if shift today and not already clocked in
+  if (isWorkDevice.value && !activeClockRecord.value && todayDay.value?.shifts?.length) {
+    await handleClockIn();
+  }
 });
 
 const loadShifts = async () => {
@@ -155,6 +195,8 @@ const handleClockIn = async () => {
     const shiftId = todayShifts[0].shift_id || todayShifts[0].id;
     const res = await EmployeeService.clockIn({ shiftId });
     activeClockRecord.value = res.data;
+    clockedInAt.value = new Date();
+    elapsedTime.value = '00:00:00';
     snackMsg.value = 'Clocked in successfully!';
     snackColor.value = 'success';
     snackbar.value = true;
@@ -172,6 +214,9 @@ const handleClockOut = async () => {
     const id = activeClockRecord.value.id || activeClockRecord.value.clock_id;
     await EmployeeService.clockOut(id);
     activeClockRecord.value = null;
+    clockedInAt.value = null;
+    elapsedTime.value = '00:00:00';
+    hoursRemaining.value = '';
     snackMsg.value = 'Clocked out successfully!';
     snackColor.value = 'success';
     snackbar.value = true;
@@ -246,20 +291,47 @@ const snackColor = ref('success');
                   </p>
                 </div>
 
-                <!-- Clock in/out -->
-                <v-btn
-                  v-if="!activeClockRecord"
-                  block color="#12086F" variant="flat" size="large"
-                  :loading="clockLoading"
-                  @click="handleClockIn"
-                >
-                  <v-icon start>mdi-login</v-icon>Clock In
-                </v-btn>
+                <!-- Clock status -->
+                <div v-if="!activeClockRecord" class="text-center py-2">
+                  <v-icon size="36" color="grey-lighten-2" class="mb-2">mdi-clock-outline</v-icon>
+                  <p class="text-caption text-grey">Not clocked in</p>
+                  <p v-if="!isWorkDevice" class="text-caption text-warning mt-1">
+                    <v-icon size="14" color="warning">mdi-laptop-off</v-icon>
+                    Use a registered work device to clock in
+                  </p>
+                </div>
                 <div v-else>
-                  <v-alert type="success" variant="tonal" density="compact" class="mb-3">
-                    <v-icon start>mdi-clock-fast</v-icon>
-                    Shift in progress
-                  </v-alert>
+                  <!-- Live elapsed timer -->
+                  <div class="timer-display pa-4 rounded-lg mb-3 text-center">
+                    <p class="text-caption mb-1" style="color:rgba(255,255,255,0.7);">Time worked</p>
+                    <p class="text-h4 font-weight-bold text-white mb-0" style="font-variant-numeric: tabular-nums;">
+                      {{ elapsedTime }}
+                    </p>
+                  </div>
+                  <div class="d-flex justify-space-between align-center mb-3 px-1">
+                    <div>
+                      <p class="text-caption text-grey mb-0">Clocked in</p>
+                      <p class="text-body-2 font-weight-bold navy-text mb-0">
+                        {{ clockedInAt?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) }}
+                      </p>
+                    </div>
+                    <div class="text-right" v-if="todayDay.shifts.length">
+                      <p class="text-caption text-grey mb-0">Clock out at</p>
+                      <p class="text-body-2 font-weight-bold navy-text mb-0">
+                        {{ formatTime(todayDay.shifts[0].endTime || todayDay.shifts[0].end_time) }}
+                      </p>
+                    </div>
+                  </div>
+                  <v-chip
+                    v-if="hoursRemaining"
+                    block
+                    :color="minutesRemaining <= 30 ? '#f57c00' : '#2e7d32'"
+                    variant="tonal"
+                    class="mb-3 w-100 justify-center"
+                  >
+                    <v-icon start size="16">mdi-timer-outline</v-icon>
+                    {{ hoursRemaining }} remaining
+                  </v-chip>
                   <v-btn block color="error" variant="flat" :loading="clockLoading" @click="handleClockOut">
                     <v-icon start>mdi-logout</v-icon>Clock Out
                   </v-btn>
@@ -425,6 +497,7 @@ const snackColor = ref('success');
 .navy-text { color: #12086F !important; }
 .navy-card { border-color: #e0e0e0; box-shadow: 0 1px 3px rgba(18,8,111,0.05); }
 .clock-display { background: linear-gradient(135deg, #12086F 0%, #1c10a8 100%); }
+.timer-display { background: linear-gradient(135deg, #2e7d32 0%, #388e3c 100%); }
 
 .schedule-grid {
   display: grid;

@@ -273,8 +273,8 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
     <v-dialog v-model="showDialog" max-width="500">
       <v-card rounded="lg">
         <v-card-title class="pa-5 pb-4 navy-text font-weight-bold">
-          <v-icon start>{{ requestType === 'timeoff' ? 'mdi-calendar-remove' : 'mdi-swap-horizontal' }}</v-icon>
-          {{ requestType === 'timeoff' ? 'Request Time Off' : 'Request Shift Swap' }}
+          <v-icon start>mdi-calendar-remove</v-icon>
+          Request Time Off
         </v-card-title>
         <v-divider />
 

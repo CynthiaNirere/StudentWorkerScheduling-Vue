@@ -19,6 +19,20 @@ const notificationPreferences = ref({
   timeOffRequests: true,
 });
 
+const isWorkDevice = ref(false);
+
+const registerWorkDevice = () => {
+  localStorage.setItem('isWorkDevice', 'true');
+  isWorkDevice.value = true;
+  showSnackbar('This device is now registered as a work device.', 'success');
+};
+
+const unregisterWorkDevice = () => {
+  localStorage.removeItem('isWorkDevice');
+  isWorkDevice.value = false;
+  showSnackbar('Work device registration removed.', 'success');
+};
+
 const snackbar        = ref(false);
 const snackbarMessage = ref("");
 const snackbarColor   = ref("success");
@@ -33,6 +47,7 @@ onMounted(() => {
   if (savedPrefs) {
     try { notificationPreferences.value = { ...notificationPreferences.value, ...JSON.parse(savedPrefs) }; } catch {}
   }
+  isWorkDevice.value = localStorage.getItem('isWorkDevice') === 'true';
 });
 
 // ✅ Instant apply on toggle — same pattern as employee
@@ -100,6 +115,31 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
         <v-card-actions class="pa-4 justify-end">
           <v-btn color="#12086F" variant="flat" @click="saveNotificationPreferences">Save Preferences</v-btn>
         </v-card-actions>
+      </v-card>
+
+      <!-- Work Device -->
+      <v-card variant="outlined" rounded="lg" class="mb-4 navy-card">
+        <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4 navy-text">
+          <v-icon start>mdi-laptop</v-icon>Work Device
+        </v-card-title>
+        <v-divider />
+        <v-card-text class="pa-5">
+          <p class="text-body-2 text-grey mb-4">
+            Register this laptop as the work device. Employees can only clock in from a registered work device.
+          </p>
+          <v-alert v-if="isWorkDevice" type="success" variant="tonal" density="compact" class="mb-4">
+            This device is registered — employees can clock in here.
+          </v-alert>
+          <v-alert v-else type="warning" variant="tonal" density="compact" class="mb-4">
+            This device is not registered. Employees cannot clock in from here.
+          </v-alert>
+          <v-btn v-if="!isWorkDevice" color="#12086F" variant="flat" prepend-icon="mdi-laptop-account" @click="registerWorkDevice">
+            Register This Device
+          </v-btn>
+          <v-btn v-else color="error" variant="tonal" prepend-icon="mdi-laptop-off" @click="unregisterWorkDevice">
+            Remove Registration
+          </v-btn>
+        </v-card-text>
       </v-card>
 
       <!-- Account -->
