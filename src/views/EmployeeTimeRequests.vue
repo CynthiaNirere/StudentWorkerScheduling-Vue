@@ -201,16 +201,6 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
         </v-btn>
       </div>
 
-      <!-- Summary chips -->
-      <div class="d-flex flex-wrap ga-2 mb-5">
-        <v-chip color="#12086F" variant="tonal" size="small">
-          <v-icon start size="small">mdi-format-list-bulleted</v-icon>{{ allRequests.length }} Total
-        </v-chip>
-        <v-chip color="#f57c00" variant="tonal" size="small">
-          <v-icon start size="small">mdi-clock-alert-outline</v-icon>{{ pendingCount }} Pending
-        </v-chip>
-      </div>
-
       <!-- Tabs -->
       <v-card variant="outlined" rounded="lg" class="mb-4 navy-card">
         <v-tabs v-model="selectedTab" color="#12086F">
