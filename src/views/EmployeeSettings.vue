@@ -139,29 +139,6 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
         </v-card-actions>
       </v-card>
 
-      <!-- Account -->
-      <v-card variant="outlined" rounded="lg" class="navy-card">
-        <v-card-title class="text-body-1 font-weight-bold pa-4 navy-text">
-          <v-icon start size="18">mdi-shield-account-outline</v-icon>Account
-        </v-card-title>
-        <v-divider />
-        <v-card-text class="pa-5">
-          <v-row dense class="mb-3">
-            <v-col cols="6">
-              <div class="text-caption text-grey">Role</div>
-              <v-chip size="small" color="#12086F" variant="tonal" class="mt-1">{{ user?.role || 'employee' }}</v-chip>
-            </v-col>
-            <v-col cols="6">
-              <div class="text-caption text-grey">Authentication</div>
-              <v-chip size="small" color="secondary" variant="tonal" class="mt-1">Google OAuth</v-chip>
-            </v-col>
-          </v-row>
-          <v-alert type="info" variant="tonal" density="compact" color="#4361EE">
-            To update your phone number, go to <strong>Profile</strong>. To sign out, use the account icon in the top right.
-          </v-alert>
-        </v-card-text>
-      </v-card>
-
     </v-container>
     <v-snackbar v-model="snackbar" :color="snackColor" timeout="3000" location="bottom right">{{ snackMsg }}</v-snackbar>
   </EmployeeLayout>
