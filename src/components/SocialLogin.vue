@@ -15,61 +15,73 @@ const loginWithGoogle = () => {
   window.google.accounts.id.initialize({
     client_id: client,
     cancel_on_tap_outside: false,
-    auto_select: true,
+    auto_select: false,
     callback: window.handleCredentialResponse,
   });
   window.google.accounts.id.renderButton(document.getElementById("parent_id"), {
     type: "standard",
     theme: "outline",
     size: "large",
-    text: "signup_with",
+    text: "signin_with",
     width: 400,
   });
 };
 
 const handleCredentialResponse = async (response) => {
-  let token = { credential: response.credential };
-
-  await AuthServices.loginUser(token)
-    .then((data) => {
-      user.value = data;
-
-      // ── BEHAVIOR 1: No workplace — blocked ─────────────────────────────
-      if (data.blocked) {
-        // ✅ Don't store user, don't clear guest flag yet — Login.vue handles this
-        window.dispatchEvent(new CustomEvent('shiftboard-login-blocked', { detail: data }));
-        return;
-      }
-
-      // ✅ Real login in progress — wipe any stale guest/user state immediately
-      localStorage.removeItem('isGuest');
-      localStorage.removeItem('user');
-
-      // ── BEHAVIOR 2: Multiple workplaces — show picker ──────────────────
-      if (data.needsWorkplaceSelect && Array.isArray(data.workplaces) && data.workplaces.length > 1) {
-        window.dispatchEvent(new CustomEvent('shiftboard-login-success', { detail: data }));
-        return;
-      }
-
-      // ── BEHAVIOR 3: Normal login — single workplace ────────────────────
-      Utils.setStore("user", data);
-      fName.value = data.fName || data.first_name || '';
-      lName.value = data.lName || data.last_name  || '';
-
-      if (data.role === 'admin')    { router.push({ name: 'roleSelect' });        return; }
-      if (data.role === 'employer') { router.push({ name: 'employerDashboard' }); return; }
-      if (data.role === 'employee') { router.push({ name: 'employeeDashboard' }); return; }
-
-      // Fallback — shouldn't normally reach here
-      router.push({ name: 'login' });
-    })
-    .catch((error) => {
-      console.error("Login error:", error);
-      alert("Login failed. Please try again.");
-    });
+  console.log("🔐 Google credential received");
+  
+  let token = {
+    credential: response.credential,
+  };
+  
+  try {
+    const loginResponse = await AuthServices.loginUser(token);
+    
+    console.log("📦 Login response from backend:", loginResponse);
+    
+    user.value = loginResponse;
+    
+    // ✅ Store user data in localStorage
+    Utils.setStore("user", user.value);
+    localStorage.setItem('token', user.value.token);
+    localStorage.setItem('isGuest', user.value.isGuest ? 'true' : 'false');
+    
+    fName.value = user.value.fName || user.value.first_name;
+    lName.value = user.value.lName || user.value.last_name;
+    
+    console.log('✅ Login successful for:', fName.value, lName.value);
+    console.log('👤 User role:', user.value.role);
+    console.log('🏢 Work location:', user.value.work_location);
+    
+    // ✅ Route based on role with guest handling
+    if (user.value.isGuest || user.value.role === 'guest') {
+      console.log('👤 Guest user detected - redirecting to guest dashboard');
+      router.push({ name: 'guestDashboard' });
+    } else if (user.value.role === 'admin') {
+      console.log('👑 Admin user - redirecting to workplace selection');
+      router.push({ name: 'workplace' });
+    } else if (user.value.role === 'employer') {
+      console.log('🏢 Employer user - redirecting to workplace selection');
+      router.push({ name: 'workplace' });
+    } else if (user.value.role === 'employee') {
+      console.log('👤 Employee user - redirecting to employee dashboard');
+      router.push({ name: 'employeeDashboard' });
+    } else {
+      console.log('⚠️ Unknown role:', user.value.role, '- redirecting to guest dashboard');
+      router.push({ name: 'guestDashboard' });
+    }
+  } catch (error) {
+    console.error("❌ Login error:", error);
+    console.error("❌ Error details:", error.response?.data);
+    
+    // Show user-friendly error message
+    const errorMessage = error.response?.data?.message || "Login failed. Please try again.";
+    alert(errorMessage);
+  }
 };
 
 onMounted(() => {
+  console.log("🚀 SocialLogin component mounted");
   loginWithGoogle();
 });
 </script>
