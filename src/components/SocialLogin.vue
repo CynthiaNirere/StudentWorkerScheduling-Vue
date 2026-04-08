@@ -36,10 +36,14 @@ const handleCredentialResponse = async (response) => {
 
       // ── BEHAVIOR 1: No workplace — blocked ─────────────────────────────
       if (data.blocked) {
-        // Fire event so Login.vue can show the blocked dialog
+        // ✅ Don't store user, don't clear guest flag yet — Login.vue handles this
         window.dispatchEvent(new CustomEvent('shiftboard-login-blocked', { detail: data }));
         return;
       }
+
+      // ✅ Real login in progress — wipe any stale guest/user state immediately
+      localStorage.removeItem('isGuest');
+      localStorage.removeItem('user');
 
       // ── BEHAVIOR 2: Multiple workplaces — show picker ──────────────────
       if (data.needsWorkplaceSelect && Array.isArray(data.workplaces) && data.workplaces.length > 1) {
@@ -49,16 +53,18 @@ const handleCredentialResponse = async (response) => {
 
       // ── BEHAVIOR 3: Normal login — single workplace ────────────────────
       Utils.setStore("user", data);
-      fName.value = data.fName;
-      lName.value = data.lName;
+      fName.value = data.fName || data.first_name || '';
+      lName.value = data.lName || data.last_name  || '';
 
-      if (data.role === 'admin')    { router.push({ name: 'roleSelect' }); return; }
+      if (data.role === 'admin')    { router.push({ name: 'roleSelect' });        return; }
       if (data.role === 'employer') { router.push({ name: 'employerDashboard' }); return; }
       if (data.role === 'employee') { router.push({ name: 'employeeDashboard' }); return; }
+
+      // Fallback — shouldn't normally reach here
       router.push({ name: 'login' });
     })
     .catch((error) => {
-      console.log("Login error:", error);
+      console.error("Login error:", error);
       alert("Login failed. Please try again.");
     });
 };
