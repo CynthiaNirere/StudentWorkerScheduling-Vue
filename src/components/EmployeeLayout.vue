@@ -9,9 +9,10 @@ import EmployerService from '../services/employerServices.js';
 
 const router = useRouter();
 const theme  = useTheme();
-const user         = ref(null);
-const businessArea = ref('');
-const rail         = ref(true);
+
+const user          = ref(null);
+const businessArea  = ref(null);   // full object { name, address, location_id }
+const rail          = ref(true);
 const showNotifications = ref(false);
 
 const { notifications, unreadCount, dismissNotification, handleNotificationAction } = useNotifications();
@@ -23,7 +24,7 @@ const loadUnreadMsgCount = async () => {
   try {
     const res = await EmployeeService.getUnreadMessageCount();
     unreadMsgCount.value = res.data?.unreadCount || 0;
-  } catch (e) { /* silent */ }
+  } catch { /* silent */ }
 };
 
 const sidebarGradient = computed(() =>
@@ -31,6 +32,9 @@ const sidebarGradient = computed(() =>
     ? 'linear-gradient(180deg, #1E1E1E 0%, #2D2D2D 100%)'
     : 'linear-gradient(180deg, #12086F 0%, #2B354F 100%)'
 );
+
+const workplaceName    = computed(() => businessArea.value?.name    || '');
+const workplaceAddress = computed(() => businessArea.value?.address || '');
 
 const userInitials = computed(() => {
   if (!user.value) return '?';
@@ -60,14 +64,19 @@ const goToNotificationPage = (notif) => {
 
 onMounted(async () => {
   user.value = Utils.getStore('user');
+
   if (user.value?.work_location) {
     try {
       const res = await EmployerService.getLocationById(user.value.work_location);
-      businessArea.value = res.data?.name || 'My Workplace';
-    } catch { businessArea.value = 'My Workplace'; }
+      businessArea.value = res.data || null;
+    } catch {
+      businessArea.value = { name: 'My Workplace', address: '' };
+    }
   }
+
   const savedTheme = localStorage.getItem('themePreference') || localStorage.getItem('theme');
   if (savedTheme) theme.global.name.value = savedTheme;
+
   await loadUnreadMsgCount();
   msgPollInterval = setInterval(loadUnreadMsgCount, 15000);
 });
@@ -90,8 +99,11 @@ onUnmounted(() => {
     >
       <div class="sidebar-header pa-4">
         <div v-show="!rail">
-          <h2 class="text-h6 font-weight-bold text-white">ShiftBoard</h2>
-          <p class="text-caption text-white-80 mt-1 mb-0">{{ businessArea || '...' }}</p>
+          <h2 class="text-h6 font-weight-bold text-white mb-0">ShiftBoard</h2>
+          <div v-if="workplaceName" class="workplace-badge mt-2">
+            <v-icon size="12" color="rgba(255,255,255,0.7)" class="mr-1">mdi-map-marker</v-icon>
+            <span class="text-caption font-weight-medium" style="color:rgba(255,255,255,0.9);">{{ workplaceName }}</span>
+          </div>
         </div>
         <div v-show="rail" class="text-center">
           <v-icon color="white" size="32">mdi-calendar-clock</v-icon>
@@ -133,7 +145,7 @@ onUnmounted(() => {
       <v-app-bar elevation="0" density="default" class="top-bar">
         <v-spacer />
 
-        <!-- Bell icon -->
+        <!-- Bell -->
         <v-menu location="bottom end" v-model="showNotifications">
           <template #activator="{ props: bellProps }">
             <v-btn v-bind="bellProps" icon variant="text" class="mr-1">
@@ -142,7 +154,7 @@ onUnmounted(() => {
               </v-badge>
             </v-btn>
           </template>
-          <v-card min-width="400" max-width="480" style="max-height: 500px; overflow-y: auto;">
+          <v-card min-width="400" max-width="480" style="max-height:500px;overflow-y:auto;">
             <v-card-title class="text-h6 font-weight-bold pa-4 d-flex align-center justify-space-between">
               <span>Notifications</span>
               <v-chip v-if="unreadCount > 0" size="x-small" color="error" variant="flat">{{ unreadCount }}</v-chip>
@@ -153,9 +165,7 @@ onUnmounted(() => {
               <p class="text-medium-emphasis text-body-2">All caught up!</p>
             </div>
             <div v-else>
-              <div
-                v-for="notif in notifications"
-                :key="notif.id"
+              <div v-for="notif in notifications" :key="notif.id"
                 class="pa-4 notif-row"
                 :class="{ 'notif-unread': !notif.read }"
                 @click="goToNotificationPage(notif)"
@@ -185,8 +195,8 @@ onUnmounted(() => {
               </v-avatar>
             </v-btn>
           </template>
-          <v-card min-width="200">
-            <v-card-text class="pa-3">
+          <v-card min-width="240">
+            <v-card-text class="pa-4">
               <div class="text-center mb-3">
                 <v-avatar size="48" color="#12086F" class="mb-2">
                   <span class="text-white font-weight-bold">{{ userInitials }}</span>
@@ -194,6 +204,14 @@ onUnmounted(() => {
                 <div class="text-body-2 font-weight-bold">{{ userFullName }}</div>
                 <div class="text-caption text-medium-emphasis">{{ userEmail }}</div>
               </div>
+
+              <!-- Workplace badge in profile -->
+              <div v-if="workplaceName" class="workplace-profile-badge mb-3">
+                <v-icon size="14" color="#12086F" class="mr-1">mdi-map-marker</v-icon>
+                <span class="text-caption font-weight-medium" style="color:#12086F;">{{ workplaceName }}</span>
+                <div v-if="workplaceAddress" class="text-caption text-grey mt-1 ml-4">{{ workplaceAddress }}</div>
+              </div>
+
               <v-divider class="my-2" />
               <v-list density="compact" class="pa-0">
                 <v-list-item prepend-icon="mdi-account" title="Profile" :to="{ name: 'employeeProfile' }" />
@@ -215,7 +233,6 @@ onUnmounted(() => {
 .employee-layout { display: flex; min-height: 100vh; }
 .sidebar { color: white; transition: width 0.3s ease; }
 .sidebar-header { background-color: rgba(0,0,0,0.15); min-height: 64px; display: flex; align-items: center; }
-.text-white-80 { color: rgba(255,255,255,0.8); }
 .border-white-20 { border-color: rgba(255,255,255,0.2) !important; }
 .nav-item { margin-bottom: 4px; transition: all 0.2s; }
 .nav-item:hover { background-color: rgba(255,255,255,0.1) !important; }
@@ -224,4 +241,19 @@ onUnmounted(() => {
 .notif-row { border-bottom: 1px solid #f0f0f0; cursor: pointer; transition: background 0.15s; }
 .notif-row:hover { background: #fafafa; }
 .notif-unread { border-left: 3px solid #f57c00; background: #fff8f3; }
+
+.workplace-badge {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255,255,255,0.12);
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+
+.workplace-profile-badge {
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  padding: 8px 12px;
+}
 </style>
