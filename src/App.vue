@@ -15,7 +15,7 @@
 /* Global size increase — scales everything uniformly */
 html {
   font-size: 20px;
-  zoom: 1.50;
+  zoom: 1.35;
 }
 body {
   font-size: 1rem;
