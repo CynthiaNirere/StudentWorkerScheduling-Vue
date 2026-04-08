@@ -18,7 +18,6 @@ const selectedWeek = ref(new Date());
 const loadingShifts = ref(false);
 const loadingTemplates = ref(false);
 
-// ✅ NEW: View mode — day | week | month
 const viewMode = ref('week');
 
 const showShiftDialog = ref(false);
@@ -86,8 +85,7 @@ const monthDays = computed(() => {
   const base = new Date(selectedWeek.value);
   const year = base.getFullYear();
   const month = base.getMonth();
-  const firstDay = new Date(year, month, 1);
-  const lastDay  = new Date(year, month + 1, 0);
+  const lastDay = new Date(year, month + 1, 0);
   const days = [];
   for (let d = 1; d <= lastDay.getDate(); d++) {
     const date = new Date(year, month, d);
@@ -108,29 +106,25 @@ const monthDays = computed(() => {
   return days;
 });
 
-// ── TODAY ONLY ────────────────────────────────────────────────────────────
 const todayDay = computed(() => {
   const today = new Date().toISOString().split('T')[0];
   return weekDays.value.find(d => d.dateString === today) || weekDays.value[0];
 });
 
-// ── DISPLAY DAYS — what the calendar actually renders ─────────────────────
 const displayDays = computed(() => {
   if (viewMode.value === 'day')   return [todayDay.value];
   if (viewMode.value === 'month') return monthDays.value;
-  return weekDays.value; // week
+  return weekDays.value;
 });
 
 const gridCols = computed(() => {
-  if (viewMode.value === 'day')   return 1;
-  if (viewMode.value === 'month') return 7;
+  if (viewMode.value === 'day') return 1;
   return 7;
 });
 
 const currentWeekLabel = computed(() => {
   if (viewMode.value === 'day') {
-    const t = new Date();
-    return t.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    return new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   }
   if (viewMode.value === 'month') {
     return new Date(selectedWeek.value).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
@@ -143,12 +137,15 @@ const currentWeekLabel = computed(() => {
 
 const timeOptions = {
   hours: Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0')),
-  minutes: ['00','15','30','45'], ampm: ['AM','PM']
+  minutes: ['00','15','30','45'],
+  ampm: ['AM','PM']
 };
 
 const availableEmployees = computed(() => {
   if (!shiftForm.value.date) return employees.value;
-  const selectedDate = new Date(shiftForm.value.date);
+  // Parse date string YYYY-MM-DD to avoid UTC timezone issues
+  const [year, month, day] = shiftForm.value.date.split('-').map(Number);
+  const selectedDate = new Date(year, month - 1, day);
   const dayOfWeek = selectedDate.getDay();
   const startMinutes = timeToMinutes(shiftForm.value.startHour, shiftForm.value.startMinute, shiftForm.value.startAmPm);
   const endMinutes   = timeToMinutes(shiftForm.value.endHour,   shiftForm.value.endMinute,   shiftForm.value.endAmPm);
@@ -156,9 +153,9 @@ const availableEmployees = computed(() => {
   return employees.value.filter(emp => {
     const empId = emp.user_id || emp.userId;
     const empAvail = availability.value.filter(a => {
-      const aUserId  = a.user_id || a.userId;
+      const aUserId    = a.user_id  || a.userId;
       const aDayOfWeek = a.day_of_week || a.dayOfWeek;
-      const isAvail  = a.is_available !== undefined ? a.is_available : true;
+      const isAvail    = a.is_available !== undefined ? a.is_available : true;
       return aUserId === empId && aDayOfWeek === dayOfWeek && isAvail;
     });
     if (!empAvail.length) return false;
@@ -189,7 +186,7 @@ const loadShifts = async () => {
   try {
     const res = await EmployerService.getAllShifts();
     shifts.value = Array.isArray(res.data) ? res.data : [];
-  } catch (err) { showSnackbar("Error loading shifts", "error"); }
+  } catch { showSnackbar("Error loading shifts", "error"); }
   finally { loadingShifts.value = false; }
 };
 
@@ -225,18 +222,16 @@ const loadTemplates = async () => {
 // ── NAVIGATION ────────────────────────────────────────────────────────────
 const previousPeriod = () => {
   const d = new Date(selectedWeek.value);
-  if (viewMode.value === 'month') { d.setMonth(d.getMonth() - 1); }
-  else { d.setDate(d.getDate() - 7); }
+  if (viewMode.value === 'month') d.setMonth(d.getMonth() - 1);
+  else d.setDate(d.getDate() - 7);
   selectedWeek.value = d;
 };
-
 const nextPeriod = () => {
   const d = new Date(selectedWeek.value);
-  if (viewMode.value === 'month') { d.setMonth(d.getMonth() + 1); }
-  else { d.setDate(d.getDate() + 7); }
+  if (viewMode.value === 'month') d.setMonth(d.getMonth() + 1);
+  else d.setDate(d.getDate() + 7);
   selectedWeek.value = d;
 };
-
 const goToToday = () => { selectedWeek.value = new Date(); };
 
 // ── SHIFT ACTIONS ─────────────────────────────────────────────────────────
@@ -278,7 +273,17 @@ const handleSaveShift = async () => {
   try {
     const [year, month, day] = shiftForm.value.date.split('-').map(Number);
     const shiftDate = new Date(year, month - 1, day, 12, 0, 0, 0);
-    const shiftData = { shiftTime: shiftDate.getTime(), startTime: startMinutes, endTime: endMinutes, userId: shiftForm.value.allowEmpty ? null : shiftForm.value.userId, jobRoleId: shiftForm.value.jobRole, notes: shiftForm.value.notes || "", status: 'draft', locationId: user.value?.work_location || 1, createdBy: user.value?.user_id || user.value?.userId };
+    const shiftData = {
+      shiftTime:   shiftDate.getTime(),
+      startTime:   startMinutes,
+      endTime:     endMinutes,
+      userId:      shiftForm.value.allowEmpty ? null : shiftForm.value.userId,
+      jobRoleId:   shiftForm.value.jobRole,
+      notes:       shiftForm.value.notes || "",
+      status:      'draft',
+      locationId:  user.value?.work_location || 1,
+      createdBy:   user.value?.user_id || user.value?.userId
+    };
     if (editMode.value && selectedShift.value) {
       await EmployerService.updateShift(selectedShift.value.shift_id || selectedShift.value.id, shiftData);
       if (shiftForm.value.assignedTasks.length > 0) {
@@ -294,7 +299,7 @@ const handleSaveShift = async () => {
       showSnackbar("Shift created successfully!", "success");
     }
     showShiftDialog.value = false; shiftCreationStep.value = 1; await loadShifts();
-  } catch (err) { showSnackbar(editMode.value ? "Error updating shift" : "Error creating shift", "error"); }
+  } catch { showSnackbar(editMode.value ? "Error updating shift" : "Error creating shift", "error"); }
   finally { creatingShift.value = false; }
 };
 
@@ -305,7 +310,16 @@ const openEditShift = async (shift) => {
   const endTime   = minutesToTime(shift.end_time   || shift.endTime);
   let assignedTasks = [];
   try { const r = await EmployerService.getShiftTasks(shift.shift_id || shift.id); if (Array.isArray(r.data)) assignedTasks = r.data.map(st => st.tasklist_id || st.tasklistId); } catch {}
-  shiftForm.value = { date: shiftDate.toISOString().split('T')[0], startHour: startTime.hour, startMinute: startTime.minute, startAmPm: startTime.ampm, endHour: endTime.hour, endMinute: endTime.minute, endAmPm: endTime.ampm, userId: shift.user_id || shift.userId || "", jobRole: shift.job_role_id || shift.jobRoleId || "", notes: shift.notes || "", assignedTasks, allowEmpty: !shift.user_id && !shift.userId };
+  shiftForm.value = {
+    date: shiftDate.toISOString().split('T')[0],
+    startHour: startTime.hour, startMinute: startTime.minute, startAmPm: startTime.ampm,
+    endHour: endTime.hour,     endMinute: endTime.minute,     endAmPm: endTime.ampm,
+    userId: shift.user_id || shift.userId || "",
+    jobRole: shift.job_role_id || shift.jobRoleId || "",
+    notes: shift.notes || "",
+    assignedTasks,
+    allowEmpty: !shift.user_id && !shift.userId
+  };
   showShiftDialog.value = true;
 };
 
@@ -378,6 +392,7 @@ const getJobRoleName = (shift) => {
 };
 
 const formatTime = (minutes) => {
+  if (minutes === undefined || minutes === null) return '';
   const hour24 = Math.floor(minutes / 60); const minute = minutes % 60;
   let hour12 = hour24 % 12; if (hour12 === 0) hour12 = 12;
   return `${hour12}:${minute.toString().padStart(2, '0')}${hour24 >= 12 ? 'PM' : 'AM'}`;
@@ -406,7 +421,7 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
         </div>
       </div>
 
-      <!-- Nav bar: prev/next + today + view toggle -->
+      <!-- Nav bar -->
       <v-card variant="outlined" rounded="lg" class="mb-4 navy-card">
         <div class="pa-3 d-flex align-center justify-space-between">
           <div class="d-flex align-center ga-1">
@@ -417,22 +432,15 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
 
           <span class="text-subtitle-1 font-weight-bold navy-text">{{ currentWeekLabel }}</span>
 
-          <!-- ✅ Day / Week / Month toggle -->
           <v-btn-toggle v-model="viewMode" color="#12086F" variant="outlined" mandatory divided density="compact">
-            <v-btn value="day" size="small">
-              <v-icon size="14" class="mr-1">mdi-calendar-today</v-icon>Day
-            </v-btn>
-            <v-btn value="week" size="small">
-              <v-icon size="14" class="mr-1">mdi-calendar-week</v-icon>Week
-            </v-btn>
-            <v-btn value="month" size="small">
-              <v-icon size="14" class="mr-1">mdi-calendar-month</v-icon>Month
-            </v-btn>
+            <v-btn value="day" size="small"><v-icon size="14" class="mr-1">mdi-calendar-today</v-icon>Day</v-btn>
+            <v-btn value="week" size="small"><v-icon size="14" class="mr-1">mdi-calendar-week</v-icon>Week</v-btn>
+            <v-btn value="month" size="small"><v-icon size="14" class="mr-1">mdi-calendar-month</v-icon>Month</v-btn>
           </v-btn-toggle>
         </div>
       </v-card>
 
-      <!-- Month view: weekday headers -->
+      <!-- Month weekday headers -->
       <div v-if="viewMode === 'month'" class="month-header-row mb-1">
         <div v-for="d in ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']" :key="d" class="month-header-cell">{{ d }}</div>
       </div>
@@ -445,10 +453,10 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
           class="calendar-grid"
           :style="{
             gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
-            minHeight: viewMode === 'day' ? '600px' : viewMode === 'month' ? 'auto' : '600px'
+            minHeight: viewMode === 'month' ? 'auto' : '600px'
           }"
         >
-          <!-- Headers — hidden in month view (we have month-header-row above) -->
+          <!-- Column headers (week/day only) -->
           <template v-if="viewMode !== 'month'">
             <div
               v-for="day in displayDays"
@@ -474,28 +482,59 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
               'calendar-day--month': viewMode === 'month'
             }"
           >
-            <!-- Month view: show date number inside cell -->
+            <!-- Month view: date number inside cell -->
             <div v-if="viewMode === 'month'" class="month-date-num" :class="{ 'today-num': day.isToday }">
               {{ day.dayOfMonth }}
             </div>
 
             <div class="shifts-container">
+              <!-- ✅ SHIFT CARD — shows start → end time, larger action buttons -->
               <div
                 v-for="shift in day.shifts"
                 :key="shift.shift_id || shift.id"
                 class="shift-card"
                 :style="{ backgroundColor: getShiftColor(shift), borderLeftColor: getShiftBorderColor(shift) }"
-                @click="openEditShift(shift)"
               >
-                <div class="shift-time">{{ formatTime(shift.start_time || shift.startTime) }}</div>
-                <div class="shift-employee">{{ getEmployeeName(shift) }}</div>
-                <div v-if="viewMode !== 'month'" class="shift-role text-caption">{{ getJobRoleName(shift) }}</div>
-                <div class="shift-actions" @click.stop>
-                  <v-btn icon="mdi-pencil" size="x-small" variant="plain" color="#4361EE" @click="openEditShift(shift)" />
-                  <v-btn icon="mdi-delete" size="x-small" variant="plain" color="#d32f2f" @click="openDeleteDialog(shift)" />
+                <!-- Time range row -->
+                <div class="shift-time-row">
+                  <span class="shift-time-start">{{ formatTime(shift.start_time || shift.startTime) }}</span>
+                  <span class="shift-time-arrow">→</span>
+                  <span class="shift-time-end">{{ formatTime(shift.end_time || shift.endTime) }}</span>
+                </div>
+
+                <!-- Employee name -->
+                <div class="shift-employee" :class="{ 'shift-unassigned': getEmployeeName(shift) === 'Unassigned' }">
+                  {{ getEmployeeName(shift) }}
+                </div>
+
+                <!-- Job role (hidden in month view) -->
+                <div v-if="viewMode !== 'month'" class="shift-role">
+                  {{ getJobRoleName(shift) }}
+                </div>
+
+                <!-- Draft badge -->
+                <div v-if="shift.status === 'draft'" class="shift-draft-badge">Draft</div>
+
+                <!-- ✅ Action buttons — always visible, larger hit area -->
+                <div class="shift-actions">
+                  <v-tooltip text="Edit shift" location="top">
+                    <template #activator="{ props }">
+                      <button v-bind="props" class="shift-action-btn shift-action-edit" @click.stop="openEditShift(shift)">
+                        <v-icon size="14">mdi-pencil</v-icon>
+                      </button>
+                    </template>
+                  </v-tooltip>
+                  <v-tooltip text="Delete shift" location="top">
+                    <template #activator="{ props }">
+                      <button v-bind="props" class="shift-action-btn shift-action-delete" @click.stop="openDeleteDialog(shift)">
+                        <v-icon size="14">mdi-delete</v-icon>
+                      </button>
+                    </template>
+                  </v-tooltip>
                 </div>
               </div>
 
+              <!-- Add shift button -->
               <div class="add-shift-area" @click="openCreateShiftForDay(day)">
                 <v-icon size="14" color="#12086F">mdi-plus</v-icon>
                 <span class="add-shift-text">{{ viewMode === 'month' ? '' : 'Add Shift' }}</span>
@@ -645,12 +684,15 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
 .navy-text { color: #12086F !important; }
 .navy-card { border-color: #e0e0e0; box-shadow: 0 1px 3px rgba(18,8,111,0.05); }
 
-.calendar-grid {
-  display: grid;
-}
+.calendar-grid { display: grid; }
 
-/* Week/Day headers */
-.calendar-header { background: linear-gradient(135deg, #12086F 0%, #2B354F 100%); color: white; padding: 12px 8px; text-align: center; border-right: 1px solid rgba(255,255,255,0.1); border-bottom: 2px solid #12086F; }
+/* ── Column headers ────────────────────────────────────────────────────── */
+.calendar-header {
+  background: linear-gradient(135deg, #12086F 0%, #2B354F 100%);
+  color: white; padding: 12px 8px; text-align: center;
+  border-right: 1px solid rgba(255,255,255,0.1);
+  border-bottom: 2px solid #12086F;
+}
 .calendar-header:last-child { border-right: none; }
 .today-header { background: linear-gradient(135deg, #4361EE 0%, #5B73F0 100%); }
 .day-name { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; margin-bottom: 4px; }
@@ -658,28 +700,158 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
 .date-number { font-size: 20px; font-weight: bold; line-height: 1; }
 .date-month { font-size: 11px; opacity: 0.8; }
 
-/* Day cells */
-.calendar-day { border-right: 1px solid #e0e0e0; border-bottom: 1px solid #e0e0e0; background: #fafafa; min-height: 500px; }
+/* ── Day cells ─────────────────────────────────────────────────────────── */
+.calendar-day {
+  border-right: 1px solid #e0e0e0;
+  border-bottom: 1px solid #e0e0e0;
+  background: #fafafa;
+  min-height: 500px;
+}
 .calendar-day:last-child { border-right: none; }
 .today-cell { background: #f0f4ff; }
-
-/* Month-specific cell */
 .calendar-day--month { min-height: 110px !important; }
+
+/* ── Month headers ─────────────────────────────────────────────────────── */
 .month-header-row { display: grid; grid-template-columns: repeat(7, 1fr); }
-.month-header-cell { background: linear-gradient(135deg, #12086F 0%, #2B354F 100%); color: white; text-align: center; padding: 8px 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-right: 1px solid rgba(255,255,255,0.1); }
+.month-header-cell {
+  background: linear-gradient(135deg, #12086F 0%, #2B354F 100%);
+  color: white; text-align: center; padding: 8px 4px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+  border-right: 1px solid rgba(255,255,255,0.1);
+}
 .month-header-cell:last-child { border-right: none; }
 .month-date-num { font-size: 13px; font-weight: 700; color: #12086F; padding: 6px 8px 2px; }
-.today-num { background: #12086F; color: white !important; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; margin: 4px 6px 2px; padding: 0; font-size: 12px; }
+.today-num {
+  background: #12086F; color: white !important; border-radius: 50%;
+  width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+  margin: 4px 6px 2px; padding: 0; font-size: 12px;
+}
 
-.shifts-container { padding: 6px; display: flex; flex-direction: column; gap: 5px; height: 100%; }
-.shift-card { background: white; border-left: 3px solid #4361EE; border-radius: 6px; padding: 6px 8px; cursor: pointer; transition: all 0.2s; position: relative; }
-.shift-card:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(18,8,111,0.15); }
-.shift-card:hover .shift-actions { opacity: 1; }
-.shift-time { font-size: 11px; font-weight: bold; color: #12086F; margin-bottom: 2px; }
-.shift-employee { font-size: 11px; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.shift-role { font-size: 10px; color: #666; margin-top: 2px; }
-.shift-actions { position: absolute; top: 4px; right: 4px; display: flex; gap: 2px; opacity: 0; transition: opacity 0.2s; background: rgba(255,255,255,0.95); border-radius: 4px; padding: 2px; }
-.add-shift-area { margin-top: auto; padding: 8px; border: 1px dashed #c0c0c0; border-radius: 6px; text-align: center; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 4px; }
+/* ── Shifts container ──────────────────────────────────────────────────── */
+.shifts-container {
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 100%;
+}
+
+/* ── Shift card ────────────────────────────────────────────────────────── */
+.shift-card {
+  background: white;
+  border-left: 3px solid #4361EE;
+  border-radius: 6px;
+  padding: 7px 8px 6px;
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.15s;
+  position: relative;
+}
+.shift-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(18,8,111,0.18);
+}
+
+/* ✅ Time range — start → end */
+.shift-time-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-bottom: 3px;
+}
+.shift-time-start,
+.shift-time-end {
+  font-size: 11px;
+  font-weight: 700;
+  color: #12086F;
+}
+.shift-time-arrow {
+  font-size: 9px;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+/* Employee name */
+.shift-employee {
+  font-size: 11px;
+  color: #1f2937;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 2px;
+}
+.shift-unassigned {
+  color: #f57c00;
+  font-style: italic;
+}
+
+/* Job role */
+.shift-role {
+  font-size: 10px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+/* Draft badge */
+.shift-draft-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  background: rgba(245, 124, 0, 0.12);
+  color: #b45309;
+  border-radius: 3px;
+  padding: 1px 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 4px;
+}
+
+/* ✅ Action buttons — always visible at bottom of card, proper size */
+.shift-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+  border-top: 1px solid rgba(0,0,0,0.06);
+  padding-top: 5px;
+}
+.shift-action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+  background: transparent;
+}
+.shift-action-edit {
+  color: #4361EE;
+}
+.shift-action-edit:hover {
+  background: rgba(67, 97, 238, 0.1);
+}
+.shift-action-delete {
+  color: #d32f2f;
+}
+.shift-action-delete:hover {
+  background: rgba(211, 47, 47, 0.1);
+}
+
+/* ── Add shift area ────────────────────────────────────────────────────── */
+.add-shift-area {
+  margin-top: auto;
+  padding: 8px;
+  border: 1px dashed #c0c0c0;
+  border-radius: 6px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
 .add-shift-area:hover { border-color: #12086F; background: rgba(18,8,111,0.03); }
 .add-shift-text { font-size: 11px; font-weight: 500; color: #12086F; }
 </style>

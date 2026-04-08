@@ -40,6 +40,7 @@ import EmployerAlerts from "./views/EmployerAlerts.vue";
 import EmployerMessages from "./views/EmployerMessages.vue";
 import EmployerSettings from "./views/EmployerSettings.vue";
 import EmployerTimeCards from "./views/EmployerTimeCards.vue";
+import ClockKiosk from "./views/ClockKiosk.vue";
 import Workplace from "./views/Workplace.vue";
 import Profile from "./views/Profile.vue";
 
@@ -313,6 +314,12 @@ const router = createRouter({
       path: "/employer/time-cards",
       name: "employerTimeCards",
       component: EmployerTimeCards,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/employer/clock-kiosk",
+      name: "clockKiosk",
+      component: ClockKiosk,
       meta: { requiresAuth: true },
     },
     

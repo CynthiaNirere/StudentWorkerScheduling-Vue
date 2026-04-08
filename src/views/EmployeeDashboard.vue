@@ -17,8 +17,8 @@ const pendingTimeOff = ref([]);
 const pendingSwaps   = ref([]);
 
 // ── CLOCK STATE ───────────────────────────────────────────────────────────
-const currentTime = ref('');
-const currentDate = ref('');
+const currentTime      = ref('');
+const currentDate      = ref('');
 const activeClockRecord = ref(null);
 const clockLoading = ref(false);
 const clockedInAt = ref(null);
@@ -128,6 +128,10 @@ onMounted(async () => {
   setInterval(updateTime, 1000);
   await Promise.all([loadShifts(), loadTasks(), loadRequests()]);
   loading.value = false;
+  // Auto clock-in on work device if shift today and not already clocked in
+  if (isWorkDevice.value && !activeClockRecord.value && todayDay.value?.shifts?.length) {
+    await handleClockIn();
+  }
 });
 
 const loadShifts = async () => {
@@ -490,6 +494,7 @@ const snackColor = ref('success');
 .navy-text { color: #12086F !important; }
 .navy-card { border-color: #e0e0e0; box-shadow: 0 1px 3px rgba(18,8,111,0.05); }
 .clock-display { background: linear-gradient(135deg, #12086F 0%, #1c10a8 100%); }
+.timer-display { background: linear-gradient(135deg, #2e7d32 0%, #388e3c 100%); }
 
 .schedule-grid {
   display: grid;

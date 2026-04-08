@@ -7,7 +7,7 @@ import { useRouter } from "vue-router";
 const router = useRouter();
 const fName = ref("");
 const lName = ref("");
-const user = ref({});
+const user  = ref({});
 
 const loginWithGoogle = () => {
   window.handleCredentialResponse = handleCredentialResponse;

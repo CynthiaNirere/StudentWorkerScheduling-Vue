@@ -5,145 +5,135 @@ import Utils from '../config/utils.js';
 import EmployerService from '../services/employerServices.js';
 import EmployerLayout from '../components/EmployerLayout.vue';
 
-const router = useRouter();
-const user = ref(null);
+const router  = useRouter();
+const user    = ref(null);
 const loading = ref(true);
 
-const weeklySchedule = ref([]);
+const weeklySchedule   = ref([]);
 const schedulePublished = ref(false);
-const pendingSwaps = ref([]);
-const pendingTimeOff = ref([]);
-const employees = ref([]);
+const pendingSwaps     = ref([]);
+const pendingTimeOff   = ref([]);
+const employees        = ref([]);
+const clockedInCount   = ref(0);
 
-const criticalAlerts = computed(() => {
-  const alerts = [];
-  if (schedulePublished.value) {
-    weekDays.value.forEach(day => {
-      if (day.shifts.length === 0 && !day.isFuture) {
-        alerts.push({
-          id: `no-shifts-${day.short}`,
-          type: 'error',
-          icon: 'mdi-alert-circle',
-          title: 'No Coverage',
-          message: `${day.full} (${day.monthShort} ${day.dateNum}) has no scheduled shifts`,
-          action: 'Add Shifts',
-          route: { name: 'employerSchedule' }
-        });
-      }
-    });
-  }
-  if (!schedulePublished.value && weeklySchedule.value.length > 0) {
-    alerts.push({
-      id: 'unpublished-schedule',
-      type: 'warning',
-      icon: 'mdi-calendar-alert',
-      title: 'Schedule Not Published',
-      message: "This week's schedule is still in draft. Publish it so employees can see their shifts.",
-      action: 'Publish Now',
-      route: { name: 'employerSchedule' }
-    });
-  }
-  if (pendingSwaps.value.length > 0) {
-    alerts.push({
-      id: 'pending-swaps',
-      type: 'info',
-      icon: 'mdi-swap-horizontal',
-      title: 'Shift Cover Requests',
-      message: `${pendingSwaps.value.length} shift cover request${pendingSwaps.value.length > 1 ? 's' : ''} awaiting review`,
-      action: 'Review',
-      route: { name: 'employerSwaps' }
-    });
-  }
-  if (pendingTimeOff.value.length > 0) {
-    alerts.push({
-      id: 'pending-timeoff',
-      type: 'info',
-      icon: 'mdi-calendar-remove',
-      title: 'Time Off Requests',
-      message: `${pendingTimeOff.value.length} time off request${pendingTimeOff.value.length > 1 ? 's' : ''} pending approval`,
-      action: 'Review',
-      route: { name: 'employerTimeOff' }
-    });
-  }
-  return alerts;
-});
-
+// ── WEEK DAYS ─────────────────────────────────────────────────────────────
 const weekDays = computed(() => {
-  const days = [
-    { short: 'SUN', full: 'Sunday' }, { short: 'MON', full: 'Monday' },
-    { short: 'TUE', full: 'Tuesday' }, { short: 'WED', full: 'Wednesday' },
-    { short: 'THU', full: 'Thursday' }, { short: 'FRI', full: 'Friday' },
-    { short: 'SAT', full: 'Saturday' }
-  ];
-  const today = new Date();
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const full  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const today  = new Date();
   const sunday = getSunday(today);
 
-  return days.map((day, i) => {
+  return days.map((short, i) => {
     const date = new Date(sunday);
     date.setDate(sunday.getDate() + i);
-    const dateNum = date.getDate();
-    const monthShort = date.toLocaleDateString('en-US', { month: 'short' });
+    const dateString = date.toISOString().split('T')[0];
     const shifts = weeklySchedule.value.filter(s => {
-      const shiftDate = new Date(Number(s.shift_time || s.shiftTime));
-      return shiftDate.toDateString() === date.toDateString();
-    }).sort((a, b) => (a.start_time || a.startTime) - (b.start_time || b.startTime));
+      const sd = new Date(Number(s.shift_time || s.shiftTime));
+      return sd.toISOString().split('T')[0] === dateString;
+    }).sort((a, b) => (a.start_time || a.startTime || 0) - (b.start_time || b.startTime || 0));
+
     return {
-      short: day.short, full: day.full, dateNum, monthShort, shifts,
+      short, full: full[i], dateNum: date.getDate(),
+      monthShort: date.toLocaleDateString('en-US', { month: 'short' }),
+      shifts,
       isToday: date.toDateString() === today.toDateString(),
-      isFuture: date > today
     };
   });
 });
 
+// ── STAT CARDS ────────────────────────────────────────────────────────────
+const statCards = computed(() => [
+  {
+    label:    'Employees',
+    value:    employees.value.length,
+    icon:     'mdi-account-group',
+    color:    '#12086F',
+    bg:       '#eef2ff',
+    route:    'employerEmployees',
+  },
+  {
+    label:    'Shifts This Week',
+    value:    weeklySchedule.value.length,
+    icon:     'mdi-calendar-check',
+    color:    '#4361EE',
+    bg:       '#e8eeff',
+    route:    'employerSchedule',
+  },
+  {
+    label:    'Pending Time Off',
+    value:    pendingTimeOff.value.length,
+    icon:     'mdi-calendar-remove',
+    color:    pendingTimeOff.value.length > 0 ? '#f57c00' : '#2e7d32',
+    bg:       pendingTimeOff.value.length > 0 ? '#fff3e0' : '#e8f5e9',
+    route:    'employerTimeOff',
+  },
+  {
+    label:    'Swap Requests',
+    value:    pendingSwaps.value.length,
+    icon:     'mdi-swap-horizontal',
+    color:    pendingSwaps.value.length > 0 ? '#9C27B0' : '#2e7d32',
+    bg:       pendingSwaps.value.length > 0 ? '#f3e5f5' : '#e8f5e9',
+    route:    'employerSwaps',
+  },
+]);
+
+// ── LIFECYCLE ─────────────────────────────────────────────────────────────
 onMounted(async () => {
   user.value = Utils.getStore('user');
-  await loadDashboardData();
+  await loadAll();
 });
 
-const loadDashboardData = async () => {
+const loadAll = async () => {
   loading.value = true;
   try {
-    await Promise.all([loadWeeklySchedule(), loadPendingRequests(), loadEmployees()]);
+    await Promise.all([loadSchedule(), loadRequests(), loadEmployees(), loadClockedIn()]);
   } finally {
     loading.value = false;
   }
 };
 
-const loadWeeklySchedule = async () => {
+const loadSchedule = async () => {
   try {
-    const sunday = getSunday(new Date());
-    const startDate = sunday.getTime();
-    const endDate = startDate + 7 * 24 * 60 * 60 * 1000;
-    const res = await EmployerService.getShiftsByWeek(startDate, endDate);
+    const res = await EmployerService.getAllShifts();
     const allShifts = Array.isArray(res.data) ? res.data : [];
-    weeklySchedule.value = allShifts;
-    schedulePublished.value = allShifts.some(s => s.status === 'published');
-  } catch (err) { console.error('Error loading schedule:', err); }
+    // Only this week's shifts
+    const sunday   = getSunday(new Date()).getTime();
+    const saturday = sunday + 7 * 24 * 60 * 60 * 1000;
+    weeklySchedule.value   = allShifts.filter(s => {
+      const t = Number(s.shift_time || s.shiftTime);
+      return t >= sunday && t < saturday;
+    });
+    schedulePublished.value = weeklySchedule.value.some(s => s.status === 'published');
+  } catch (err) { console.error('Schedule error:', err); }
 };
 
-const loadPendingRequests = async () => {
+const loadRequests = async () => {
   try {
-    const [swapRes, timeOffRes] = await Promise.all([
+    const [swapRes, toRes] = await Promise.all([
       EmployerService.getAllShiftSwapRequests(),
-      EmployerService.getAllTimeOffRequests()
+      EmployerService.getAllTimeOffRequests(),
     ]);
-    pendingSwaps.value = (Array.isArray(swapRes.data) ? swapRes.data : []).filter(s => s.status === 'pending' || s.status === 'accepted');
-    pendingTimeOff.value = (Array.isArray(timeOffRes.data) ? timeOffRes.data : []).filter(t => t.status === 'pending');
-  } catch (err) { console.error('Error loading requests:', err); }
+    pendingSwaps.value   = (Array.isArray(swapRes.data) ? swapRes.data : []).filter(s => s.status === 'pending' || s.status === 'accepted');
+    pendingTimeOff.value = (Array.isArray(toRes.data)   ? toRes.data   : []).filter(t => t.status === 'pending');
+  } catch (err) { console.error('Requests error:', err); }
 };
 
 const loadEmployees = async () => {
   try {
     const res = await EmployerService.getAllEmployees();
     employees.value = (Array.isArray(res.data) ? res.data : []).filter(u => u.role === 'employee');
-  } catch (err) { console.error('Error loading employees:', err); }
+  } catch (err) { console.error('Employees error:', err); }
 };
 
-const navigateToAlert = (alert) => { if (alert.route) router.push(alert.route); };
-const manageSchedule = () => router.push({ name: 'employerSchedule' });
-const addEmployee = () => router.push({ name: 'employerEmployees' });
-const viewTemplates = () => router.push({ name: 'employerTemplates' });
+const loadClockedIn = async () => {
+  try {
+    const res = await EmployerService.getAllClockRecords();
+    const records = Array.isArray(res.data) ? res.data : [];
+    clockedInCount.value = records.filter(r => r.status === 'clocked_in').length;
+  } catch { clockedInCount.value = 0; }
+};
 
+// ── HELPERS ───────────────────────────────────────────────────────────────
 const getSunday = (date) => {
   const d = new Date(date);
   d.setDate(d.getDate() - d.getDay());
@@ -151,125 +141,110 @@ const getSunday = (date) => {
   return d;
 };
 
-const formatShiftTime = (minutes) => {
+const formatTime = (minutes) => {
   if (!minutes && minutes !== 0) return '';
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
+  const h    = Math.floor(minutes / 60);
+  const m    = minutes % 60;
   const ampm = h >= 12 ? 'PM' : 'AM';
   const hour = h % 12 || 12;
   return `${hour}:${String(m).padStart(2, '0')}${ampm}`;
 };
-
-const getAlertColor = (type) => ({ error: '#d32f2f', warning: '#f57c00', info: '#4361EE', success: '#2e7d32' }[type] || '#4361EE');
 </script>
 
 <template>
   <EmployerLayout>
     <v-container fluid class="pa-6">
-      <div class="mb-6">
-        <h1 class="text-h4 font-weight-bold navy-text mb-1">Dashboard</h1>
-        <p class="text-body-2 text-grey">Your command center for workforce management</p>
+
+      <!-- Header -->
+      <div class="d-flex align-center justify-space-between mb-6">
+        <div>
+          <h1 class="text-h4 font-weight-bold navy-text">Dashboard</h1>
+          <p class="text-body-2 text-grey">
+            Welcome back, {{ user?.fName || user?.first_name }}!
+            <v-chip v-if="clockedInCount > 0" size="x-small" color="#2e7d32" variant="tonal" class="ml-2">
+              <v-icon start size="14">mdi-circle</v-icon>
+              {{ clockedInCount }} clocked in now
+            </v-chip>
+          </p>
+        </div>
+        <v-chip :color="schedulePublished ? '#2e7d32' : '#f57c00'" variant="tonal" size="small">
+          <v-icon start size="18">{{ schedulePublished ? 'mdi-check-circle' : 'mdi-alert-circle' }}</v-icon>
+          Schedule {{ schedulePublished ? 'Published' : 'Draft' }}
+        </v-chip>
       </div>
 
       <div v-if="loading" class="text-center py-12">
         <v-progress-circular indeterminate color="#12086F" size="48" />
-        <p class="text-body-2 text-grey mt-4">Loading dashboard...</p>
       </div>
 
       <template v-else>
-        <!-- Critical Alerts -->
-        <v-card v-if="criticalAlerts.length > 0" variant="outlined" rounded="lg" class="mb-6 alert-card">
-          <v-card-title class="pa-4 d-flex align-center">
-            <v-icon color="#d32f2f" class="mr-2">mdi-alert</v-icon>
-            <span class="text-h6 font-weight-bold">Needs Attention</span>
-            <v-spacer />
-            <v-chip size="small" color="error" variant="flat">{{ criticalAlerts.length }}</v-chip>
-          </v-card-title>
-          <v-divider />
-          <v-card-text class="pa-0">
-            <v-list density="compact">
-              <v-list-item
-                v-for="alert in criticalAlerts"
-                :key="alert.id"
-                class="alert-item"
-                @click="navigateToAlert(alert)"
-              >
-                <template #prepend>
-                  <v-avatar :color="getAlertColor(alert.type)" size="40">
-                    <v-icon color="white">{{ alert.icon }}</v-icon>
-                  </v-avatar>
-                </template>
-                <v-list-item-title class="font-weight-bold">{{ alert.title }}</v-list-item-title>
-                <v-list-item-subtitle>{{ alert.message }}</v-list-item-subtitle>
-                <template #append>
-                  <v-btn size="small" :color="getAlertColor(alert.type)" variant="tonal">
-                    {{ alert.action }}
-                    <v-icon end size="small">mdi-arrow-right</v-icon>
-                  </v-btn>
-                </template>
-              </v-list-item>
-            </v-list>
-          </v-card-text>
-        </v-card>
 
-        <!-- Quick Actions -->
+        <!-- ── Quick Actions ─────────────────────────────────────────────── -->
         <v-row class="mb-6">
           <v-col cols="12" sm="4">
-            <v-btn color="#12086F" variant="flat" size="x-large" @click="manageSchedule" block>
+            <v-btn block color="#12086F" variant="flat" size="large"
+              @click="router.push({ name: 'employerSchedule' })">
               <v-icon start>mdi-calendar-edit</v-icon>Manage Schedule
             </v-btn>
           </v-col>
           <v-col cols="12" sm="4">
-            <v-btn color="#4361EE" variant="outlined" size="x-large" @click="addEmployee" block>
-              <v-icon start>mdi-account-plus</v-icon>Add Employee
+            <v-btn block color="#4361EE" variant="outlined" size="large"
+              @click="router.push({ name: 'employerEmployees' })">
+              <v-icon start>mdi-account-plus</v-icon>Manage Employees
             </v-btn>
           </v-col>
           <v-col cols="12" sm="4">
-            <v-btn color="#9C27B0" variant="outlined" size="x-large" @click="viewTemplates" block>
-              <v-icon start>mdi-content-save</v-icon>Templates
+            <v-btn block color="#9C27B0" variant="outlined" size="large"
+              @click="router.push({ name: 'employerTimeCards' })">
+              <v-icon start>mdi-credit-card-clock-outline</v-icon>Review Time Cards
             </v-btn>
           </v-col>
         </v-row>
 
-        <!-- Weekly Schedule -->
-        <v-card class="navy-card mb-6" variant="outlined" rounded="lg">
-          <v-card-title class="d-flex justify-space-between align-center pa-4">
-            <div class="d-flex align-center">
-              <v-icon color="#12086F" class="mr-2">mdi-calendar-week</v-icon>
-              <span class="text-h6 font-weight-bold">This Week's Schedule</span>
-            </div>
-            <v-chip :color="schedulePublished ? '#2e7d32' : '#f57c00'" size="small" variant="tonal">
-              <v-icon start size="small">{{ schedulePublished ? 'mdi-check-circle' : 'mdi-alert-circle' }}</v-icon>
-              {{ schedulePublished ? 'Published' : 'Draft' }}
-            </v-chip>
+        <!-- ── This Week's Schedule ──────────────────────────────────────── -->
+        <v-card variant="outlined" rounded="lg" class="navy-card">
+          <v-card-title class="d-flex align-center justify-space-between pa-4">
+            <span class="text-body-1 font-weight-bold navy-text">
+              <v-icon start size="22">mdi-calendar-week</v-icon>This Week's Schedule
+            </span>
+            <v-btn size="small" color="#12086F" variant="tonal"
+              @click="router.push({ name: 'employerSchedule' })">
+              Open Full Schedule
+            </v-btn>
           </v-card-title>
           <v-divider />
           <v-card-text class="pa-4">
-            <div class="schedule-grid">
-              <div v-for="day in weekDays" :key="day.short" class="schedule-column" :class="{ 'today-column': day.isToday }">
-                <div class="schedule-header pa-3 text-center">
-                  <div class="text-overline font-weight-bold text-white mb-1">{{ day.short }}</div>
-                  <div class="text-h5 font-weight-bold text-white mb-0">{{ day.dateNum }}</div>
-                  <div class="text-caption text-white-70">{{ day.monthShort }}</div>
+            <div class="week-grid">
+              <div v-for="day in weekDays" :key="day.short"
+                class="week-col" :class="{ 'week-col--today': day.isToday }">
+
+                <!-- Day header -->
+                <div class="week-header">
+                  <div class="text-overline font-weight-bold text-white" style="font-size:13px;">{{ day.short }}</div>
+                  <div class="text-h6 font-weight-black text-white">{{ day.dateNum }}</div>
+                  <div class="text-caption text-white" style="opacity:0.7; font-size:12px;">{{ day.monthShort }}</div>
                 </div>
-                <div class="schedule-body pa-2">
-                  <v-chip v-if="day.isToday" color="#FFD700" size="x-small" class="mb-2 mx-auto d-block" style="width: fit-content;">
-                    <v-icon start size="x-small">mdi-star</v-icon>Today
-                  </v-chip>
-                  <div v-for="shift in day.shifts" :key="shift.shift_id" class="shift-item pa-2 mb-2">
-                    <div class="text-caption font-weight-bold navy-text">{{ formatShiftTime(shift.start_time || shift.startTime) }}</div>
-                    <div class="text-caption">{{ shift.employee_name || shift.employeeName || 'Unassigned' }}</div>
+
+                <!-- Shifts in this day -->
+                <div class="week-body">
+                  <div v-if="day.shifts.length === 0" class="empty-day">
+                    <v-icon size="26" color="grey-lighten-2">mdi-calendar-blank-outline</v-icon>
+                    <span class="text-caption text-grey" style="font-size:13px;">No shifts</span>
                   </div>
-                  <div v-if="day.shifts.length === 0" class="text-center py-6">
-                    <v-icon size="32" class="text-grey-lighten-1 mb-1">mdi-calendar-blank-outline</v-icon>
-                    <div class="text-caption text-grey">No shifts</div>
+                  <div v-for="shift in day.shifts" :key="shift.shift_id || shift.id" class="mini-shift">
+                    <div class="mini-shift-time">{{ formatTime(shift.start_time || shift.startTime) }}</div>
+                    <div class="mini-shift-name text-truncate">
+                      {{ shift.employee_name || shift.employeeName || 'Unassigned' }}
+                    </div>
+                    <v-chip v-if="shift.status === 'draft'" size="x-small" color="#f57c00" variant="tonal"
+                      style="font-size:11px; height:20px;">Draft</v-chip>
                   </div>
                 </div>
               </div>
             </div>
           </v-card-text>
         </v-card>
-        <!-- ✅ Stat cards with icons REMOVED — info is surfaced through alerts above -->
+
       </template>
     </v-container>
   </EmployerLayout>
@@ -277,16 +252,38 @@ const getAlertColor = (type) => ({ error: '#d32f2f', warning: '#f57c00', info: '
 
 <style scoped>
 .navy-text { color: #12086F !important; }
-.navy-card { border-color: #e0e0e0; box-shadow: 0 1px 3px rgba(18, 8, 111, 0.05); }
-.alert-card { border-left: 4px solid #d32f2f; }
-.alert-item { cursor: pointer; transition: background 0.2s; }
-.alert-item:hover { background: #f5f5f5; }
-.schedule-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; background: #f5f5f5; padding: 8px; border-radius: 8px; }
-.schedule-column { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.2s; }
-.schedule-column:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
-.today-column { border: 2px solid #FFD700; box-shadow: 0 2px 8px rgba(255,215,0,0.3); }
-.schedule-header { background: linear-gradient(135deg, #12086F 0%, #2B354F 100%); min-height: 90px; display: flex; flex-direction: column; justify-content: center; }
-.text-white-70 { color: rgba(255,255,255,0.7); }
-.schedule-body { min-height: 200px; max-height: 300px; overflow-y: auto; }
-.shift-item { background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-left: 3px solid #4361EE; border-radius: 6px; }
+.navy-card { border-color: #e0e0e0; box-shadow: 0 1px 3px rgba(18,8,111,0.05); }
+
+/* Stat cards */
+.stat-card { transition: all 0.2s; }
+.stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(18,8,111,0.12) !important; }
+.stat-icon-wrap { width: 52px; height: 52px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+
+/* Week grid */
+.week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; background: #f5f5f5; padding: 8px; border-radius: 12px; }
+.week-col { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: box-shadow 0.2s; }
+.week-col:hover { box-shadow: 0 3px 8px rgba(18,8,111,0.12); }
+.week-col--today { outline: 2px solid #4361EE; }
+
+.week-header {
+  background: linear-gradient(135deg, #12086F, #2B354F);
+  padding: 14px 8px;
+  text-align: center;
+  display: flex; flex-direction: column; align-items: center;
+}
+.week-col--today .week-header { background: linear-gradient(135deg, #4361EE, #5B73F0); }
+
+.week-body { padding: 8px; min-height: 140px; max-height: 280px; overflow-y: auto; }
+
+.empty-day { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 16px 4px; }
+
+.mini-shift {
+  background: #f0f4ff;
+  border-left: 3px solid #4361EE;
+  border-radius: 4px;
+  padding: 4px 6px;
+  margin-bottom: 4px;
+}
+.mini-shift-time { font-size: 13px; font-weight: 700; color: #12086F; }
+.mini-shift-name { font-size: 13px; color: #444; max-width: 100%; }
 </style>

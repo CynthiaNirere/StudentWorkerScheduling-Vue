@@ -207,7 +207,7 @@ const loadAvailabilityForWeek = async () => {
 
     avail.forEach(a => {
       const dbDay  = a.day_of_week ?? a.dayOfWeek;
-      const calIdx = dbDay === 0 ? 6 : dbDay - 1;
+      const calIdx = dbDay;
       const s      = a.start_time ?? a.startTime;
       const e      = a.end_time   ?? a.endTime;
       if (calIdx >= 0 && calIdx <= 6 && s != null && e != null) {
@@ -245,9 +245,8 @@ const submitAvailability = async () => {
       await EmployeeService.deleteAvailability(a.id ?? a.availability_id);
     }
 
-    // Re-create — calIdx 0(Mon)→dbDay 1, calIdx 6(Sun)→dbDay 0
     for (let calIdx = 0; calIdx < weekData.length; calIdx++) {
-      const dbDay = calIdx === 6 ? 0 : calIdx + 1;
+      const dbDay = calIdx;
       for (const slot of weekData[calIdx]) {
         await EmployeeService.createAvailability({
           userId,

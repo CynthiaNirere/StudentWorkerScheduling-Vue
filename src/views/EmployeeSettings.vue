@@ -11,6 +11,13 @@ const darkMode     = ref(false);
 const urgentPref   = ref('email');
 const urgentSaving = ref(false);
 
+const notificationPreferences = ref({
+  shiftReminders: true,
+  swapRequests: true,
+  timeOffRequests: true,
+  scheduleChanges: true,
+});
+
 const snackbar   = ref(false);
 const snackMsg   = ref('');
 const snackColor = ref('success');
@@ -20,6 +27,11 @@ onMounted(() => {
   const saved = localStorage.getItem('themePreference') || localStorage.getItem('theme');
   if (saved) { darkMode.value = saved === 'dark'; theme.global.name.value = saved; }
   if (user.value?.urgentContact) urgentPref.value = user.value.urgentContact;
+
+  const savedPrefs = localStorage.getItem('notificationPreferences');
+  if (savedPrefs) {
+    try { notificationPreferences.value = { ...notificationPreferences.value, ...JSON.parse(savedPrefs) }; } catch {}
+  }
 });
 
 watch(darkMode, (val) => {
@@ -35,6 +47,12 @@ const saveUrgentPref = async () => {
   user.value = Utils.getStore('user');
   urgentSaving.value = false;
   showSnackbar('Communication preference saved!');
+};
+
+const saveNotificationPreferences = () => {
+  localStorage.setItem('notificationPreferences', JSON.stringify(notificationPreferences.value));
+  window.dispatchEvent(new CustomEvent('notif-prefs-updated'));
+  showSnackbar('Notification preferences saved!');
 };
 
 const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackColor.value = color; snackbar.value = true; };
@@ -100,27 +118,25 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
         </v-card-text>
       </v-card>
 
-      <!-- Account -->
-      <v-card variant="outlined" rounded="lg" class="navy-card">
+      <!-- Notification Types -->
+      <v-card variant="outlined" rounded="lg" class="navy-card mb-4">
         <v-card-title class="text-body-1 font-weight-bold pa-4 navy-text">
-          <v-icon start size="18">mdi-shield-account-outline</v-icon>Account
+          <v-icon start size="18">mdi-bell-outline</v-icon>Notification Types
         </v-card-title>
         <v-divider />
         <v-card-text class="pa-5">
-          <v-row dense class="mb-3">
-            <v-col cols="6">
-              <div class="text-caption text-grey">Role</div>
-              <v-chip size="small" color="#12086F" variant="tonal" class="mt-1">{{ user?.role || 'employee' }}</v-chip>
-            </v-col>
-            <v-col cols="6">
-              <div class="text-caption text-grey">Authentication</div>
-              <v-chip size="small" color="secondary" variant="tonal" class="mt-1">Google OAuth</v-chip>
-            </v-col>
-          </v-row>
-          <v-alert type="info" variant="tonal" density="compact" color="#4361EE">
-            To update your phone number, go to <strong>Profile</strong>. To sign out, use the account icon in the top right.
+          <v-alert type="info" variant="tonal" density="compact" class="mb-4" color="#4361EE">
+            Choose which notification types appear in your bell icon.
           </v-alert>
+          <v-checkbox v-model="notificationPreferences.shiftReminders" label="Shift reminders" color="#12086F" density="compact" class="mb-1" hide-details />
+          <v-checkbox v-model="notificationPreferences.swapRequests" label="Shift swap requests" color="#12086F" density="compact" class="mb-1" hide-details />
+          <v-checkbox v-model="notificationPreferences.timeOffRequests" label="Time off requests" color="#12086F" density="compact" class="mb-1" hide-details />
+          <v-checkbox v-model="notificationPreferences.scheduleChanges" label="Schedule changes" color="#12086F" density="compact" hide-details />
         </v-card-text>
+        <v-divider />
+        <v-card-actions class="pa-4 justify-end">
+          <v-btn color="#12086F" variant="flat" @click="saveNotificationPreferences">Save Preferences</v-btn>
+        </v-card-actions>
       </v-card>
 
     </v-container>

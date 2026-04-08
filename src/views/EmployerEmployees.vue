@@ -183,7 +183,11 @@ const handleAddEmployee = async () => {
     showAddDialog.value = false;
     newEmployee.value = { first_name: "", last_name: "", email: "", phone_number: "", job_role: "" };
     await loadEmployees();
-  } catch { showSnackbar("Error adding employee", "error"); }
+  } catch (err) {
+    const msg = err.response?.data?.message || err.message || "Error adding employee";
+    showSnackbar(msg, "error");
+    console.error("Add employee error detail:", err.response?.data);
+  }
   finally { saving.value = false; }
 };
 
