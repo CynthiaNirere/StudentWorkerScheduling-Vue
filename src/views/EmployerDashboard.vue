@@ -162,13 +162,13 @@ const formatTime = (minutes) => {
           <p class="text-body-2 text-grey">
             Welcome back, {{ user?.fName || user?.first_name }}!
             <v-chip v-if="clockedInCount > 0" size="x-small" color="#2e7d32" variant="tonal" class="ml-2">
-              <v-icon start size="10">mdi-circle</v-icon>
+              <v-icon start size="14">mdi-circle</v-icon>
               {{ clockedInCount }} clocked in now
             </v-chip>
           </p>
         </div>
         <v-chip :color="schedulePublished ? '#2e7d32' : '#f57c00'" variant="tonal" size="small">
-          <v-icon start size="14">{{ schedulePublished ? 'mdi-check-circle' : 'mdi-alert-circle' }}</v-icon>
+          <v-icon start size="18">{{ schedulePublished ? 'mdi-check-circle' : 'mdi-alert-circle' }}</v-icon>
           Schedule {{ schedulePublished ? 'Published' : 'Draft' }}
         </v-chip>
       </div>
@@ -187,7 +187,7 @@ const formatTime = (minutes) => {
               <v-card-text class="pa-4">
                 <div class="d-flex align-center justify-space-between mb-3">
                   <div class="stat-icon-wrap" :style="{ background: card.bg }">
-                    <v-icon :color="card.color" size="22">{{ card.icon }}</v-icon>
+                    <v-icon :color="card.color" size="28">{{ card.icon }}</v-icon>
                   </div>
                   <span class="text-h4 font-weight-black" :style="{ color: card.color }">{{ card.value }}</span>
                 </div>
@@ -223,7 +223,7 @@ const formatTime = (minutes) => {
         <v-card variant="outlined" rounded="lg" class="navy-card">
           <v-card-title class="d-flex align-center justify-space-between pa-4">
             <span class="text-body-1 font-weight-bold navy-text">
-              <v-icon start size="18">mdi-calendar-week</v-icon>This Week's Schedule
+              <v-icon start size="22">mdi-calendar-week</v-icon>This Week's Schedule
             </span>
             <v-btn size="small" color="#12086F" variant="tonal"
               @click="router.push({ name: 'employerSchedule' })">
@@ -238,16 +238,16 @@ const formatTime = (minutes) => {
 
                 <!-- Day header -->
                 <div class="week-header">
-                  <div class="text-overline font-weight-bold text-white" style="font-size:9px;">{{ day.short }}</div>
+                  <div class="text-overline font-weight-bold text-white" style="font-size:13px;">{{ day.short }}</div>
                   <div class="text-h6 font-weight-black text-white">{{ day.dateNum }}</div>
-                  <div class="text-caption text-white" style="opacity:0.7;">{{ day.monthShort }}</div>
+                  <div class="text-caption text-white" style="opacity:0.7; font-size:12px;">{{ day.monthShort }}</div>
                 </div>
 
                 <!-- Shifts in this day -->
                 <div class="week-body">
                   <div v-if="day.shifts.length === 0" class="empty-day">
-                    <v-icon size="20" color="grey-lighten-2">mdi-calendar-blank-outline</v-icon>
-                    <span class="text-caption text-grey" style="font-size:10px;">No shifts</span>
+                    <v-icon size="26" color="grey-lighten-2">mdi-calendar-blank-outline</v-icon>
+                    <span class="text-caption text-grey" style="font-size:13px;">No shifts</span>
                   </div>
                   <div v-for="shift in day.shifts" :key="shift.shift_id || shift.id" class="mini-shift">
                     <div class="mini-shift-time">{{ formatTime(shift.start_time || shift.startTime) }}</div>
@@ -255,7 +255,7 @@ const formatTime = (minutes) => {
                       {{ shift.employee_name || shift.employeeName || 'Unassigned' }}
                     </div>
                     <v-chip v-if="shift.status === 'draft'" size="x-small" color="#f57c00" variant="tonal"
-                      style="font-size:8px; height:14px;">Draft</v-chip>
+                      style="font-size:11px; height:20px;">Draft</v-chip>
                   </div>
                 </div>
               </div>
@@ -275,23 +275,23 @@ const formatTime = (minutes) => {
 /* Stat cards */
 .stat-card { transition: all 0.2s; }
 .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(18,8,111,0.12) !important; }
-.stat-icon-wrap { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+.stat-icon-wrap { width: 52px; height: 52px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
 
 /* Week grid */
-.week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; background: #f5f5f5; padding: 6px; border-radius: 10px; }
+.week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; background: #f5f5f5; padding: 8px; border-radius: 12px; }
 .week-col { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: box-shadow 0.2s; }
 .week-col:hover { box-shadow: 0 3px 8px rgba(18,8,111,0.12); }
 .week-col--today { outline: 2px solid #4361EE; }
 
 .week-header {
   background: linear-gradient(135deg, #12086F, #2B354F);
-  padding: 10px 6px;
+  padding: 14px 8px;
   text-align: center;
   display: flex; flex-direction: column; align-items: center;
 }
 .week-col--today .week-header { background: linear-gradient(135deg, #4361EE, #5B73F0); }
 
-.week-body { padding: 6px; min-height: 120px; max-height: 240px; overflow-y: auto; }
+.week-body { padding: 8px; min-height: 140px; max-height: 280px; overflow-y: auto; }
 
 .empty-day { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 16px 4px; }
 
@@ -302,6 +302,6 @@ const formatTime = (minutes) => {
   padding: 4px 6px;
   margin-bottom: 4px;
 }
-.mini-shift-time { font-size: 10px; font-weight: 700; color: #12086F; }
-.mini-shift-name { font-size: 10px; color: #444; max-width: 100%; }
+.mini-shift-time { font-size: 13px; font-weight: 700; color: #12086F; }
+.mini-shift-name { font-size: 13px; color: #444; max-width: 100%; }
 </style>
