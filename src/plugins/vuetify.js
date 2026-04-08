@@ -18,6 +18,16 @@ loadFonts();
 const vuetify = createVuetify({
   components,
   directives,
+  defaults: {
+    VBtn: { size: 'large' },
+    VCard: { density: 'comfortable' },
+    VList: { density: 'comfortable' },
+    VListItem: { density: 'comfortable' },
+    VChip: { size: 'default' },
+    VTextField: { density: 'comfortable' },
+    VSelect: { density: 'comfortable' },
+    VAppBar: { density: 'default' },
+  },
   theme: {
     defaultTheme: "light",
     themes: {

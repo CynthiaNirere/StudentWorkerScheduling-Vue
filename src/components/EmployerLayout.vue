@@ -229,7 +229,7 @@ const logout = () => {
     </v-navigation-drawer>
 
     <div class="main-content">
-      <v-app-bar elevation="0" density="compact" class="top-bar">
+      <v-app-bar elevation="0" density="default" class="top-bar">
         <v-spacer />
 
         <!-- Bell icon -->
@@ -276,7 +276,7 @@ const logout = () => {
         <v-menu location="bottom end">
           <template #activator="{ props: menuProps }">
             <v-btn v-bind="menuProps" icon variant="text">
-              <v-avatar size="36" :color="isGuest ? '#4895EF' : '#12086F'">
+              <v-avatar size="42" :color="isGuest ? '#4895EF' : '#12086F'">
                 <span class="text-white font-weight-bold text-caption">{{ userInitials }}</span>
               </v-avatar>
             </v-btn>
@@ -284,7 +284,7 @@ const logout = () => {
           <v-card min-width="200">
             <v-card-text class="pa-3">
               <div class="text-center mb-3">
-                <v-avatar size="48" :color="isGuest ? '#4895EF' : '#12086F'" class="mb-2">
+                <v-avatar size="56" :color="isGuest ? '#4895EF' : '#12086F'" class="mb-2">
                   <span class="text-white font-weight-bold">{{ userInitials }}</span>
                 </v-avatar>
                 <div class="text-body-2 font-weight-bold">{{ userFullName }}</div>
