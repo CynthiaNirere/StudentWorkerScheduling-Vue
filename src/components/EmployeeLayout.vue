@@ -5,11 +5,13 @@ import { useTheme } from 'vuetify';
 import Utils from '../config/utils.js';
 import { useNotifications } from '../composables/useNotifications.js';
 import EmployeeService from '../services/employeeServices.js';
+import EmployerService from '../services/employerServices.js';
 
 const router = useRouter();
 const theme  = useTheme();
-const user   = ref(null);
-const rail   = ref(true);
+const user         = ref(null);
+const businessArea = ref('');
+const rail         = ref(true);
 const showNotifications = ref(false);
 
 const { notifications, unreadCount, dismissNotification, handleNotificationAction } = useNotifications();
@@ -58,6 +60,12 @@ const goToNotificationPage = (notif) => {
 
 onMounted(async () => {
   user.value = Utils.getStore('user');
+  if (user.value?.work_location) {
+    try {
+      const res = await EmployerService.getLocationById(user.value.work_location);
+      businessArea.value = res.data?.name || 'My Workplace';
+    } catch { businessArea.value = 'My Workplace'; }
+  }
   const savedTheme = localStorage.getItem('themePreference') || localStorage.getItem('theme');
   if (savedTheme) theme.global.name.value = savedTheme;
   await loadUnreadMsgCount();
@@ -83,6 +91,7 @@ onUnmounted(() => {
       <div class="sidebar-header pa-4">
         <div v-show="!rail">
           <h2 class="text-h6 font-weight-bold text-white">ShiftBoard</h2>
+          <p class="text-caption text-white-80 mt-1 mb-0">{{ businessArea || '...' }}</p>
         </div>
         <div v-show="rail" class="text-center">
           <v-icon color="white" size="32">mdi-calendar-clock</v-icon>
@@ -206,6 +215,7 @@ onUnmounted(() => {
 .employee-layout { display: flex; min-height: 100vh; }
 .sidebar { color: white; transition: width 0.3s ease; }
 .sidebar-header { background-color: rgba(0,0,0,0.15); min-height: 64px; display: flex; align-items: center; }
+.text-white-80 { color: rgba(255,255,255,0.8); }
 .border-white-20 { border-color: rgba(255,255,255,0.2) !important; }
 .nav-item { margin-bottom: 4px; transition: all 0.2s; }
 .nav-item:hover { background-color: rgba(255,255,255,0.1) !important; }
