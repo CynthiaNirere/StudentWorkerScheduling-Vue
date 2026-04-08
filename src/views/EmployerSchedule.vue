@@ -143,7 +143,9 @@ const timeOptions = {
 
 const availableEmployees = computed(() => {
   if (!shiftForm.value.date) return employees.value;
-  const selectedDate = new Date(shiftForm.value.date);
+  // Parse date string YYYY-MM-DD to avoid UTC timezone issues
+  const [year, month, day] = shiftForm.value.date.split('-').map(Number);
+  const selectedDate = new Date(year, month - 1, day);
   const dayOfWeek = selectedDate.getDay();
   const startMinutes = timeToMinutes(shiftForm.value.startHour, shiftForm.value.startMinute, shiftForm.value.startAmPm);
   const endMinutes   = timeToMinutes(shiftForm.value.endHour,   shiftForm.value.endMinute,   shiftForm.value.endAmPm);

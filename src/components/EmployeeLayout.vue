@@ -121,7 +121,7 @@ onUnmounted(() => {
 
     <!-- ── Main Content ─────────────────────────────────────────────────── -->
     <div class="main-content">
-      <v-app-bar elevation="0" density="compact" class="top-bar">
+      <v-app-bar elevation="0" density="default" class="top-bar">
         <v-spacer />
 
         <!-- Bell icon -->

@@ -1,8 +1,11 @@
 <script setup>
 import { ref, onMounted, watch } from "vue";
 import { useTheme } from 'vuetify';
+import { useRouter } from 'vue-router';
 import Utils from "../config/utils";
 import EmployerLayout from '../components/EmployerLayout.vue';
+
+const router = useRouter();
 
 const theme = useTheme();
 const user  = ref(null);
@@ -155,15 +158,25 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
           >
             Register This Device
           </v-btn>
-          <v-btn
-            v-else
-            color="error"
-            variant="tonal"
-            prepend-icon="mdi-laptop-off"
-            @click="unregisterWorkDevice"
-          >
-            Remove Registration
-          </v-btn>
+          <div v-else class="d-flex ga-3 flex-wrap">
+            <v-btn
+              color="#2E7D32"
+              variant="flat"
+              prepend-icon="mdi-clock-check-outline"
+              size="large"
+              @click="router.push({ name: 'clockKiosk' })"
+            >
+              Start Clock-In Mode
+            </v-btn>
+            <v-btn
+              color="error"
+              variant="tonal"
+              prepend-icon="mdi-laptop-off"
+              @click="unregisterWorkDevice"
+            >
+              Remove Registration
+            </v-btn>
+          </div>
         </v-card-text>
       </v-card>
 
