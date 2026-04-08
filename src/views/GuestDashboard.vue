@@ -112,7 +112,7 @@ const formatShiftTime = (minutes) => {
 const exitGuestMode = () => {
   localStorage.removeItem('isGuest');
   localStorage.removeItem('user');
-  router.push({ name: 'login' });
+  router.push({ name: 'landing' });
 };
 </script>
 
