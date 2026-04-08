@@ -16,6 +16,7 @@ const pickingWorkplace    = ref(false);
 // ── BLOCKED ───────────────────────────────────────────────────────────────
 const showBlockedDialog = ref(false);
 const blockedUserName   = ref('');
+const blockedReason     = ref('not_found');
 
 const handleLoginSuccess = (event) => {
   const data = event.detail;
@@ -35,6 +36,7 @@ const handleLoginSuccess = (event) => {
 const handleLoginBlocked = (event) => {
   const data = event?.detail || {};
   blockedUserName.value   = data.fName || '';
+  blockedReason.value     = data.reason || 'not_found';
   showBlockedDialog.value = true;
 };
 
@@ -181,13 +183,17 @@ onUnmounted(() => {
         <v-card-text class="pa-6 text-center">
           <v-icon size="56" color="#f57c00" class="mb-3">mdi-lock-outline</v-icon>
           <h2 class="text-h6 font-weight-bold mb-2" style="color:#12086F;">
-            No Workplace Found<span v-if="blockedUserName">, {{ blockedUserName }}</span>
+            {{ blockedReason === 'no_workplace' ? 'No Workplace Assigned' : 'Account Not Found' }}
+            <span v-if="blockedUserName">, {{ blockedUserName }}</span>
           </h2>
           <p class="text-body-2 text-grey mb-2">
-            Your account isn't linked to any workplace yet.
+            {{ blockedReason === 'no_workplace'
+              ? "Your account exists but hasn't been assigned to a workplace yet."
+              : "Your Google account hasn't been added to ShiftBoard yet." }}
           </p>
           <p class="text-body-2 text-grey mb-5">
-            Ask your supervisor to add you. Once added, sign in again and you'll be directed to your dashboard.
+            Ask your supervisor to {{ blockedReason === 'no_workplace' ? 'assign you to a workplace' : 'add your email to the system' }}.
+            Once done, sign in again and you'll be directed to your dashboard.
           </p>
           <v-alert type="info" variant="tonal" density="compact" color="#4361EE" class="mb-5 text-left">
             <strong>In the meantime</strong>, you can explore ShiftBoard as a guest to see how it works.
