@@ -274,6 +274,13 @@ export default {
   clockOut(id) {
     return apiClient.put(`/clock-records/clock-out/${id}`, {}, addDemoHeader());
   },
+  // Kiosk mode: clock in/out on behalf of an employee
+  kioskClockIn({ userId, shiftId }) {
+    return apiClient.post("/clock-records/clock-in", { userId, shiftId }, addDemoHeader());
+  },
+  kioskClockOut({ userId }) {
+    return apiClient.put("/clock-records/clock-out/0", { userId }, addDemoHeader());
+  },
 
   // ── BUSINESS AREAS / LOCATIONS ───────────────────────────────────────────
   getAllLocations() {

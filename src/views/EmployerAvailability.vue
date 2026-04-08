@@ -27,7 +27,7 @@ const defaultForm = { userId: null, dayOfWeek: null, startTime: null, endTime: n
 const addForm = ref({ ...defaultForm });
 const editForm = ref({ ...defaultForm, id: null });
 
-const dayOptions = daysOfWeek.map((label, index) => ({ title: label, value: (index + 6) % 7 }));
+const dayOptions = daysOfWeek.map((label, index) => ({ title: label, value: index }));
 
 const timeOptions = (() => {
   const opts = [];
@@ -55,7 +55,7 @@ const availabilityGrid = computed(() => {
 
     const weekSchedule = {};
     daysOfWeek.forEach((day, index) => {
-      const dbDay = (index + 6) % 7;
+      const dbDay = index;
       const dayAvail = employeeAvailability.filter((a) => {
         const d = a.day_of_week ?? a.dayOfWeek;
         return d === dbDay;

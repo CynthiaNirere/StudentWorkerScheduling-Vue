@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import Utils from '../config/utils.js';
 import EmployeeService from '../services/employeeServices.js';
 import EmployeeLayout from '../components/EmployeeLayout.vue';
@@ -27,8 +27,11 @@ const snackColor = ref('success');
 
 const myId = computed(() => user.value?.user_id || user.value?.userId);
 
-const unreadCount = computed(() =>
-  threads.value.reduce((sum, t) => sum + (t.unreadCount || 0), 0)
+const directUnreadCount = computed(() =>
+  threads.value.filter(t => t.type !== 'broadcast').reduce((sum, t) => sum + (t.unreadCount || 0), 0)
+);
+const broadcastUnreadCount = computed(() =>
+  threads.value.filter(t => t.type === 'broadcast').reduce((sum, t) => sum + (t.unreadCount || 0), 0)
 );
 
 const displayedThreads = computed(() => {
@@ -36,10 +39,15 @@ const displayedThreads = computed(() => {
   return threads.value.filter(t => t.type !== 'broadcast');
 });
 
+let pollTimer = null;
+
 onMounted(async () => {
   user.value = Utils.getStore('user');
   await loadMessages();
+  pollTimer = setInterval(pollMessages, 10000);
 });
+
+onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 
 const loadMessages = async () => {
   loading.value = true;
@@ -56,14 +64,26 @@ const loadMessages = async () => {
 };
 
 const deleteThread = async (thread) => {
-  try {
-    for (const m of thread.messages) {
-      try { await EmployeeService.deleteMessage(m.message_id); } catch {}
+  let deleted = 0;
+  let failed  = 0;
+  for (const m of thread.messages) {
+    try {
+      await EmployeeService.deleteMessage(m.message_id);
+      deleted++;
+    } catch (err) {
+      console.error('Delete message error:', m.message_id, err?.response?.data || err);
+      failed++;
     }
-    if (openThread.value?.threadKey === thread.threadKey) openThread.value = null;
+  }
+  if (openThread.value?.threadKey === thread.threadKey) openThread.value = null;
+  if (failed === 0) {
     showSnackbar('Conversation deleted', 'success');
-    await loadMessages();
-  } catch { showSnackbar('Error deleting conversation', 'error'); }
+  } else if (deleted > 0) {
+    showSnackbar(`Partially deleted (${failed} failed)`, 'warning');
+  } else {
+    showSnackbar('Error deleting conversation', 'error');
+  }
+  await loadMessages();
 };
 
 const buildThreads = (messages) => {
@@ -109,8 +129,14 @@ const openChat = async (thread) => {
   openThread.value     = thread;
   threadMessages.value = thread.messages.sort((a, b) => Number(a.created_at) - Number(b.created_at));
   replyText.value      = '';
-  for (const m of thread.messages.filter(m => !m.is_read)) {
-    try { await EmployeeService.markMessageAsRead(m.message_id); } catch {}
+  const me = myId.value;
+  // Only mark messages from OTHER people as read — never mark our own outgoing messages
+  const toMark = thread.messages.filter(m => !m.is_read && (m.sender_id || m.senderId) !== me);
+  for (const m of toMark) {
+    try {
+      await EmployeeService.markMessageAsRead(m.message_id);
+      m.is_read = true;
+    } catch {}
   }
   thread.unreadCount = 0;
 };
@@ -124,6 +150,11 @@ const sendReply = async () => {
       ? (lastMsg?.sender_id || lastMsg?.senderId)
       : (lastMsg?.recipient_id || lastMsg?.recipientId);
 
+    if (!recipientId) {
+      showSnackbar('Could not determine recipient', 'error');
+      return;
+    }
+
     await EmployeeService.sendMessage({
       recipientId,
       subject:     openThread.value.subject,
@@ -135,7 +166,7 @@ const sendReply = async () => {
     await loadMessages();
     const refreshed = threads.value.find(t => t.threadKey === openThread.value.threadKey);
     if (refreshed) openChat(refreshed);
-  } catch { showSnackbar('Error sending reply', 'error'); }
+  } catch (err) { console.error('Reply error:', err); showSnackbar('Error sending reply', 'error'); }
   finally { sendingReply.value = false; }
 };
 
@@ -171,12 +202,33 @@ const formatTimestamp = (ts) => {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
+// ── BACKGROUND POLL ──────────────────────────────────────────────────────
+const pollMessages = async () => {
+  try {
+    const [inboxRes, sentRes] = await Promise.all([
+      EmployeeService.getInbox(),
+      EmployeeService.getSentMessages(),
+    ]);
+    const inbox = Array.isArray(inboxRes.data) ? inboxRes.data : [];
+    const sent  = Array.isArray(sentRes.data)  ? sentRes.data  : [];
+    const currentKey = openThread.value?.threadKey;
+    threads.value = buildThreads([...inbox, ...sent]);
+    if (currentKey) {
+      const refreshed = threads.value.find(t => t.threadKey === currentKey);
+      if (refreshed) {
+        openThread.value = refreshed;
+        threadMessages.value = refreshed.messages.sort((a, b) => Number(a.created_at) - Number(b.created_at));
+      }
+    }
+  } catch (e) { console.warn('Poll refresh failed:', e); }
+};
+
 const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackColor.value = color; snackbar.value = true; };
 </script>
 
 <template>
   <EmployeeLayout>
-    <v-container fluid class="pa-6" style="max-width: 1100px;">
+    <v-container fluid class="pa-6">
 
       <div class="d-flex align-center justify-space-between mb-5">
         <div>
@@ -194,9 +246,12 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
             <v-tabs v-model="selectedTab" color="#12086F" density="compact">
               <v-tab value="direct">
                 Direct
-                <v-chip v-if="unreadCount > 0" size="x-small" color="#f57c00" variant="tonal" class="ml-1">{{ unreadCount }}</v-chip>
+                <v-chip v-if="directUnreadCount > 0" size="x-small" color="#f57c00" variant="tonal" class="ml-1">{{ directUnreadCount }}</v-chip>
               </v-tab>
-              <v-tab value="broadcast">Broadcast</v-tab>
+              <v-tab value="broadcast">
+                Broadcast
+                <v-chip v-if="broadcastUnreadCount > 0" size="x-small" color="#f57c00" variant="tonal" class="ml-1">{{ broadcastUnreadCount }}</v-chip>
+              </v-tab>
             </v-tabs>
             <v-divider />
             <div v-if="loading" class="text-center pa-6"><v-progress-circular indeterminate color="#12086F" size="24" /></div>
@@ -284,32 +339,35 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
     </v-container>
 
     <!-- Compose Dialog -->
-    <v-dialog v-model="showComposeDialog" max-width="600">
-      <v-card rounded="lg">
-        <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4 navy-text">New Message</v-card-title>
-        <v-divider />
-        <v-card-text class="pa-5">
-          <v-select
-            v-model="composeRecipient"
-            :items="[
-              { title: 'My Manager', value: 'manager' },
-              { title: 'All Employees', value: 'all' },
-            ]"
-            label="Send to *"
-            variant="outlined" density="compact" class="mb-3" color="#12086F"
-          />
-          <v-alert v-if="composeRecipient === 'all'" type="info" variant="tonal" density="compact" color="#9C27B0" class="mb-3">
-            This message will be sent to all employees at your workplace.
-          </v-alert>
-          <v-text-field v-model="composeSubject" label="Subject" variant="outlined" density="compact" class="mb-3" color="#12086F" />
-          <v-textarea v-model="composeMessage" label="Message *" variant="outlined" density="compact" rows="4" class="mb-3" color="#12086F" />
-        </v-card-text>
-        <v-divider />
-        <v-card-actions class="pa-4">
+    <v-dialog v-model="showComposeDialog" fullscreen transition="dialog-bottom-transition">
+      <v-card rounded="0" class="d-flex flex-column" style="height:100%;">
+        <v-toolbar color="#12086F" density="compact">
+          <v-btn icon="mdi-close" variant="text" @click="showComposeDialog = false" />
+          <v-toolbar-title class="text-body-1 font-weight-bold">New Message</v-toolbar-title>
           <v-spacer />
-          <v-btn variant="text" @click="showComposeDialog = false">Cancel</v-btn>
-          <v-btn color="#12086F" variant="flat" :loading="composing" @click="sendNewMessage">Send</v-btn>
-        </v-card-actions>
+          <v-btn variant="text" class="text-none" @click="showComposeDialog = false">Cancel</v-btn>
+          <v-btn variant="flat" color="white" class="text-none" :loading="composing" @click="sendNewMessage">Send</v-btn>
+        </v-toolbar>
+        <div class="flex-grow-1 d-flex justify-center" style="overflow-y:auto; background:#f8f9fc;">
+          <div style="width:100%; max-width:720px; padding:32px 24px;">
+            <v-card rounded="lg" class="pa-6" variant="outlined">
+              <v-select
+                v-model="composeRecipient"
+                :items="[
+                  { title: 'My Manager', value: 'manager' },
+                  { title: 'All Employees', value: 'all' },
+                ]"
+                label="Send to *"
+                variant="outlined" density="comfortable" class="mb-4" color="#12086F"
+              />
+              <v-alert v-if="composeRecipient === 'all'" type="info" variant="tonal" density="compact" color="#9C27B0" class="mb-4">
+                This message will be sent to all employees at your workplace.
+              </v-alert>
+              <v-text-field v-model="composeSubject" label="Subject" variant="outlined" density="comfortable" class="mb-4" color="#12086F" />
+              <v-textarea v-model="composeMessage" label="Message *" variant="outlined" density="comfortable" rows="8" class="mb-4" color="#12086F" />
+            </v-card>
+          </div>
+        </div>
       </v-card>
     </v-dialog>
 
