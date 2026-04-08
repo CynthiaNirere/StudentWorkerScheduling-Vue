@@ -1,6 +1,6 @@
 <template>
   <DashboardLayout>
-    <!-- ✅ TOP NAVIGATION BAR -->
+    <!-- TOP NAVIGATION BAR -->
     <div class="workplace-header d-flex justify-space-between align-center mb-6 pa-4 bg-primary">
       <div>
         <h1 class="text-h4 font-weight-bold text-white">
@@ -12,7 +12,6 @@
         </p>
       </div>
 
-      <!-- Profile Menu in Far Right -->
       <v-menu location="bottom">
         <template v-slot:activator="{ props }">
           <v-btn v-bind="props" icon>
@@ -21,31 +20,16 @@
             </v-avatar>
           </v-btn>
         </template>
-
         <v-card min-width="250">
           <v-card-text class="text-center pa-4">
             <v-avatar color="primary" size="64" class="mb-3">
-              <span class="text-h4 font-weight-bold text-white">
-                {{ getUserInitials() }}
-              </span>
+              <span class="text-h4 font-weight-bold text-white">{{ getUserInitials() }}</span>
             </v-avatar>
-            
             <h3 class="text-h6 mb-1">{{ getUserName() }}</h3>
             <p class="text-caption text-medium-emphasis mb-2">{{ getUserEmail() }}</p>
-            
-            <v-chip size="small" color="error" class="mb-4">
-              {{ getUserRole() }}
-            </v-chip>
-
-            <v-divider class="my-3"></v-divider>
-
-            <v-btn 
-              color="error" 
-              variant="tonal"
-              block 
-              @click="handleLogout" 
-              prepend-icon="mdi-logout"
-            >
+            <v-chip size="small" color="error" class="mb-4">{{ getUserRole() }}</v-chip>
+            <v-divider class="my-3" />
+            <v-btn color="error" variant="tonal" block @click="handleLogout" prepend-icon="mdi-logout">
               Logout
             </v-btn>
           </v-card-text>
@@ -54,33 +38,25 @@
     </div>
 
     <v-container fluid class="pa-6">
-      <!-- ✅ MANAGERS VIEW - Shows when workplace is selected -->
+
+      <!-- MANAGERS VIEW -->
       <div v-if="selectedWorkplace">
-        <!-- Quick Actions -->
         <div class="mb-6">
           <h3 class="text-h6 font-weight-medium mb-3">Quick Actions</h3>
           <div class="d-flex gap-3">
-            <v-btn color="primary" prepend-icon="mdi-account-plus" @click="openAddManagerDialog">
-              Add New Manager
-            </v-btn>
-            <v-btn variant="outlined" color="primary" prepend-icon="mdi-arrow-left" @click="backToWorkplaces">
-              Back to Workplaces
-            </v-btn>
+            <v-btn color="primary" prepend-icon="mdi-account-plus" @click="openAddManagerDialog">Add New Manager</v-btn>
+            <v-btn variant="outlined" color="primary" prepend-icon="mdi-arrow-left" @click="backToWorkplaces">Back to Workplaces</v-btn>
           </div>
         </div>
 
-        <!-- Managers Table -->
         <v-card elevation="2">
           <v-card-title class="bg-primary text-white d-flex align-center">
-            <v-icon start>mdi-account-tie</v-icon>
-            Managers
+            <v-icon start>mdi-account-tie</v-icon>Managers
           </v-card-title>
-          
           <div v-if="loading" class="text-center py-12">
-            <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
+            <v-progress-circular indeterminate color="primary" size="64" />
             <p class="mt-4 text-h6">Loading managers...</p>
           </div>
-
           <v-table v-else>
             <thead>
               <tr>
@@ -103,25 +79,8 @@
                 <td>{{ manager.email }}</td>
                 <td>{{ manager.phone_number || 'N/A' }}</td>
                 <td>
-                  <v-btn 
-                    variant="outlined" 
-                    size="small"
-                    color="primary"
-                    class="mr-2"
-                    prepend-icon="mdi-pencil"
-                    @click="openEditManagerDialog(manager)"
-                  >
-                    Edit
-                  </v-btn>
-                  <v-btn 
-                    variant="outlined" 
-                    size="small" 
-                    color="error"
-                    prepend-icon="mdi-delete"
-                    @click="confirmDeleteManager(manager)"
-                  >
-                    Delete
-                  </v-btn>
+                  <v-btn variant="outlined" size="small" color="primary" class="mr-2" prepend-icon="mdi-pencil" @click="openEditManagerDialog(manager)">Edit</v-btn>
+                  <v-btn variant="outlined" size="small" color="error" prepend-icon="mdi-delete" @click="confirmDeleteManager(manager)">Delete</v-btn>
                 </td>
               </tr>
             </tbody>
@@ -134,34 +93,23 @@
             <v-card-title class="bg-primary text-white">
               <div class="d-flex justify-space-between align-center">
                 <span class="text-h5">Add New Manager</span>
-                <v-btn icon variant="text" color="white" @click="closeAddManagerDialog">
-                  <v-icon>mdi-close</v-icon>
-                </v-btn>
+                <v-btn icon variant="text" color="white" @click="closeAddManagerDialog"><v-icon>mdi-close</v-icon></v-btn>
               </div>
             </v-card-title>
-
             <v-card-text class="pt-4">
               <v-form>
                 <v-row>
-                  <v-col cols="6">
-                    <v-text-field v-model="newManager.firstName" label="First Name *" variant="outlined" required></v-text-field>
-                  </v-col>
-                  <v-col cols="6">
-                    <v-text-field v-model="newManager.lastName" label="Last Name *" variant="outlined" required></v-text-field>
-                  </v-col>
+                  <v-col cols="6"><v-text-field v-model="newManager.firstName" label="First Name *" variant="outlined" required /></v-col>
+                  <v-col cols="6"><v-text-field v-model="newManager.lastName" label="Last Name *" variant="outlined" required /></v-col>
                 </v-row>
-
-                <v-text-field v-model="newManager.email" label="Email *" type="email" variant="outlined" required></v-text-field>
-                <v-text-field v-model="newManager.phoneNumber" label="Phone Number" variant="outlined"></v-text-field>
+                <v-text-field v-model="newManager.email" label="Email *" type="email" variant="outlined" required />
+                <v-text-field v-model="newManager.phoneNumber" label="Phone Number" variant="outlined" />
               </v-form>
             </v-card-text>
-
             <v-card-actions>
-              <v-spacer></v-spacer>
+              <v-spacer />
               <v-btn variant="text" @click="closeAddManagerDialog">Cancel</v-btn>
-              <v-btn color="primary" @click="addManager" :disabled="!newManager.firstName || !newManager.lastName || !newManager.email">
-                Add Manager
-              </v-btn>
+              <v-btn color="primary" @click="addManager" :disabled="!newManager.firstName || !newManager.lastName || !newManager.email">Add Manager</v-btn>
             </v-card-actions>
           </v-card>
         </v-dialog>
@@ -172,34 +120,23 @@
             <v-card-title class="bg-primary text-white">
               <div class="d-flex justify-space-between align-center">
                 <span class="text-h5">Edit Manager</span>
-                <v-btn icon variant="text" color="white" @click="closeEditManagerDialog">
-                  <v-icon>mdi-close</v-icon>
-                </v-btn>
+                <v-btn icon variant="text" color="white" @click="closeEditManagerDialog"><v-icon>mdi-close</v-icon></v-btn>
               </div>
             </v-card-title>
-
             <v-card-text class="pt-4">
               <v-form>
                 <v-row>
-                  <v-col cols="6">
-                    <v-text-field v-model="editManager.firstName" label="First Name *" variant="outlined" required></v-text-field>
-                  </v-col>
-                  <v-col cols="6">
-                    <v-text-field v-model="editManager.lastName" label="Last Name *" variant="outlined" required></v-text-field>
-                  </v-col>
+                  <v-col cols="6"><v-text-field v-model="editManager.firstName" label="First Name *" variant="outlined" required /></v-col>
+                  <v-col cols="6"><v-text-field v-model="editManager.lastName" label="Last Name *" variant="outlined" required /></v-col>
                 </v-row>
-
-                <v-text-field v-model="editManager.email" label="Email *" type="email" variant="outlined" required></v-text-field>
-                <v-text-field v-model="editManager.phoneNumber" label="Phone Number" variant="outlined"></v-text-field>
+                <v-text-field v-model="editManager.email" label="Email *" type="email" variant="outlined" required />
+                <v-text-field v-model="editManager.phoneNumber" label="Phone Number" variant="outlined" />
               </v-form>
             </v-card-text>
-
             <v-card-actions>
-              <v-spacer></v-spacer>
+              <v-spacer />
               <v-btn variant="text" @click="closeEditManagerDialog">Cancel</v-btn>
-              <v-btn color="primary" @click="saveEditManager" :disabled="!editManager.firstName || !editManager.lastName || !editManager.email">
-                Save Changes
-              </v-btn>
+              <v-btn color="primary" @click="saveEditManager" :disabled="!editManager.firstName || !editManager.lastName || !editManager.email">Save Changes</v-btn>
             </v-card-actions>
           </v-card>
         </v-dialog>
@@ -208,24 +145,19 @@
         <v-dialog v-model="showDeleteManagerDialog" max-width="500px">
           <v-card>
             <v-card-title class="bg-error text-white d-flex align-center">
-              <v-icon color="white" class="mr-2">mdi-alert-circle</v-icon>
-              Delete Manager
+              <v-icon color="white" class="mr-2">mdi-alert-circle</v-icon>Delete Manager
             </v-card-title>
-
             <v-card-text class="pt-6">
               <div v-if="managerToDelete" class="text-center">
                 <v-icon size="64" color="error" class="mb-4">mdi-account-remove</v-icon>
                 <p class="text-h6 mb-2">Are you sure you want to delete this manager?</p>
                 <p class="text-body-1 font-weight-bold">{{ managerToDelete.first_name }} {{ managerToDelete.last_name }}</p>
                 <p class="text-caption text-medium-emphasis">{{ managerToDelete.email }}</p>
-                <v-alert type="warning" variant="tonal" class="mt-4">
-                  <strong>Warning:</strong> This action cannot be undone.
-                </v-alert>
+                <v-alert type="warning" variant="tonal" class="mt-4"><strong>Warning:</strong> This action cannot be undone.</v-alert>
               </div>
             </v-card-text>
-
             <v-card-actions class="px-6 pb-6">
-              <v-spacer></v-spacer>
+              <v-spacer />
               <v-btn variant="text" @click="showDeleteManagerDialog = false; managerToDelete = null">Cancel</v-btn>
               <v-btn color="error" @click="deleteManager" prepend-icon="mdi-delete">Delete Manager</v-btn>
             </v-card-actions>
@@ -233,24 +165,14 @@
         </v-dialog>
       </div>
 
-      <!-- ✅ WORKPLACE SELECTION VIEW - Shows when no workplace selected -->
+      <!-- WORKPLACE SELECTION VIEW -->
       <div v-else>
         <h2 class="text-h5 mb-4">Business Areas</h2>
-
-        <!-- Business Areas Grid -->
         <v-row>
-          <v-col
-            v-for="area in businessAreas"
-            :key="area.location_id"
-            cols="12"
-            md="6"
-            lg="4"
-          >
+          <v-col v-for="area in businessAreas" :key="area.location_id" cols="12" md="6" lg="4">
             <v-card elevation="2" class="text-center pa-6 hover-card">
               <v-avatar size="80" color="accent" class="mb-4">
-                <span class="text-h4 text-white font-weight-bold">
-                  {{ getInitials(area.name) }}
-                </span>
+                <span class="text-h4 text-white font-weight-bold">{{ getInitials(area.name) }}</span>
               </v-avatar>
 
               <h3 class="text-h6 mb-2">{{ area.name }}</h3>
@@ -268,22 +190,42 @@
                 </v-list-item>
               </v-list>
 
+              <!-- Three action buttons -->
               <div class="d-flex gap-2 mt-4">
-                <v-btn color="primary" variant="flat" class="flex-grow-1" @click="selectWorkplace(area)">
-                  <v-icon start>mdi-check-circle</v-icon>
-                  Select & Continue
-                </v-btn>
-                
-                <v-btn color="primary" variant="outlined" @click="openManageDialog(area)">
+                <!-- Manage (gear) -->
+                <v-btn color="primary" variant="outlined" @click="openManageDialog(area)" size="default">
                   <v-icon>mdi-cog</v-icon>
                 </v-btn>
+
+                <!-- Select & Continue (managers view) -->
+                <v-btn color="primary" variant="flat" class="flex-grow-1" @click="selectWorkplace(area)">
+                  <v-icon start>mdi-account-tie</v-icon>Managers
+                </v-btn>
+
+                <!-- Login as this Workplace (impersonate) -->
+                <v-btn
+                  color="warning"
+                  variant="flat"
+                  :loading="impersonating === area.location_id"
+                  @click="loginAsWorkplace(area)"
+                  title="Login as this workplace"
+                >
+                  <v-icon>mdi-login-variant</v-icon>
+                </v-btn>
               </div>
+
+              <!-- Tooltip hint under impersonate button -->
+              <p class="text-caption text-medium-emphasis mt-2">
+                <v-icon size="12">mdi-information-outline</v-icon>
+                Use <v-icon size="12" color="warning">mdi-login-variant</v-icon> to view as this workplace's employer
+              </p>
             </v-card>
           </v-col>
 
           <!-- Add New Workplace Card -->
           <v-col cols="12" md="6" lg="4">
-            <v-card elevation="2" class="text-center pa-6 d-flex align-center justify-center hover-card" style="min-height: 320px; cursor: pointer;" @click="showAddDialog = true">
+            <v-card elevation="2" class="text-center pa-6 d-flex align-center justify-center hover-card"
+              style="min-height: 320px; cursor: pointer;" @click="showAddDialog = true">
               <div>
                 <v-icon size="64" color="primary" class="mb-4">mdi-plus-circle</v-icon>
                 <h3 class="text-h6 text-primary">Add Workplace</h3>
@@ -299,19 +241,15 @@
           <v-card-title class="bg-primary text-white">
             <div class="d-flex justify-space-between align-center">
               <span class="text-h5">Add New Business Area</span>
-              <v-btn icon variant="text" color="white" @click="closeAddDialog">
-                <v-icon>mdi-close</v-icon>
-              </v-btn>
+              <v-btn icon variant="text" color="white" @click="closeAddDialog"><v-icon>mdi-close</v-icon></v-btn>
             </div>
           </v-card-title>
-
           <v-card-text class="pt-4">
-            <v-text-field v-model="newArea.name" label="Name *" variant="outlined" placeholder="Enter full name" required></v-text-field>
-            <v-text-field v-model="newArea.address" label="Address *" variant="outlined" placeholder="Enter address" required></v-text-field>
+            <v-text-field v-model="newArea.name" label="Name *" variant="outlined" placeholder="Enter full name" required />
+            <v-text-field v-model="newArea.address" label="Address *" variant="outlined" placeholder="Enter address" required />
           </v-card-text>
-
           <v-card-actions>
-            <v-spacer></v-spacer>
+            <v-spacer />
             <v-btn variant="text" @click="closeAddDialog">Cancel</v-btn>
             <v-btn color="primary" @click="addBusinessArea" :disabled="!newArea.name || !newArea.address">Save</v-btn>
           </v-card-actions>
@@ -319,142 +257,76 @@
       </v-dialog>
 
       <!-- Manage Business Area Dialog -->
-<v-dialog v-model="showManageDialog" max-width="700px" persistent>
-  <v-card>
-    <v-card-title class="bg-primary text-white d-flex justify-space-between align-center pa-4">
-      <span class="text-h5">Manage {{ selectedArea?.name }}</span>
-      <v-btn icon variant="text" color="white" @click="closeManageDialog">
-        <v-icon>mdi-close</v-icon>
-      </v-btn>
-    </v-card-title>
-
-    <v-card-text class="pt-4">
-      <v-tabs v-model="manageTab" color="primary" class="mb-4">
-        <v-tab value="edit">Edit Details</v-tab>
-        <v-tab value="managers">Managers</v-tab>
-        <v-tab value="danger">Delete</v-tab>
-      </v-tabs>
-
-      <v-window v-model="manageTab">
-        <!-- Edit Details Tab -->
-        <v-window-item value="edit">
-          <v-form class="mt-4">
-            <v-text-field
-              v-model="editArea.name"
-              label="Name *"
-              variant="outlined"
-              required
-              hint="Enter workplace name"
-              persistent-hint
-            ></v-text-field>
-
-            <v-text-field
-              v-model="editArea.address"
-              label="Address *"
-              variant="outlined"
-              required
-              class="mt-4"
-              hint="Enter workplace address"
-              persistent-hint
-            ></v-text-field>
-
-            <v-btn color="primary" @click="updateBusinessArea" class="mt-6">
-              Save Changes
-            </v-btn>
-          </v-form>
-        </v-window-item>
-
-        <!-- Managers Tab -->
-        <v-window-item value="managers">
-          <div class="mt-4">
-            <h3 class="text-subtitle-1 font-weight-bold mb-4">Managers at {{ selectedArea?.name }}</h3>
-            
-            <v-list v-if="getManagers(selectedArea?.location_id).length > 0">
-              <v-list-item v-for="manager in getManagers(selectedArea?.location_id)" :key="manager.user_id" class="mb-2">
-                <template v-slot:prepend>
-                  <v-avatar color="secondary" size="40">
-                    <span class="text-white font-weight-bold">
-                      {{ manager.first_name[0] }}{{ manager.last_name[0] }}
-                    </span>
-                  </v-avatar>
-                </template>
-
-                <v-list-item-title>{{ manager.first_name }} {{ manager.last_name }}</v-list-item-title>
-                <v-list-item-subtitle>{{ manager.email }}</v-list-item-subtitle>
-
-                <template v-slot:append>
-                  <v-btn icon variant="text" color="error" @click="removeManager(manager)">
-                    <v-icon>mdi-delete</v-icon>
-                  </v-btn>
-                </template>
-              </v-list-item>
-            </v-list>
-
-            <v-alert v-else type="info" variant="tonal" class="mb-4">
-              No managers assigned to this workplace yet.
-            </v-alert>
-
-            <v-divider class="my-4"></v-divider>
-
-            <h4 class="text-subtitle-2 font-weight-bold mb-3">Assign New Manager</h4>
-            <v-select
-              v-model="selectedManagerToAdd"
-              :items="availableManagers"
-              item-title="fullName"
-              item-value="user_id"
-              label="Select Manager"
-              variant="outlined"
-              density="comfortable"
-            ></v-select>
-            <v-btn color="primary" @click="assignManager" :disabled="!selectedManagerToAdd" class="mt-2">
-              Assign Manager
-            </v-btn>
-          </div>
-        </v-window-item>
-
-        <!-- Danger Zone Tab -->
-        <v-window-item value="danger">
-          <div class="mt-4">
-            <v-alert type="warning" variant="tonal" class="mb-4">
-              <strong>Warning:</strong> Deleting this workplace is permanent and cannot be undone.
-            </v-alert>
-
-            <v-card variant="outlined" color="error">
-              <v-card-text>
-                <div class="d-flex align-center justify-space-between">
-                  <div>
-                    <h3 class="text-h6 mb-1">Delete this workplace</h3>
-                    <p class="text-caption text-medium-emphasis">
-                      This will permanently delete {{ selectedArea?.name }} and all associated data.
-                    </p>
-                  </div>
-                  <v-btn color="error" @click="confirmDelete">
-                    Delete Workplace
-                  </v-btn>
+      <v-dialog v-model="showManageDialog" max-width="700px" persistent>
+        <v-card>
+          <v-card-title class="bg-primary text-white d-flex justify-space-between align-center pa-4">
+            <span class="text-h5">Manage {{ selectedArea?.name }}</span>
+            <v-btn icon variant="text" color="white" @click="closeManageDialog"><v-icon>mdi-close</v-icon></v-btn>
+          </v-card-title>
+          <v-card-text class="pt-4">
+            <v-tabs v-model="manageTab" color="primary" class="mb-4">
+              <v-tab value="edit">Edit Details</v-tab>
+              <v-tab value="managers">Managers</v-tab>
+              <v-tab value="danger">Delete</v-tab>
+            </v-tabs>
+            <v-window v-model="manageTab">
+              <v-window-item value="edit">
+                <v-form class="mt-4">
+                  <v-text-field v-model="editArea.name" label="Name *" variant="outlined" required hint="Enter workplace name" persistent-hint />
+                  <v-text-field v-model="editArea.address" label="Address *" variant="outlined" required class="mt-4" hint="Enter workplace address" persistent-hint />
+                  <v-btn color="primary" @click="updateBusinessArea" class="mt-6">Save Changes</v-btn>
+                </v-form>
+              </v-window-item>
+              <v-window-item value="managers">
+                <div class="mt-4">
+                  <h3 class="text-subtitle-1 font-weight-bold mb-4">Managers at {{ selectedArea?.name }}</h3>
+                  <v-list v-if="getManagers(selectedArea?.location_id).length > 0">
+                    <v-list-item v-for="manager in getManagers(selectedArea?.location_id)" :key="manager.user_id" class="mb-2">
+                      <template v-slot:prepend>
+                        <v-avatar color="secondary" size="40">
+                          <span class="text-white font-weight-bold">{{ manager.first_name[0] }}{{ manager.last_name[0] }}</span>
+                        </v-avatar>
+                      </template>
+                      <v-list-item-title>{{ manager.first_name }} {{ manager.last_name }}</v-list-item-title>
+                      <v-list-item-subtitle>{{ manager.email }}</v-list-item-subtitle>
+                      <template v-slot:append>
+                        <v-btn icon variant="text" color="error" @click="removeManager(manager)"><v-icon>mdi-delete</v-icon></v-btn>
+                      </template>
+                    </v-list-item>
+                  </v-list>
+                  <v-alert v-else type="info" variant="tonal" class="mb-4">No managers assigned to this workplace yet.</v-alert>
+                  <v-divider class="my-4" />
+                  <h4 class="text-subtitle-2 font-weight-bold mb-3">Assign New Manager</h4>
+                  <v-select v-model="selectedManagerToAdd" :items="availableManagers" item-title="fullName" item-value="user_id" label="Select Manager" variant="outlined" density="comfortable" />
+                  <v-btn color="primary" @click="assignManager" :disabled="!selectedManagerToAdd" class="mt-2">Assign Manager</v-btn>
                 </div>
-              </v-card-text>
-            </v-card>
-          </div>
-        </v-window-item>
-      </v-window>
-    </v-card-text>
+              </v-window-item>
+              <v-window-item value="danger">
+                <div class="mt-4">
+                  <v-alert type="warning" variant="tonal" class="mb-4"><strong>Warning:</strong> Deleting this workplace is permanent and cannot be undone.</v-alert>
+                  <v-card variant="outlined" color="error">
+                    <v-card-text>
+                      <div class="d-flex align-center justify-space-between">
+                        <div>
+                          <h3 class="text-h6 mb-1">Delete this workplace</h3>
+                          <p class="text-caption text-medium-emphasis">This will permanently delete {{ selectedArea?.name }} and all associated data.</p>
+                        </div>
+                        <v-btn color="error" @click="confirmDelete">Delete Workplace</v-btn>
+                      </div>
+                    </v-card-text>
+                  </v-card>
+                </div>
+              </v-window-item>
+            </v-window>
+          </v-card-text>
+          <v-card-actions class="px-4 pb-4">
+            <v-spacer /><v-btn variant="text" @click="closeManageDialog">Close</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
 
-    <v-card-actions class="px-4 pb-4">
-      <v-spacer></v-spacer>
-      <v-btn variant="text" @click="closeManageDialog">Close</v-btn>
-    </v-card-actions>
-  </v-card>
-</v-dialog>
-
-      <!-- Success Snackbar -->
-      <v-snackbar v-model="showSuccess" color="success" :timeout="3000">
-        {{ successMessage }}
-      </v-snackbar>
-
-      <!-- Error Snackbar -->
-      <v-snackbar v-model="showError" color="error" :timeout="3000">
-        {{ errorMessage }}
-      </v-snackbar>
+      <v-snackbar v-model="showSuccess" color="success" :timeout="3000">{{ successMessage }}</v-snackbar>
+      <v-snackbar v-model="showError"   color="error"   :timeout="3000">{{ errorMessage }}</v-snackbar>
     </v-container>
   </DashboardLayout>
 </template>
@@ -465,117 +337,127 @@ import { useRouter } from 'vue-router';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import businessAreaServices from '../services/businessAreaServices';
 import adminServices from '../services/adminViewServices';
-import Utils from '../config/utils';
 import AuthServices from '../services/authServices';
+import Utils from '../config/utils';
 
 const router = useRouter();
-const businessAreas = ref([]);
-const employees = ref([]);
+
+const businessAreas   = ref([]);
+const employees       = ref([]);
 const selectedWorkplace = ref(null);
-const loading = ref(false);
+const loading           = ref(false);
+const impersonating     = ref(null); // holds locationId while loading
 
-const showAddDialog = ref(false);
-const showManageDialog = ref(false);
-const showDeleteDialog = ref(false);
-const showSuccess = ref(false);
-const showError = ref(false);
-const successMessage = ref('');
-const errorMessage = ref('');
-const manageTab = ref('edit');
-const selectedArea = ref(null);
-const selectedManagerToAdd = ref(null);
+const showAddDialog          = ref(false);
+const showManageDialog       = ref(false);
+const showDeleteDialog       = ref(false);
+const showSuccess            = ref(false);
+const showError              = ref(false);
+const successMessage         = ref('');
+const errorMessage           = ref('');
+const manageTab              = ref('edit');
+const selectedArea           = ref(null);
+const selectedManagerToAdd   = ref(null);
 
-const showAddManagerDialog = ref(false);
-const showEditManagerDialog = ref(false);
+const showAddManagerDialog    = ref(false);
+const showEditManagerDialog   = ref(false);
 const showDeleteManagerDialog = ref(false);
-const managerToDelete = ref(null);
+const managerToDelete         = ref(null);
 
-const newArea = ref({ name: '', address: '' });
-const editArea = ref({ name: '', address: '' });
+const newArea    = ref({ name: '', address: '' });
+const editArea   = ref({ name: '', address: '' });
+const newManager = ref({ firstName: '', lastName: '', email: '', phoneNumber: '' });
+const editManager = ref({ userId: '', firstName: '', lastName: '', email: '', phoneNumber: '' });
 
-const newManager = ref({
-  firstName: '',
-  lastName: '',
-  email: '',
-  phoneNumber: ''
-});
-
-const editManager = ref({
-  userId: '',
-  firstName: '',
-  lastName: '',
-  email: '',
-  phoneNumber: ''
-});
-
-// ✅ Computed: Filter managers for selected workplace
 const filteredManagers = computed(() => {
   if (!selectedWorkplace.value) return [];
-  
-  return employees.value.filter(emp => 
-    emp.role === 'employer' && 
-    emp.work_location === selectedWorkplace.value.location_id
-  );
+  return employees.value.filter(e => e.role === 'employer' && e.work_location === selectedWorkplace.value.location_id);
 });
 
-const getUserInitials = () => {
-  const user = Utils.getStore('user');
-  if (!user) return 'U';
-  return `${user.fName?.[0] || ''}${user.lName?.[0] || ''}`.toUpperCase();
+const availableManagers = computed(() =>
+  employees.value
+    .filter(e => e.role === 'employer' && e.work_location !== selectedArea.value?.location_id)
+    .map(e => ({ ...e, fullName: `${e.first_name} ${e.last_name}` }))
+);
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+const getUserInitials = () => { const u = Utils.getStore('user'); return u ? `${u.fName?.[0] || ''}${u.lName?.[0] || ''}`.toUpperCase() : 'U'; };
+const getUserName     = () => { const u = Utils.getStore('user'); return u ? `${u.fName || ''} ${u.lName || ''}`.trim() : 'User'; };
+const getUserEmail    = () => Utils.getStore('user')?.email || '';
+const getUserRole     = () => Utils.getStore('user')?.role || 'user';
+
+const getInitials      = (name) => name.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2);
+const getEmployeeCount = (lid)  => employees.value.filter(e => e.work_location === lid && e.role === 'employee').length;
+const getManagerCount  = (lid)  => employees.value.filter(e => e.work_location === lid && e.role === 'employer').length;
+const getManagers      = (lid)  => employees.value.filter(e => e.work_location === lid && e.role === 'employer');
+
+// ── Login as Workplace (impersonate) ──────────────────────────────────────
+const loginAsWorkplace = async (area) => {
+  impersonating.value = area.location_id;
+  try {
+    const currentUser = Utils.getStore('user');
+
+    // Save the real admin session so we can restore it on exit
+    localStorage.setItem('adminToken',    currentUser.token);
+    localStorage.setItem('adminUserData', JSON.stringify(currentUser));
+
+    const res = await AuthServices.impersonate({ locationId: area.location_id });
+    const data = res.data;
+
+    // Store the impersonation session
+    Utils.setStore('user', data);
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('isImpersonating', 'true');
+    localStorage.setItem('impersonatedLocationName', area.name);
+
+    successMessage.value = `Entering ${area.name} as employer view...`;
+    showSuccess.value    = true;
+
+    // Small delay so snackbar is visible, then navigate
+    setTimeout(() => {
+      router.push({ name: 'employerDashboard' });
+    }, 800);
+
+  } catch (err) {
+    console.error('Impersonation error:', err);
+    errorMessage.value = err.response?.data?.message || 'Failed to enter workplace view';
+    showError.value    = true;
+  } finally {
+    impersonating.value = null;
+  }
 };
 
-const getUserName = () => {
-  const user = Utils.getStore('user');
-  if (!user) return 'User';
-  return `${user.fName || ''} ${user.lName || ''}`.trim();
-};
-
-const getUserEmail = () => {
-  const user = Utils.getStore('user');
-  return user?.email || '';
-};
-
-const getUserRole = () => {
-  const user = Utils.getStore('user');
-  return user?.role || 'user';
-};
-
+// ── Standard auth ─────────────────────────────────────────────────────────
 const handleLogout = async () => {
   try {
     const user = Utils.getStore('user');
     await AuthServices.logoutUser({ token: user?.token });
-  } catch (error) {
-    console.error('Logout error:', error);
-  } finally {
+  } catch {}
+  finally {
     Utils.removeItem('user');
     localStorage.clear();
     sessionStorage.clear();
-    
-    if (window.google && window.google.accounts) {
-      window.google.accounts.id.disableAutoSelect();
-    }
-    
+    if (window.google?.accounts) window.google.accounts.id.disableAutoSelect();
     router.push({ name: 'login' });
   }
 };
 
+// ── Data loading ──────────────────────────────────────────────────────────
 const loadBusinessAreas = async () => {
   try {
-    const response = await businessAreaServices.getAll();
-    businessAreas.value = response.data;
+    const res = await businessAreaServices.getAll();
+    businessAreas.value = res.data;
   } catch (err) {
-    console.error('Error loading business areas:', err);
     errorMessage.value = 'Failed to load business areas';
-    showError.value = true;
+    showError.value    = true;
   }
 };
 
 const loadEmployees = async () => {
   try {
     loading.value = true;
-    const response = await adminServices.getAllUsers();
-    employees.value = response.data;
-    console.log('✅ Loaded employees:', employees.value);
+    const res     = await adminServices.getAllUsers();
+    employees.value = res.data;
   } catch (err) {
     console.error('Error loading employees:', err);
   } finally {
@@ -583,280 +465,123 @@ const loadEmployees = async () => {
   }
 };
 
-// ✅ Select workplace and show managers
+// ── Workplace selection ───────────────────────────────────────────────────
 const selectWorkplace = (area) => {
   selectedWorkplace.value = area;
   localStorage.setItem('selectedWorkplace', JSON.stringify(area));
-  console.log('✅ Selected workplace:', area);
-  console.log('✅ Filtered managers:', filteredManagers.value);
 };
 
-// ✅ Go back to workplace selection
 const backToWorkplaces = () => {
   selectedWorkplace.value = null;
   localStorage.removeItem('selectedWorkplace');
 };
 
-const getInitials = (name) => {
-  return name.split(' ').map(word => word[0]).join('').toUpperCase().substring(0, 2);
-};
-
-const getEmployeeCount = (locationId) => {
-  return employees.value.filter(emp => emp.work_location === locationId && emp.role === 'employee').length;
-};
-
-const getManagerCount = (locationId) => {
-  return employees.value.filter(emp => emp.work_location === locationId && emp.role === 'employer').length;
-};
-
-const getManagers = (locationId) => {
-  return employees.value.filter(emp => emp.work_location === locationId && emp.role === 'employer');
-};
-
-const availableManagers = computed(() => {
-  return employees.value
-    .filter(emp => emp.role === 'employer' && emp.work_location !== selectedArea.value?.location_id)
-    .map(emp => ({ ...emp, fullName: `${emp.first_name} ${emp.last_name}` }));
-});
-
-// ✅ Manager CRUD operations
-const openAddManagerDialog = () => {
-  showAddManagerDialog.value = true;
-  newManager.value = { firstName: '', lastName: '', email: '', phoneNumber: '' };
-};
-
-const closeAddManagerDialog = () => {
-  showAddManagerDialog.value = false;
-};
+// ── Manager CRUD ──────────────────────────────────────────────────────────
+const openAddManagerDialog  = () => { newManager.value = { firstName: '', lastName: '', email: '', phoneNumber: '' }; showAddManagerDialog.value = true; };
+const closeAddManagerDialog = () => { showAddManagerDialog.value = false; };
 
 const addManager = async () => {
   if (!newManager.value.firstName || !newManager.value.lastName || !newManager.value.email) {
-    errorMessage.value = 'Please fill in all required fields';
-    showError.value = true;
-    return;
+    errorMessage.value = 'Please fill in all required fields'; showError.value = true; return;
   }
-
   try {
-    const managerData = {
-      first_name: newManager.value.firstName,
-      last_name: newManager.value.lastName,
-      email: newManager.value.email,
-      phone_number: newManager.value.phoneNumber,
-      role: 'employer',
-      work_location: selectedWorkplace.value.location_id
-    };
-
-    await adminServices.createUser(managerData);
+    await adminServices.createUser({ first_name: newManager.value.firstName, last_name: newManager.value.lastName, email: newManager.value.email, phone_number: newManager.value.phoneNumber, role: 'employer', work_location: selectedWorkplace.value.location_id });
     await loadEmployees();
     closeAddManagerDialog();
-    successMessage.value = 'Manager added successfully!';
-    showSuccess.value = true;
+    successMessage.value = 'Manager added successfully!'; showSuccess.value = true;
   } catch (err) {
-    console.error('Error adding manager:', err);
-    errorMessage.value = err.response?.status === 400 ? 'Email already exists' : 'Failed to add manager';
-    showError.value = true;
+    errorMessage.value = err.response?.status === 400 ? 'Email already exists' : 'Failed to add manager'; showError.value = true;
   }
 };
 
-const openEditManagerDialog = (manager) => {
-  editManager.value = {
-    userId: manager.user_id,
-    firstName: manager.first_name,
-    lastName: manager.last_name,
-    email: manager.email,
-    phoneNumber: manager.phone_number || ''
-  };
-  showEditManagerDialog.value = true;
-};
-
-const closeEditManagerDialog = () => {
-  showEditManagerDialog.value = false;
-};
+const openEditManagerDialog  = (m) => { editManager.value = { userId: m.user_id, firstName: m.first_name, lastName: m.last_name, email: m.email, phoneNumber: m.phone_number || '' }; showEditManagerDialog.value = true; };
+const closeEditManagerDialog = () => { showEditManagerDialog.value = false; };
 
 const saveEditManager = async () => {
   try {
-    const managerData = {
-      first_name: editManager.value.firstName,
-      last_name: editManager.value.lastName,
-      email: editManager.value.email,
-      phone_number: editManager.value.phoneNumber
-    };
-
-    await adminServices.updateUser(editManager.value.userId, managerData);
+    await adminServices.updateUser(editManager.value.userId, { first_name: editManager.value.firstName, last_name: editManager.value.lastName, email: editManager.value.email, phone_number: editManager.value.phoneNumber });
     await loadEmployees();
     closeEditManagerDialog();
-    successMessage.value = 'Manager updated successfully!';
-    showSuccess.value = true;
-  } catch (err) {
-    console.error('Error updating manager:', err);
-    errorMessage.value = 'Failed to update manager';
-    showError.value = true;
-  }
+    successMessage.value = 'Manager updated successfully!'; showSuccess.value = true;
+  } catch { errorMessage.value = 'Failed to update manager'; showError.value = true; }
 };
 
-const confirmDeleteManager = (manager) => {
-  managerToDelete.value = manager;
-  showDeleteManagerDialog.value = true;
-};
+const confirmDeleteManager = (m) => { managerToDelete.value = m; showDeleteManagerDialog.value = true; };
 
 const deleteManager = async () => {
   try {
     await adminServices.deleteUser(managerToDelete.value.user_id);
     await loadEmployees();
-    showDeleteManagerDialog.value = false;
-    managerToDelete.value = null;
-    successMessage.value = 'Manager deleted successfully!';
-    showSuccess.value = true;
-  } catch (err) {
-    console.error('Error deleting manager:', err);
-    errorMessage.value = 'Failed to delete manager';
-    showError.value = true;
-  }
+    showDeleteManagerDialog.value = false; managerToDelete.value = null;
+    successMessage.value = 'Manager deleted successfully!'; showSuccess.value = true;
+  } catch { errorMessage.value = 'Failed to delete manager'; showError.value = true; }
 };
 
-// Business area management
-const openManageDialog = (area) => {
-  selectedArea.value = area;
-  editArea.value = { name: area.name, address: area.address };
-  manageTab.value = 'edit';
-  showManageDialog.value = true;
-};
-
-const closeManageDialog = () => {
-  showManageDialog.value = false;
-  selectedArea.value = null;
-  selectedManagerToAdd.value = null;
-};
-
-const closeAddDialog = () => {
-  showAddDialog.value = false;
-  newArea.value = { name: '', address: '' };
-};
+// ── Business area management ──────────────────────────────────────────────
+const openManageDialog  = (area) => { selectedArea.value = area; editArea.value = { name: area.name, address: area.address }; manageTab.value = 'edit'; showManageDialog.value = true; };
+const closeManageDialog = () => { showManageDialog.value = false; selectedArea.value = null; selectedManagerToAdd.value = null; };
+const closeAddDialog    = () => { showAddDialog.value = false; newArea.value = { name: '', address: '' }; };
 
 const addBusinessArea = async () => {
-  if (!newArea.value.name || !newArea.value.address) {
-    errorMessage.value = 'Please fill in all required fields';
-    showError.value = true;
-    return;
-  }
-
+  if (!newArea.value.name || !newArea.value.address) { errorMessage.value = 'Please fill in all required fields'; showError.value = true; return; }
   try {
     await businessAreaServices.create(newArea.value);
-    showAddDialog.value = false;
-    newArea.value = { name: '', address: '' };
+    showAddDialog.value = false; newArea.value = { name: '', address: '' };
     await loadBusinessAreas();
-    successMessage.value = 'Business area added successfully!';
-    showSuccess.value = true;
-  } catch (err) {
-    console.error('Error adding business area:', err);
-    errorMessage.value = 'Failed to add business area';
-    showError.value = true;
-  }
+    successMessage.value = 'Business area added successfully!'; showSuccess.value = true;
+  } catch { errorMessage.value = 'Failed to add business area'; showError.value = true; }
 };
 
 const updateBusinessArea = async () => {
   try {
     await businessAreaServices.update(selectedArea.value.location_id, editArea.value);
     await loadBusinessAreas();
-    successMessage.value = 'Business area updated successfully!';
-    showSuccess.value = true;
+    successMessage.value = 'Business area updated successfully!'; showSuccess.value = true;
     closeManageDialog();
-  } catch (err) {
-    console.error('Error updating business area:', err);
-    errorMessage.value = 'Failed to update business area';
-    showError.value = true;
-  }
+  } catch { errorMessage.value = 'Failed to update business area'; showError.value = true; }
 };
 
 const assignManager = async () => {
   if (!selectedManagerToAdd.value) return;
-
   try {
-    await adminServices.updateUser(selectedManagerToAdd.value, {
-      work_location: selectedArea.value.location_id
-    });
+    await adminServices.updateUser(selectedManagerToAdd.value, { work_location: selectedArea.value.location_id });
     await loadEmployees();
-    successMessage.value = 'Manager assigned successfully!';
-    showSuccess.value = true;
+    successMessage.value = 'Manager assigned successfully!'; showSuccess.value = true;
     selectedManagerToAdd.value = null;
-  } catch (err) {
-    console.error('Error assigning manager:', err);
-    errorMessage.value = 'Failed to assign manager';
-    showError.value = true;
-  }
+  } catch { errorMessage.value = 'Failed to assign manager'; showError.value = true; }
 };
 
 const removeManager = async (manager) => {
   try {
     await adminServices.updateUser(manager.user_id, { work_location: null });
     await loadEmployees();
-    successMessage.value = 'Manager removed successfully!';
-    showSuccess.value = true;
-  } catch (err) {
-    console.error('Error removing manager:', err);
-    errorMessage.value = 'Failed to remove manager';
-    showError.value = true;
-  }
+    successMessage.value = 'Manager removed successfully!'; showSuccess.value = true;
+  } catch { errorMessage.value = 'Failed to remove manager'; showError.value = true; }
 };
 
-const confirmDelete = () => {
-  showDeleteDialog.value = true;
-};
+const confirmDelete = () => { showDeleteDialog.value = true; };
 
 const deleteBusinessArea = async () => {
   try {
     await businessAreaServices.delete(selectedArea.value.location_id);
-    showDeleteDialog.value = false;
-    closeManageDialog();
+    showDeleteDialog.value = false; closeManageDialog();
     await loadBusinessAreas();
-    successMessage.value = 'Workplace deleted successfully!';
-    showSuccess.value = true;
-  } catch (err) {
-    console.error('Error deleting business area:', err);
-    errorMessage.value = 'Failed to delete workplace';
-    showError.value = true;
-  }
+    successMessage.value = 'Workplace deleted successfully!'; showSuccess.value = true;
+  } catch { errorMessage.value = 'Failed to delete workplace'; showError.value = true; }
 };
 
 onMounted(async () => {
   await Promise.all([loadBusinessAreas(), loadEmployees()]);
-  
-  // Check if there's a saved workplace selection
   const saved = localStorage.getItem('selectedWorkplace');
-  if (saved) {
-    try {
-      selectedWorkplace.value = JSON.parse(saved);
-    } catch (e) {
-      console.error('Error parsing saved workplace:', e);
-    }
-  }
+  if (saved) { try { selectedWorkplace.value = JSON.parse(saved); } catch {} }
 });
 </script>
 
 <style scoped>
-.workplace-header {
-  border-radius: 8px;
-  margin-bottom: 24px;
-}
-
-.opacity-90 {
-  opacity: 0.9;
-}
-
-.hover-card {
-  transition: all 0.3s ease;
-}
-
-.hover-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 16px rgba(18, 8, 111, 0.15) !important;
-}
-
-.gap-2 {
-  gap: 8px;
-}
-
-.gap-3 {
-  gap: 12px;
-}
+.workplace-header { border-radius: 8px; margin-bottom: 24px; }
+.opacity-90 { opacity: 0.9; }
+.hover-card { transition: all 0.3s ease; }
+.hover-card:hover { transform: translateY(-4px); box-shadow: 0 8px 16px rgba(18, 8, 111, 0.15) !important; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
 </style>
