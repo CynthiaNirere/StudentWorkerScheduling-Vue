@@ -179,24 +179,6 @@ const formatTime = (minutes) => {
 
       <template v-else>
 
-        <!-- ── Stat Cards ────────────────────────────────────────────────── -->
-        <v-row class="mb-6">
-          <v-col v-for="card in statCards" :key="card.label" cols="6" md="3">
-            <v-card variant="outlined" rounded="lg" class="stat-card navy-card"
-              style="cursor:pointer;" @click="router.push({ name: card.route })">
-              <v-card-text class="pa-4">
-                <div class="d-flex align-center justify-space-between mb-3">
-                  <div class="stat-icon-wrap" :style="{ background: card.bg }">
-                    <v-icon :color="card.color" size="28">{{ card.icon }}</v-icon>
-                  </div>
-                  <span class="text-h4 font-weight-black" :style="{ color: card.color }">{{ card.value }}</span>
-                </div>
-                <div class="text-body-2 text-grey font-weight-medium">{{ card.label }}</div>
-              </v-card-text>
-            </v-card>
-          </v-col>
-        </v-row>
-
         <!-- ── Quick Actions ─────────────────────────────────────────────── -->
         <v-row class="mb-6">
           <v-col cols="12" sm="4">

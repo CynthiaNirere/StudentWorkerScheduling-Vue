@@ -46,7 +46,7 @@ const headers = [
 
 const jobRoleSuggestions = computed(() => {
   const backendRoles = jobRoles.value.map(r => r.title);
-  const empRoles = employees.value.map(e => e.job_role).filter(r => r && r !== 'Not assigned');
+  const empRoles = employees.value.flatMap(e => (e.jobRoles || []).map(r => r.role_title)).filter(Boolean);
   return [...new Set([...backendRoles, ...empRoles])].sort();
 });
 
@@ -129,16 +129,26 @@ const openManageRolesDialog = async (employee) => {
 };
 
 const handleAddRole = async () => {
-  if (!selectedNewRole.value) { showSnackbar("Please select a role", "error"); return; }
+  if (!selectedNewRole.value) { showSnackbar("Please select or type a role", "error"); return; }
   addingRole.value = true;
   try {
-    await EmployerService.addRoleToUser(selectedEmployee.value.user_id || selectedEmployee.value.userId, { jobRoleId: selectedNewRole.value, isPrimary: makePrimary.value });
+    let roleId;
+    if (typeof selectedNewRole.value === 'object' && selectedNewRole.value.job_role_id) {
+      roleId = selectedNewRole.value.job_role_id;
+    } else if (typeof selectedNewRole.value === 'number') {
+      roleId = selectedNewRole.value;
+    } else {
+      const roleName = typeof selectedNewRole.value === 'string' ? selectedNewRole.value : selectedNewRole.value?.title;
+      roleId = await resolveOrCreateRole(roleName);
+    }
+    if (!roleId) { showSnackbar("Could not resolve role", "error"); addingRole.value = false; return; }
+    await EmployerService.addRoleToUser(selectedEmployee.value.user_id || selectedEmployee.value.userId, { jobRoleId: roleId, isPrimary: makePrimary.value });
     showSnackbar("Role added successfully!", "success");
     selectedNewRole.value = null;
     makePrimary.value = false;
-    await loadEmployeeRoles(selectedEmployee.value.user_id || selectedEmployee.value.userId);
-    await loadEmployees();
+    await Promise.all([loadEmployeeRoles(selectedEmployee.value.user_id || selectedEmployee.value.userId), loadJobRoles(), loadEmployees()]);
   } catch (err) {
+    console.error('Error adding role:', err);
     showSnackbar(err.response?.data?.message || "Error adding role", "error");
   } finally {
     addingRole.value = false;
@@ -165,15 +175,18 @@ const handleSetPrimary = async (roleId) => {
 };
 
 const resolveOrCreateRole = async (roleName) => {
-  const existing = jobRoles.value.find(r => r.title.toLowerCase() === roleName.toLowerCase());
+  if (!roleName || typeof roleName !== 'string' || !roleName.trim()) return null;
+  const trimmed = roleName.trim();
+  const existing = jobRoles.value.find(r => r.title.toLowerCase() === trimmed.toLowerCase());
   if (existing) return existing.job_role_id;
   try {
-    const res = await EmployerService.createJobRole({ title: roleName, location_id: user.value?.work_location });
+    const res = await EmployerService.createJobRole({ title: trimmed, location_id: user.value?.work_location });
     const created = res.data;
     jobRoles.value.push(created);
     return created.job_role_id;
   } catch (err) {
-    console.error(`Error creating role "${roleName}":`, err);
+    console.error(`Error creating role "${trimmed}":`, err);
+    showSnackbar(`Could not create role "${trimmed}"`, 'error');
     return null;
   }
 };
@@ -191,7 +204,7 @@ const handleAddEmployee = async () => {
       for (let i = 0; i < newEmployee.value.job_roles.length; i++) {
         const roleId = await resolveOrCreateRole(newEmployee.value.job_roles[i]);
         if (roleId) {
-          try { await EmployerService.addRoleToUser(newUserId, { jobRoleId: roleId, isPrimary: i === 0 }); } catch {}
+          try { await EmployerService.addRoleToUser(newUserId, { jobRoleId: roleId, isPrimary: i === 0 }); } catch (e) { console.error('Error assigning role:', e); }
         }
       }
     }
@@ -199,7 +212,7 @@ const handleAddEmployee = async () => {
     showAddDialog.value = false;
     newEmployee.value = { first_name: "", last_name: "", email: "", phone_number: "", job_roles: [] };
     await loadEmployees();
-  } catch { showSnackbar("Error adding employee", "error"); }
+  } catch (err) { console.error('Error adding employee:', err); showSnackbar("Error adding employee", "error"); }
   finally { saving.value = false; }
 };
 
@@ -233,21 +246,21 @@ const handleEditEmployee = async () => {
 
     for (const role of toRemove) {
       if (currentRoles.length - toRemove.length + toAdd.length > 0) {
-        try { await EmployerService.removeRoleFromUser(empId, role.job_role_id); } catch {}
+        try { await EmployerService.removeRoleFromUser(empId, role.job_role_id); } catch (e) { console.error('Error removing role:', e); }
       }
     }
     for (let i = 0; i < toAdd.length; i++) {
       const roleId = await resolveOrCreateRole(toAdd[i]);
       if (roleId) {
         const isPrimary = currentRoles.length === 0 && toRemove.length === 0 && i === 0;
-        try { await EmployerService.addRoleToUser(empId, { jobRoleId: roleId, isPrimary }); } catch {}
+        try { await EmployerService.addRoleToUser(empId, { jobRoleId: roleId, isPrimary }); } catch (e) { console.error('Error adding role:', e); }
       }
     }
 
     showSnackbar("Employee updated successfully!", "success");
     showEditDialog.value = false;
     await loadEmployees();
-  } catch { showSnackbar("Error updating employee", "error"); }
+  } catch (err) { console.error('Error updating employee:', err); showSnackbar("Error updating employee", "error"); }
   finally { saving.value = false; }
 };
 
@@ -333,7 +346,7 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
           </v-row>
           <v-text-field v-model="newEmployee.email" label="Email *" type="email" variant="outlined" density="compact" class="mb-3" color="#12086F" />
           <v-text-field v-model="newEmployee.phone_number" label="Phone Number" variant="outlined" density="compact" class="mb-3" color="#12086F" />
-          <v-combobox v-model="newEmployee.job_roles" :items="jobRoleSuggestions" label="Job Roles" variant="outlined" density="compact" multiple chips closable-chips hint="Select existing roles or type to create new ones" persistent-hint color="#12086F" clearable :loading="loadingRoles" />
+          <v-combobox v-model="newEmployee.job_roles" :items="jobRoleSuggestions" label="Job Roles" variant="outlined" density="compact" multiple chips closable-chips hint="Select existing or type new role name, press Enter to add" persistent-hint color="#12086F" clearable :loading="loadingRoles" no-data-text="Type a new role name and press Enter" />
         </v-card-text>
         <v-divider />
         <v-card-actions class="pa-4">
@@ -356,7 +369,7 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
           </v-row>
           <v-text-field v-model="editForm.email" label="Email *" type="email" variant="outlined" density="compact" class="mb-3" color="#12086F" />
           <v-text-field v-model="editForm.phone_number" label="Phone Number" variant="outlined" density="compact" class="mb-3" color="#12086F" />
-          <v-combobox v-model="editForm.job_roles" :items="jobRoleSuggestions" label="Job Roles" variant="outlined" density="compact" multiple chips closable-chips hint="Select existing roles or type to create new ones" persistent-hint color="#12086F" clearable :loading="loadingRoles" />
+          <v-combobox v-model="editForm.job_roles" :items="jobRoleSuggestions" label="Job Roles" variant="outlined" density="compact" multiple chips closable-chips hint="Select existing or type new role name, press Enter to add" persistent-hint color="#12086F" clearable :loading="loadingRoles" no-data-text="Type a new role name and press Enter" />
         </v-card-text>
         <v-divider />
         <v-card-actions class="pa-4">
@@ -410,7 +423,7 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
           <v-divider class="my-4" />
           <div>
             <div class="text-subtitle-2 mb-2 navy-text">Add New Role</div>
-            <v-select v-model="selectedNewRole" :items="availableRolesToAdd" item-title="title" item-value="job_role_id" label="Select Role" variant="outlined" density="compact" class="mb-3" color="#12086F" :disabled="availableRolesToAdd.length === 0" />
+            <v-combobox v-model="selectedNewRole" :items="availableRolesToAdd" item-title="title" item-value="job_role_id" label="Select or type a new role" variant="outlined" density="compact" class="mb-3" color="#12086F" no-data-text="Type a new role name and press Enter" hint="Pick from list or type a new role" persistent-hint return-object />
             <v-checkbox v-model="makePrimary" label="Set as primary role" color="#12086F" density="compact" hide-details class="mb-3" :disabled="!selectedNewRole" />
             <v-btn color="#12086F" variant="flat" block :loading="addingRole" :disabled="!selectedNewRole" @click="handleAddRole" prepend-icon="mdi-plus">Add Role</v-btn>
           </div>
