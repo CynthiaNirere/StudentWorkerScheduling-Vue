@@ -62,14 +62,11 @@ const filteredRecords = computed(() => {
 });
 
 const pendingCount  = computed(() => recordsWithDetails.value.filter(r => r.status === 'pending' || r.status === 'clocked_out').length);
-const approvedCount = computed(() => recordsWithDetails.value.filter(r => r.status === 'approved').length);
-const rejectedCount = computed(() => recordsWithDetails.value.filter(r => r.status === 'rejected').length);
 
 const statusColor = (s) => ({ pending: '#f57c00', approved: '#2e7d32', rejected: '#d32f2f', clocked_in: '#9C27B0', clocked_out: '#f57c00' }[s] || '#9e9e9e');
 const statusLabel = (s) => ({ pending: 'Pending Review', approved: 'Approved', rejected: 'Rejected', clocked_in: 'Clocked In', clocked_out: 'Awaiting Review' }[s] || s);
 const getRecordId = (r) => r?.id ?? r?.clock_id ?? r?.clockId ?? null;
 const tsToLocal = (ts) => ts ? new Date(Number(ts)).toISOString().slice(0, 16) : '';
-
 const isPending = (r) => r.status === 'pending' || r.status === 'clocked_out';
 
 onMounted(async () => {
@@ -90,13 +87,11 @@ const loadClockRecords = async () => {
 };
 
 const openDetails = (r) => { selectedRecord.value = r; showDetailsDialog.value = true; };
-
 const openEdit = (r) => {
   selectedRecord.value = r;
   editForm.value = { clockInTime: tsToLocal(r._clockInTime), clockOutTime: tsToLocal(r._clockOutTime), notes: r.notes || '' };
   showEditDialog.value = true;
 };
-
 const openReject = (r) => { selectedRecord.value = r; rejectReason.value = ''; showRejectDialog.value = true; };
 
 const handleApprove = async (r) => {
@@ -145,27 +140,27 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
 <template>
   <EmployerLayout>
     <v-container fluid class="pa-6">
+
+      <!-- ✅ Header only — summary chips removed -->
       <div class="mb-5">
         <h1 class="text-h4 font-weight-bold navy-text">Time Cards</h1>
         <p class="text-body-2 text-grey">Review, approve, modify, or reject submitted employee time cards</p>
       </div>
 
-      <div class="d-flex flex-wrap ga-2 mb-5">
-        <v-chip color="#12086F" variant="tonal" size="small"><v-icon start size="small">mdi-credit-card-clock-outline</v-icon>{{ recordsWithDetails.length }} Total</v-chip>
-        <v-chip color="#f57c00" variant="tonal" size="small"><v-icon start size="small">mdi-clock-alert-outline</v-icon>{{ pendingCount }} Pending</v-chip>
-        <v-chip color="#2e7d32" variant="tonal" size="small"><v-icon start size="small">mdi-check-circle-outline</v-icon>{{ approvedCount }} Approved</v-chip>
-        <v-chip color="#d32f2f" variant="tonal" size="small"><v-icon start size="small">mdi-close-circle-outline</v-icon>{{ rejectedCount }} Rejected</v-chip>
-      </div>
-
+      <!-- Tabs -->
       <v-card variant="outlined" rounded="lg" class="mb-4 navy-card">
         <v-tabs v-model="selectedTab" color="#12086F">
-          <v-tab value="pending">Pending<v-chip v-if="pendingCount > 0" size="x-small" color="#f57c00" variant="tonal" class="ml-2">{{ pendingCount }}</v-chip></v-tab>
+          <v-tab value="pending">
+            Pending
+            <v-chip v-if="pendingCount > 0" size="x-small" color="#f57c00" variant="tonal" class="ml-2">{{ pendingCount }}</v-chip>
+          </v-tab>
           <v-tab value="approved">Approved</v-tab>
           <v-tab value="rejected">Rejected</v-tab>
           <v-tab value="all">All</v-tab>
         </v-tabs>
       </v-card>
 
+      <!-- Table -->
       <v-card variant="outlined" rounded="lg" class="navy-card">
         <v-card-text class="pa-0">
           <v-data-table :headers="headers" :items="filteredRecords" :loading="loading" items-per-page="15">

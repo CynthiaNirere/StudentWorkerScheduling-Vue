@@ -13,14 +13,13 @@ onMounted(() => {
   }
 });
 
-// Handle admin button click
+// navigate to workplace selection
 const handleAdminClick = () => {
-  router.push({ name: "adminViewDashboard" });
+  router.push({ name: "workplace" }); // Changed from "adminViewDashboard"
 };
 
 // Handle business area manager button click
 const handleManagerClick = () => {
-  // You can change this to whatever page managers should see
   router.push({ name: "businessAreaSelect" });
 };
 </script>
@@ -28,7 +27,7 @@ const handleManagerClick = () => {
 <template>
   <v-container class="fill-height">
     <v-row align="center" justify="center">
-      <v-col cols="15" sm="8" md="6" lg="5">
+      <v-col cols="12" sm="8" md="6" lg="5">
         <v-card class="pa-8" elevation="3">
           <!-- Header -->
           <div class="text-center mb-6">

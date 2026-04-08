@@ -87,9 +87,30 @@ const goToLogin = () => {
 };
 
 const viewAsGuest = () => {
-  // Set guest flag in localStorage
+  console.log('👁️ Setting up guest mode...');
+  
+  // ✅ Set guest flag
   localStorage.setItem('isGuest', 'true');
-  router.push({ name: 'guestDashboard' });
+  
+  // ✅ Set demo user data
+  const DEMO_USER = {
+    userId: 'demo-employer',
+    user_id: 'demo-employer',
+    email: 'demo@shiftboard.com',
+    fName: 'Demo',
+    lName: 'Manager',
+    role: 'guest',
+    isGuest: true,
+    work_location: null,
+    token: 'demo-token'
+  };
+  
+  localStorage.setItem('user', JSON.stringify(DEMO_USER));
+  
+  console.log('✅ Guest mode set up, navigating to dashboard...');
+  
+  // ✅ Navigate to guest dashboard
+  router.push({ path: '/guest' });
 };
 </script>
 
