@@ -266,7 +266,6 @@
           <v-card-text class="pt-4">
             <v-tabs v-model="manageTab" color="primary" class="mb-4">
               <v-tab value="edit">Edit Details</v-tab>
-              <v-tab value="managers">Managers</v-tab>
               <v-tab value="danger">Delete</v-tab>
             </v-tabs>
             <v-window v-model="manageTab">
@@ -277,30 +276,7 @@
                   <v-btn color="primary" @click="updateBusinessArea" class="mt-6">Save Changes</v-btn>
                 </v-form>
               </v-window-item>
-              <v-window-item value="managers">
-                <div class="mt-4">
-                  <h3 class="text-subtitle-1 font-weight-bold mb-4">Managers at {{ selectedArea?.name }}</h3>
-                  <v-list v-if="getManagers(selectedArea?.location_id).length > 0">
-                    <v-list-item v-for="manager in getManagers(selectedArea?.location_id)" :key="manager.user_id" class="mb-2">
-                      <template v-slot:prepend>
-                        <v-avatar color="secondary" size="40">
-                          <span class="text-white font-weight-bold">{{ manager.first_name[0] }}{{ manager.last_name[0] }}</span>
-                        </v-avatar>
-                      </template>
-                      <v-list-item-title>{{ manager.first_name }} {{ manager.last_name }}</v-list-item-title>
-                      <v-list-item-subtitle>{{ manager.email }}</v-list-item-subtitle>
-                      <template v-slot:append>
-                        <v-btn icon variant="text" color="error" @click="removeManager(manager)"><v-icon>mdi-delete</v-icon></v-btn>
-                      </template>
-                    </v-list-item>
-                  </v-list>
-                  <v-alert v-else type="info" variant="tonal" class="mb-4">No managers assigned to this workplace yet.</v-alert>
-                  <v-divider class="my-4" />
-                  <h4 class="text-subtitle-2 font-weight-bold mb-3">Assign New Manager</h4>
-                  <v-select v-model="selectedManagerToAdd" :items="availableManagers" item-title="fullName" item-value="user_id" label="Select Manager" variant="outlined" density="comfortable" />
-                  <v-btn color="primary" @click="assignManager" :disabled="!selectedManagerToAdd" class="mt-2">Assign Manager</v-btn>
-                </div>
-              </v-window-item>
+
               <v-window-item value="danger">
                 <div class="mt-4">
                   <v-alert type="warning" variant="tonal" class="mb-4"><strong>Warning:</strong> Deleting this workplace is permanent and cannot be undone.</v-alert>
@@ -357,7 +333,6 @@ const successMessage         = ref('');
 const errorMessage           = ref('');
 const manageTab              = ref('edit');
 const selectedArea           = ref(null);
-const selectedManagerToAdd   = ref(null);
 
 const showAddManagerDialog    = ref(false);
 const showEditManagerDialog   = ref(false);
@@ -374,11 +349,7 @@ const filteredManagers = computed(() => {
   return employees.value.filter(e => e.role === 'employer' && e.work_location === selectedWorkplace.value.location_id);
 });
 
-const availableManagers = computed(() =>
-  employees.value
-    .filter(e => e.role === 'employer' && e.work_location !== selectedArea.value?.location_id)
-    .map(e => ({ ...e, fullName: `${e.first_name} ${e.last_name}` }))
-);
+// Removed: availableManagers computed property (was used only in managers tab)
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 const getUserInitials = () => { const u = Utils.getStore('user'); return u ? `${u.fName?.[0] || ''}${u.lName?.[0] || ''}`.toUpperCase() : 'U'; };
@@ -389,7 +360,6 @@ const getUserRole     = () => Utils.getStore('user')?.role || 'user';
 const getInitials      = (name) => name.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2);
 const getEmployeeCount = (lid)  => employees.value.filter(e => e.work_location === lid && e.role === 'employee').length;
 const getManagerCount  = (lid)  => employees.value.filter(e => e.work_location === lid && e.role === 'employer').length;
-const getManagers      = (lid)  => employees.value.filter(e => e.work_location === lid && e.role === 'employer');
 
 // ── Login as Workplace (impersonate) ──────────────────────────────────────
 const loginAsWorkplace = async (area) => {
@@ -519,7 +489,7 @@ const deleteManager = async () => {
 
 // ── Business area management ──────────────────────────────────────────────
 const openManageDialog  = (area) => { selectedArea.value = area; editArea.value = { name: area.name, address: area.address }; manageTab.value = 'edit'; showManageDialog.value = true; };
-const closeManageDialog = () => { showManageDialog.value = false; selectedArea.value = null; selectedManagerToAdd.value = null; };
+const closeManageDialog = () => { showManageDialog.value = false; selectedArea.value = null; };
 const closeAddDialog    = () => { showAddDialog.value = false; newArea.value = { name: '', address: '' }; };
 
 const addBusinessArea = async () => {
@@ -541,23 +511,7 @@ const updateBusinessArea = async () => {
   } catch { errorMessage.value = 'Failed to update business area'; showError.value = true; }
 };
 
-const assignManager = async () => {
-  if (!selectedManagerToAdd.value) return;
-  try {
-    await adminServices.updateUser(selectedManagerToAdd.value, { work_location: selectedArea.value.location_id });
-    await loadEmployees();
-    successMessage.value = 'Manager assigned successfully!'; showSuccess.value = true;
-    selectedManagerToAdd.value = null;
-  } catch { errorMessage.value = 'Failed to assign manager'; showError.value = true; }
-};
-
-const removeManager = async (manager) => {
-  try {
-    await adminServices.updateUser(manager.user_id, { work_location: null });
-    await loadEmployees();
-    successMessage.value = 'Manager removed successfully!'; showSuccess.value = true;
-  } catch { errorMessage.value = 'Failed to remove manager'; showError.value = true; }
-};
+// Removed: assignManager and removeManager functions (were used only in managers tab)
 
 const confirmDelete = () => { showDeleteDialog.value = true; };
 
