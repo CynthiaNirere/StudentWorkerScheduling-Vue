@@ -94,8 +94,6 @@ onUnmounted(() => {
       <v-list nav class="px-2">
         <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard"
           :to="{ name: 'employeeDashboard' }" color="white" class="nav-item" rounded="lg" />
-        <v-list-item prepend-icon="mdi-home-circle-outline" title="My Hub"
-          :to="{ name: 'employeeHub' }" color="white" class="nav-item" rounded="lg" />
         <v-list-item prepend-icon="mdi-calendar-month" title="My Schedule"
           :to="{ name: 'employeeSchedule' }" color="white" class="nav-item" rounded="lg" />
         <v-list-item prepend-icon="mdi-clock-outline" title="My Availability"

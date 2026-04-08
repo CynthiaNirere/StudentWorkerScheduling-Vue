@@ -114,10 +114,16 @@ const getShiftBorderColor = (shift) => ['#1976D2','#2e7d32','#f57c00','#ff6f00',
           <h1 class="text-h4 font-weight-bold navy-text">My Schedule</h1>
           <p class="text-body-2 text-grey">{{ currentWeekLabel }}</p>
         </div>
-        <v-btn color="#12086F" variant="flat" prepend-icon="mdi-calendar-clock"
-          @click="router.push({ name: 'employeeTimeRequests' })">
-          Request Time Off / Swap
-        </v-btn>
+        <div class="d-flex ga-2">
+          <v-btn color="#7209B7" variant="tonal" prepend-icon="mdi-swap-horizontal"
+            @click="router.push({ name: 'employeeSwaps' })">
+            Request Swap
+          </v-btn>
+          <v-btn color="#12086F" variant="flat" prepend-icon="mdi-calendar-remove"
+            @click="router.push({ name: 'employeeTimeRequests' })">
+            Request Time Off
+          </v-btn>
+        </div>
       </div>
 
       <!-- Nav bar + view toggle -->
@@ -190,7 +196,7 @@ const getShiftBorderColor = (shift) => ['#1976D2','#2e7d32','#f57c00','#ff6f00',
 
       <v-alert type="info" variant="tonal" color="#4361EE" density="compact">
         <v-icon start>mdi-information-outline</v-icon>
-        To request time off or swap a shift, use the button above or go to <strong>Time Requests</strong> in the sidebar.
+        Use <strong>Request Swap</strong> to trade a shift, or <strong>Request Time Off</strong> for days off.
       </v-alert>
 
     </v-container>
