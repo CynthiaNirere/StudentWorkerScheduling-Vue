@@ -180,28 +180,6 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
         </v-card-text>
       </v-card>
 
-      <!-- Account -->
-      <v-card variant="outlined" rounded="lg" class="navy-card">
-        <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4 navy-text">
-          <v-icon start>mdi-shield-account-outline</v-icon>Account
-        </v-card-title>
-        <v-divider />
-        <v-card-text class="pa-5">
-          <v-row dense>
-            <v-col cols="6">
-              <div class="text-caption text-medium-emphasis">Role</div>
-              <v-chip size="small" color="#12086F" variant="tonal" class="mt-1">{{ user?.role || 'employer' }}</v-chip>
-            </v-col>
-            <v-col cols="6">
-              <div class="text-caption text-medium-emphasis">Authentication</div>
-              <v-chip size="small" color="secondary" variant="tonal" class="mt-1">Google OAuth</v-chip>
-            </v-col>
-          </v-row>
-          <v-alert type="info" variant="tonal" density="compact" color="#4361EE" class="mt-4">
-            To update your profile, go to <strong>Profile</strong>. To sign out, use the account icon in the top right.
-          </v-alert>
-        </v-card-text>
-      </v-card>
 
     </v-container>
     <v-snackbar v-model="snackbar" :color="snackbarColor" timeout="3000" location="bottom right">{{ snackbarMessage }}</v-snackbar>

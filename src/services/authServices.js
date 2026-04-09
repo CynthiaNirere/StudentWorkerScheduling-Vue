@@ -9,19 +9,29 @@ export default {
         return response.data;
       });
   },
-  
+
   authorizeUser(code) {
     return apiClient.post("auth/authorize", code)
       .then(response => response.data);
   },
-  
+
   logoutUser(token) {
     return apiClient.post("auth/logout", token)
       .then(response => response.data);
   },
-  
+
   signUp(userData) {
     return apiClient.post("auth/signup", userData)
       .then(response => response.data);
-  }
+  },
+
+  // Admin enters a workplace as employer view
+  impersonate(data) {
+    return apiClient.post("auth/impersonate", data);
+  },
+
+  // Admin exits impersonation and restores their own session
+  exitImpersonation(data) {
+    return apiClient.post("auth/exit-impersonation", data);
+  },
 };

@@ -303,31 +303,9 @@ onUnmounted(() => {
     <v-container fluid class="pa-6">
 
       <!-- Header -->
-      <div class="d-flex align-center justify-space-between mb-4">
-        <div>
-          <h1 class="text-h4 font-weight-bold navy-text">My Availability</h1>
-          <p class="text-body-2 text-grey mb-0">Drag on the calendar to mark your available hours. You can update anytime.</p>
-        </div>
-
-        <!-- ✅ Location selector — for employees at multiple locations -->
-        <v-select
-          v-if="locations.length > 1"
-          v-model="selectedLocation"
-          :items="locations"
-          :item-title="l => l.name"
-          :item-value="l => l.location_id || l.locationId"
-          label="Submitting for"
-          variant="outlined"
-          density="compact"
-          style="max-width: 220px"
-          color="#12086F"
-          :loading="loadingLocations"
-          prepend-inner-icon="mdi-map-marker"
-        />
-        <v-chip v-else color="#12086F" variant="tonal" size="small">
-          <v-icon start size="small">mdi-map-marker</v-icon>
-          {{ selectedLocationName }}
-        </v-chip>
+      <div class="mb-4">
+        <h1 class="text-h4 font-weight-bold navy-text">My Availability</h1>
+        <p class="text-body-2 text-grey mb-0">Drag on the calendar to mark your available hours. You can update anytime.</p>
       </div>
 
       <!-- Week navigation -->
