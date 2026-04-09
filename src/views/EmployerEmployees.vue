@@ -94,7 +94,7 @@ const loadEmployees = async () => {
     const list          = allUsers.filter(u => u.role === 'employee' && (u.user_id || u.userId) !== currentUserId);
     for (const emp of list) {
       try {
-        const r = await EmployerService.getUserRoles(emp.user_id || emp.userId);
+        const r = await EmployerService.getUserRoles(emp.user_id || emp.userId, user.value?.work_location);
         emp.jobRoles = Array.isArray(r.data) ? r.data : [];
       } catch { emp.jobRoles = []; }
     }
@@ -119,7 +119,7 @@ const loadJobRoles = async () => {
 const loadEmployeeRoles = async (userId) => {
   loadingRoles.value = true;
   try {
-    const res           = await EmployerService.getUserRoles(userId);
+    const res           = await EmployerService.getUserRoles(userId, user.value?.work_location);
     employeeRoles.value = Array.isArray(res.data) ? res.data : [];
   } catch { employeeRoles.value = []; }
   finally { loadingRoles.value = false; }
