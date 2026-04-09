@@ -143,27 +143,33 @@ const timeOptions = {
 
 const availableEmployees = computed(() => {
   if (!shiftForm.value.date) return employees.value;
-  // Parse date string YYYY-MM-DD to avoid UTC timezone issues
+
   const [year, month, day] = shiftForm.value.date.split('-').map(Number);
   const selectedDate = new Date(year, month - 1, day);
-  const dayOfWeek = selectedDate.getDay();
+  const dayOfWeek    = selectedDate.getDay();
+
   const startMinutes = timeToMinutes(shiftForm.value.startHour, shiftForm.value.startMinute, shiftForm.value.startAmPm);
   const endMinutes   = timeToMinutes(shiftForm.value.endHour,   shiftForm.value.endMinute,   shiftForm.value.endAmPm);
+
   if (startMinutes >= endMinutes) return employees.value;
+
   return employees.value.filter(emp => {
-    const empId = emp.user_id || emp.userId;
+    const empId    = emp.user_id || emp.userId;
     const empAvail = availability.value.filter(a => {
-      const aUserId    = a.user_id  || a.userId;
-      const aDayOfWeek = a.day_of_week || a.dayOfWeek;
-      const isAvail    = a.is_available !== undefined ? a.is_available : true;
-      return aUserId === empId && aDayOfWeek === dayOfWeek && isAvail;
+      const aUserId    = a.user_id    || a.userId;
+      const aDayOfWeek = a.day_of_week !== undefined ? a.day_of_week : a.dayOfWeek;
+      return String(aUserId) === String(empId) && Number(aDayOfWeek) === dayOfWeek;
     });
-    if (!empAvail.length) return false;
-    const buf = 30;
+
+    // If employee has no availability on record, show them anyway
+    if (empAvail.length === 0) return true;
+
+    // Standard interval overlap: overlaps if slot starts before shift ends
+    // AND slot ends after shift starts
     return empAvail.some(slot => {
-      const aStart = slot.start_time || slot.startTime;
-      const aEnd   = slot.end_time   || slot.endTime;
-      return (aStart - buf) <= startMinutes && (aEnd + buf) >= endMinutes;
+      const aStart = slot.start_time !== undefined ? slot.start_time : (slot.startTime || 0);
+      const aEnd   = slot.end_time   !== undefined ? slot.end_time   : (slot.endTime   || 1440);
+      return aStart < endMinutes && aEnd > startMinutes;
     });
   });
 });

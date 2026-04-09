@@ -192,6 +192,16 @@ const handleAddEmployee = async () => {
     const createdUser = res.data?.user || res.data;
     const newUserId   = createdUser?.user_id || createdUser?.userId;
 
+    // Backend returns alreadyExisted:true when the person already had an account
+    // and was auto-assigned to this workplace — treat it as a success, just no role assignment
+    if (res.data?.alreadyExisted) {
+      showSnackbar(`${createdUser?.fName || newEmployee.value.first_name} already has an account — added to your workplace!`, "success");
+      showAddDialog.value = false;
+      newEmployee.value   = { first_name: '', last_name: '', email: '', phone_number: '', job_role: '' };
+      await loadEmployees();
+      return;
+    }
+
     if (newEmployee.value.job_role && newUserId) {
       const matched = jobRoles.value.find(r => r.title === newEmployee.value.job_role);
       if (matched) {
