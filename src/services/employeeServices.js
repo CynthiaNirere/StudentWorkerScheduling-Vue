@@ -28,8 +28,9 @@ export default {
   },
 
   // ─── AVAILABILITY ────────────────────────────────────────────────────────
-  getMyAvailability(userId) {
-    return apiClient.get(`/availability/user/${userId}`);
+  getMyAvailability(userId, locationId = null) {
+    const query = locationId ? `?locationId=${locationId}` : '';
+    return apiClient.get(`/availability/user/${userId}${query}`);
   },
 
   createAvailability(data) {

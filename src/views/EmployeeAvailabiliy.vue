@@ -117,6 +117,11 @@ watch(weekKey, (key) => {
   if (!allWeeks[key]) allWeeks[key] = [[], [], [], [], [], [], []];
 }, { immediate: true });
 
+watch(selectedLocation, () => {
+  allWeeks[weekKey.value] = [[], [], [], [], [], [], []];
+  if (user.value) loadAvailabilityForWeek();
+});
+
 const availability = computed(() => allWeeks[weekKey.value] || [[], [], [], [], [], [], []]);
 
 const toMin     = (str) => { if (!str) return 0; const [h, m] = str.split(':').map(Number); return h * 60 + m; };
@@ -225,7 +230,7 @@ const previewStyle = (dayIdx) => {
 const loadAvailabilityForWeek = async () => {
   try {
     const userId = user.value?.user_id || user.value?.userId;
-    const res    = await EmployeeService.getMyAvailability(userId);
+    const res    = await EmployeeService.getMyAvailability(userId, selectedLocation.value);
     const avail  = Array.isArray(res.data) ? res.data : [];
 
     allWeeks[weekKey.value] = [[], [], [], [], [], [], []];
@@ -263,8 +268,8 @@ const submitAvailability = async () => {
     const userId   = user.value?.user_id || user.value?.userId;
     const weekData = allWeeks[weekKey.value];
 
-    // Delete all existing availability for this user
-    const existing     = await EmployeeService.getMyAvailability(userId);
+    // Delete existing availability for this user at the selected location only
+    const existing     = await EmployeeService.getMyAvailability(userId, selectedLocation.value);
     const existingList = Array.isArray(existing.data) ? existing.data : [];
     for (const a of existingList) {
       await EmployeeService.deleteAvailability(a.id ?? a.availability_id);
