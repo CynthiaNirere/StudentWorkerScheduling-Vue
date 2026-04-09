@@ -6,25 +6,25 @@ import EmployerLayout from '../components/EmployerLayout.vue';
 
 const user = ref(null);
 
-const availability = ref([]);
-const employees = ref([]);
-const loading = ref(false);
+const availability    = ref([]);
+const employees       = ref([]);
+const loading         = ref(false);
 const selectedEmployee = ref(null);
 
-const snackbar = ref(false);
+const snackbar        = ref(false);
 const snackbarMessage = ref("");
-const snackbarColor = ref("success");
+const snackbarColor   = ref("success");
 
 const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-const showAddDialog = ref(false);
-const showEditDialog = ref(false);
+const showAddDialog    = ref(false);
+const showEditDialog   = ref(false);
 const showDeleteDialog = ref(false);
-const processing = ref(false);
-const itemToDelete = ref(null);
+const processing       = ref(false);
+const itemToDelete     = ref(null);
 
 const defaultForm = { userId: null, dayOfWeek: null, startTime: null, endTime: null };
-const addForm = ref({ ...defaultForm });
+const addForm  = ref({ ...defaultForm });
 const editForm = ref({ ...defaultForm, id: null });
 
 const dayOptions = daysOfWeek.map((label, index) => ({ title: label, value: index }));
@@ -32,14 +32,19 @@ const dayOptions = daysOfWeek.map((label, index) => ({ title: label, value: inde
 const timeOptions = (() => {
   const opts = [];
   for (let m = 0; m < 24 * 60; m += 30) {
-    const h = Math.floor(m / 60);
-    const min = m % 60;
+    const h    = Math.floor(m / 60);
+    const min  = m % 60;
     const ampm = h >= 12 ? 'PM' : 'AM';
     const hour = h % 12 || 12;
     opts.push({ title: `${hour}:${String(min).padStart(2, '0')} ${ampm}`, value: m });
   }
   return opts;
 })();
+
+// ── The employer's location from their session ────────────────────────────
+const employerLocationId = computed(() =>
+  user.value?.work_location || user.value?.impersonatedLocation || null
+);
 
 const availabilityGrid = computed(() => {
   const currentUserId = user.value?.user_id || user.value?.userId;
@@ -55,19 +60,18 @@ const availabilityGrid = computed(() => {
 
     const weekSchedule = {};
     daysOfWeek.forEach((day, index) => {
-      const dbDay = index;
       const dayAvail = employeeAvailability.filter((a) => {
         const d = a.day_of_week ?? a.dayOfWeek;
-        return d === dbDay;
+        return d === index;
       });
       weekSchedule[day] = dayAvail.map((a) => ({
-        id: a.id || a.availability_id,
-        start: formatTime(a.start_time || a.startTime),
-        end: formatTime(a.end_time || a.endTime),
+        id:        a.id || a.availability_id,
+        start:     formatTime(a.start_time || a.startTime),
+        end:       formatTime(a.end_time   || a.endTime),
         startTime: a.start_time || a.startTime,
-        endTime: a.end_time || a.endTime,
+        endTime:   a.end_time   || a.endTime,
         dayOfWeek: a.day_of_week ?? a.dayOfWeek,
-        userId: a.user_id || a.userId,
+        userId:    a.user_id || a.userId,
       }));
     });
 
@@ -84,6 +88,8 @@ onMounted(async () => {
   await Promise.all([loadAvailability(), loadEmployees()]);
 });
 
+// ── LOAD — scoped to this employer's location ─────────────────────────────
+// The backend now filters by location_id so The Brew never sees Gym rows.
 const loadAvailability = async () => {
   loading.value = true;
   try {
@@ -113,8 +119,8 @@ const loadEmployees = async () => {
 
 const formatTime = (minutes) => {
   if (minutes === undefined || minutes === null) return "";
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
+  const h    = Math.floor(minutes / 60);
+  const m    = minutes % 60;
   const ampm = h >= 12 ? "PM" : "AM";
   const hour = h % 12 || 12;
   return `${hour}${m ? `:${String(m).padStart(2, "0")}` : ""}${ampm}`;
@@ -122,15 +128,16 @@ const formatTime = (minutes) => {
 
 const showSnackbar = (message, color = "success") => {
   snackbarMessage.value = message;
-  snackbarColor.value = color;
-  snackbar.value = true;
+  snackbarColor.value   = color;
+  snackbar.value        = true;
 };
 
 const openAddDialog = () => {
-  addForm.value = { ...defaultForm };
+  addForm.value       = { ...defaultForm };
   showAddDialog.value = true;
 };
 
+// ── ADD — includes locationId so the row is scoped to this workplace ──────
 const handleAdd = async () => {
   if (!addForm.value.userId || addForm.value.dayOfWeek === null || !addForm.value.startTime || !addForm.value.endTime) {
     showSnackbar('Please fill in all fields', 'error');
@@ -138,7 +145,10 @@ const handleAdd = async () => {
   }
   processing.value = true;
   try {
-    await EmployerService.createAvailability(addForm.value);
+    await EmployerService.createAvailability({
+      ...addForm.value,
+      locationId: employerLocationId.value,   // ✅ scoped to this workplace
+    });
     showSnackbar('Availability added successfully');
     showAddDialog.value = false;
     await loadAvailability();
@@ -150,7 +160,7 @@ const handleAdd = async () => {
 };
 
 const openEditDialog = (slot) => {
-  editForm.value = { id: slot.id, userId: slot.userId, dayOfWeek: slot.dayOfWeek, startTime: slot.startTime, endTime: slot.endTime };
+  editForm.value       = { id: slot.id, userId: slot.userId, dayOfWeek: slot.dayOfWeek, startTime: slot.startTime, endTime: slot.endTime };
   showEditDialog.value = true;
 };
 
@@ -164,7 +174,7 @@ const handleEdit = async () => {
     await EmployerService.updateAvailability(editForm.value.id, {
       dayOfWeek: editForm.value.dayOfWeek,
       startTime: editForm.value.startTime,
-      endTime: editForm.value.endTime,
+      endTime:   editForm.value.endTime,
     });
     showSnackbar('Availability updated successfully');
     showEditDialog.value = false;
@@ -177,7 +187,7 @@ const handleEdit = async () => {
 };
 
 const openDeleteDialog = (slot) => {
-  itemToDelete.value = slot;
+  itemToDelete.value    = slot;
   showDeleteDialog.value = true;
 };
 
@@ -188,7 +198,7 @@ const handleDelete = async () => {
     await EmployerService.deleteAvailability(itemToDelete.value.id);
     showSnackbar('Availability deleted successfully');
     showDeleteDialog.value = false;
-    itemToDelete.value = null;
+    itemToDelete.value     = null;
     await loadAvailability();
   } catch (err) {
     showSnackbar('Error deleting availability', 'error');
@@ -239,7 +249,6 @@ const handleDelete = async () => {
               <div class="font-weight-medium">{{ row.employeeName }}</div>
             </div>
             <div v-for="day in daysOfWeek" :key="day" class="day-column">
-              <!-- ✅ CHANGED: "Unavailable" → "In Class" -->
               <div v-if="row.schedule[day].length === 0" class="in-class">
                 <v-icon size="12" class="mr-1">mdi-school</v-icon>
                 In Class
@@ -279,10 +288,13 @@ const handleDelete = async () => {
         <v-card rounded="lg">
           <v-card-title class="navy-text font-weight-bold">Add Employee Availability</v-card-title>
           <v-card-text>
-            <v-select v-model="addForm.userId" :items="employees" :item-title="(e) => `${e.fName || e.first_name || ''} ${e.lName || e.last_name || ''}`" :item-value="(e) => e.user_id || e.userId" label="Employee" variant="outlined" density="compact" class="mb-3" color="#12086F" />
+            <v-select v-model="addForm.userId" :items="employees"
+              :item-title="(e) => `${e.fName || e.first_name || ''} ${e.lName || e.last_name || ''}`"
+              :item-value="(e) => e.user_id || e.userId"
+              label="Employee" variant="outlined" density="compact" class="mb-3" color="#12086F" />
             <v-select v-model="addForm.dayOfWeek" :items="dayOptions" label="Day of Week" variant="outlined" density="compact" class="mb-3" color="#12086F" />
-            <v-select v-model="addForm.startTime" :items="timeOptions" label="Start Time" variant="outlined" density="compact" class="mb-3" color="#12086F" />
-            <v-select v-model="addForm.endTime" :items="timeOptions" label="End Time" variant="outlined" density="compact" color="#12086F" />
+            <v-select v-model="addForm.startTime" :items="timeOptions" label="Start Time"  variant="outlined" density="compact" class="mb-3" color="#12086F" />
+            <v-select v-model="addForm.endTime"   :items="timeOptions" label="End Time"    variant="outlined" density="compact" color="#12086F" />
           </v-card-text>
           <v-card-actions>
             <v-spacer />
@@ -298,8 +310,8 @@ const handleDelete = async () => {
           <v-card-title class="navy-text font-weight-bold">Edit Availability</v-card-title>
           <v-card-text>
             <v-select v-model="editForm.dayOfWeek" :items="dayOptions" label="Day of Week" variant="outlined" density="compact" class="mb-3" color="#12086F" />
-            <v-select v-model="editForm.startTime" :items="timeOptions" label="Start Time" variant="outlined" density="compact" class="mb-3" color="#12086F" />
-            <v-select v-model="editForm.endTime" :items="timeOptions" label="End Time" variant="outlined" density="compact" color="#12086F" />
+            <v-select v-model="editForm.startTime" :items="timeOptions" label="Start Time"  variant="outlined" density="compact" class="mb-3" color="#12086F" />
+            <v-select v-model="editForm.endTime"   :items="timeOptions" label="End Time"    variant="outlined" density="compact" color="#12086F" />
           </v-card-text>
           <v-card-actions>
             <v-spacer />
@@ -375,7 +387,6 @@ const handleDelete = async () => {
 }
 .available-slot .slot-actions { display: none; margin-left: 2px; }
 .available-slot:hover .slot-actions { display: inline-flex; }
-/* ✅ NEW: In Class style - replaces Unavailable */
 .in-class {
   color: #5c6bc0;
   font-size: 11px;
