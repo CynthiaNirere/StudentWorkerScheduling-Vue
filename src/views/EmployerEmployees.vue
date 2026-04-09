@@ -14,7 +14,13 @@ const loading = ref(false);
 const loadingRoles = ref(false);
 const search = ref("");
 
-const showAddDialog = ref(false);
+const showAddDialog     = ref(false);
+const showSearchDialog  = ref(false);
+const searchQuery       = ref('');
+const searchResults     = ref([]);
+const searching         = ref(false);
+const searchDone        = ref(false);
+const assigning         = ref(false);
 const showEditDialog = ref(false);
 const showDetailsDialog = ref(false);
 const showDeleteDialog = ref(false);
@@ -79,9 +85,10 @@ const loadEmployees = async () => {
       const empId = u.user_id || u.userId;
       return u.role === 'employee' && empId !== currentUserId;
     });
+    const workLocation = user.value?.work_location;
     for (const emp of employeesList) {
       try {
-        const rolesRes = await EmployerService.getUserRoles(emp.user_id || emp.userId);
+        const rolesRes = await EmployerService.getUserRoles(emp.user_id || emp.userId, workLocation);
         emp.jobRoles = Array.isArray(rolesRes.data) ? rolesRes.data : [];
       } catch {
         emp.jobRoles = [];
@@ -270,11 +277,47 @@ const confirmDelete = async () => {
   if (!employeeToDelete.value) return;
   deleting.value = true;
   try {
-    await EmployerService.deleteEmployee(employeeToDelete.value.user_id || employeeToDelete.value.userId);
-    showSnackbar("Employee deleted successfully", "success");
+    await EmployerService.removeFromWorkplace(employeeToDelete.value.user_id || employeeToDelete.value.userId);
+    showSnackbar("Employee removed from your workplace", "success");
     await loadEmployees();
-  } catch { showSnackbar("Error deleting employee", "error"); }
+  } catch { showSnackbar("Error removing employee", "error"); }
   finally { deleting.value = false; showDeleteDialog.value = false; employeeToDelete.value = null; }
+};
+
+const openSearchDialog = () => {
+  searchQuery.value   = '';
+  searchResults.value = [];
+  searchDone.value    = false;
+  showSearchDialog.value = true;
+};
+
+const runSearch = async () => {
+  if (!searchQuery.value.trim()) return;
+  searching.value = true;
+  searchDone.value = false;
+  try {
+    const res = await EmployerService.searchEmployees(searchQuery.value.trim());
+    searchResults.value = Array.isArray(res.data) ? res.data : [];
+  } catch {
+    searchResults.value = [];
+  } finally {
+    searching.value  = false;
+    searchDone.value = true;
+  }
+};
+
+const handleAssign = async (foundUser) => {
+  assigning.value = true;
+  try {
+    await EmployerService.assignToWorkplace(foundUser.user_id || foundUser.userId);
+    showSnackbar(`${foundUser.fName} ${foundUser.lName} added to your workplace!`, 'success');
+    showSearchDialog.value = false;
+    await loadEmployees();
+  } catch (err) {
+    showSnackbar(err.response?.data?.message || 'Error adding employee', 'error');
+  } finally {
+    assigning.value = false;
+  }
 };
 
 const openDetailsDialog = (employee) => { selectedEmployee.value = employee; showDetailsDialog.value = true; };
@@ -290,7 +333,7 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
           <h1 class="text-h4 font-weight-bold navy-text">Employee Management</h1>
           <p class="text-body-2 text-grey">Manage your team members and their job roles</p>
         </div>
-        <v-btn color="#12086F" variant="flat" prepend-icon="mdi-plus" size="large" @click="showAddDialog = true">
+        <v-btn color="#12086F" variant="flat" prepend-icon="mdi-plus" size="large" @click="openSearchDialog">
           Add Employee
         </v-btn>
       </div>
@@ -334,7 +377,72 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
       </v-card>
     </v-container>
 
-    <!-- Add Employee Dialog -->
+    <!-- Search-first Add Employee Dialog -->
+    <v-dialog v-model="showSearchDialog" max-width="520" persistent>
+      <v-card rounded="lg">
+        <v-card-title class="text-body-1 font-weight-bold pa-5 pb-2 navy-text d-flex align-center ga-2">
+          <v-icon color="#12086F">mdi-account-plus</v-icon> Add Employee
+        </v-card-title>
+        <v-card-subtitle class="px-5 pb-3 text-grey">Search by name to add someone already in the system, or add them manually if they're new.</v-card-subtitle>
+        <v-divider />
+        <v-card-text class="pa-5">
+          <div class="d-flex ga-2 mb-4">
+            <v-text-field
+              v-model="searchQuery"
+              label="Search by first or last name"
+              variant="outlined"
+              density="compact"
+              hide-details
+              color="#12086F"
+              clearable
+              @keyup.enter="runSearch"
+            />
+            <v-btn color="#12086F" variant="flat" :loading="searching" @click="runSearch">Search</v-btn>
+          </div>
+
+          <div v-if="searching" class="text-center py-6">
+            <v-progress-circular indeterminate color="#12086F" />
+          </div>
+          <div v-else-if="searchDone && searchResults.length === 0" class="text-center py-6">
+            <v-icon size="48" color="grey-lighten-2" class="mb-2">mdi-account-question</v-icon>
+            <div class="text-body-2 text-grey">No one found for "{{ searchQuery }}"</div>
+            <div class="text-caption text-grey">They might not have an account yet.</div>
+          </div>
+          <div v-else-if="searchResults.length > 0" class="d-flex flex-column ga-2">
+            <v-card
+              v-for="found in searchResults"
+              :key="found.user_id"
+              variant="outlined"
+              rounded="lg"
+              class="pa-3 d-flex align-center justify-space-between"
+            >
+              <div>
+                <div class="text-body-2 font-weight-bold navy-text">{{ found.fName }} {{ found.lName }}</div>
+                <div class="text-caption text-grey">{{ found.email }}</div>
+                <div v-if="found.phone_number" class="text-caption text-grey">{{ found.phone_number }}</div>
+              </div>
+              <v-btn
+                v-if="!found.alreadyAtLocation"
+                color="#12086F"
+                variant="flat"
+                size="small"
+                :loading="assigning"
+                @click="handleAssign(found)"
+              >Add</v-btn>
+              <v-chip v-else size="small" color="success" variant="tonal">Already added</v-chip>
+            </v-card>
+          </div>
+        </v-card-text>
+        <v-divider />
+        <v-card-actions class="pa-4">
+          <v-btn variant="tonal" color="#12086F" prepend-icon="mdi-account-edit" @click="showSearchDialog = false; showAddDialog = true">Add Manually Instead</v-btn>
+          <v-spacer />
+          <v-btn variant="text" @click="showSearchDialog = false">Cancel</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Manual Add Employee Dialog -->
     <v-dialog v-model="showAddDialog" max-width="500">
       <v-card rounded="lg">
         <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4 navy-text">Add New Employee</v-card-title>
@@ -443,7 +551,7 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
         <v-divider />
         <v-card-text class="pa-5">
           <p class="text-body-1">Are you sure you want to delete <strong>{{ (employeeToDelete?.fName || employeeToDelete?.first_name || '') }} {{ (employeeToDelete?.lName || employeeToDelete?.last_name || '') }}</strong>?</p>
-          <p class="text-body-2 text-grey mt-2">This action cannot be undone.</p>
+          <p class="text-body-2 text-grey mt-2">They will be removed from your workplace. Their account will not be deleted.</p>
         </v-card-text>
         <v-divider />
         <v-card-actions class="pa-4">
