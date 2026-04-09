@@ -143,6 +143,16 @@ export default {
     return apiClient.post(`/users/${userId}/assign`, {}, addDemoHeader());
   },
 
+  // Search existing users by name (for the assign-to-workplace flow)
+  searchEmployeesByName(q) {
+    return apiClient.get(`/users/search?q=${encodeURIComponent(q)}`, addDemoHeader());
+  },
+
+  // Assign an existing user to the employer's workplace — no duplicate record created
+  assignEmployeeToWorkplace(userId) {
+    return apiClient.post(`/users/${userId}/assign`, {}, addDemoHeader());
+  },
+
   // ── USER JOB ROLES ───────────────────────────────────────────────────────
   addRoleToUser(userId, roleData) {
     return apiClient.post(`/user-job-roles/user/${userId}/roles`, roleData, addDemoHeader());
@@ -265,7 +275,6 @@ export default {
   },
 
   // ── CLOCK RECORDS (time cards) ───────────────────────────────────────────
-  // Routes registered at both /clock-records and /clock in index.js
   getAllClockRecords() {
     return apiClient.get("/clock-records", addDemoHeader());
   },
@@ -284,7 +293,6 @@ export default {
   clockOut(id) {
     return apiClient.put(`/clock-records/clock-out/${id}`, {}, addDemoHeader());
   },
-  // Kiosk mode: clock in/out on behalf of an employee
   kioskClockIn({ userId, shiftId }) {
     return apiClient.post("/clock-records/clock-in", { userId, shiftId }, addDemoHeader());
   },
