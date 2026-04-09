@@ -16,11 +16,12 @@ const loadLocations = async () => {
   try {
     const res = await EmployeeService.getBusinessAreas();
     locations.value = Array.isArray(res.data) ? res.data : [];
-    // Default to user's primary work location
-    const userId = user.value?.work_location;
-    if (userId && locations.value.length) {
-      const match = locations.value.find(l => (l.location_id || l.locationId) === userId);
-      selectedLocation.value = match ? (match.location_id || match.locationId) : (locations.value[0].location_id || locations.value[0].locationId);
+    const userLoc = user.value?.work_location;
+    if (userLoc && locations.value.length) {
+      const match = locations.value.find(l => (l.location_id || l.locationId) === userLoc);
+      selectedLocation.value = match
+        ? (match.location_id || match.locationId)
+        : (locations.value[0].location_id || locations.value[0].locationId);
     } else if (locations.value.length) {
       selectedLocation.value = locations.value[0].location_id || locations.value[0].locationId;
     }
@@ -36,6 +37,18 @@ const selectedLocationName = computed(() => {
   const loc = locations.value.find(l => (l.location_id || l.locationId) === selectedLocation.value);
   return loc?.name || 'My Workplace';
 });
+
+// ── DAY INDEX HELPERS ─────────────────────────────────────────────────────
+// The calendar displays Mon–Sun as calIdx 0–6.
+// The database uses JS standard: 0=Sun, 1=Mon, 2=Tue, ... 6=Sat.
+// These two helpers translate between them so the employer grid always
+// sees the correct day_of_week integer.
+
+// calIdx (0=Mon … 6=Sun)  →  dbDay (0=Sun, 1=Mon … 6=Sat)
+const calIdxToDbDay = (calIdx) => (calIdx + 1) % 7;
+
+// dbDay (0=Sun … 6=Sat)  →  calIdx (0=Mon … 6=Sun)
+const dbDayToCalIdx = (dbDay) => (dbDay + 6) % 7;
 
 // ── WEEK NAVIGATION ───────────────────────────────────────────────────────
 const currentWeekStart = ref(getMonday(new Date()));
@@ -90,6 +103,7 @@ const timeLabels = computed(() =>
 const allWeeks = reactive({});
 const weekKey  = computed(() => currentWeekStart.value.toISOString().split('T')[0]);
 
+// Calendar columns: Mon=0, Tue=1, Wed=2, Thu=3, Fri=4, Sat=5, Sun=6
 const weekDays = computed(() => {
   const labels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   return labels.map((label, i) => {
@@ -105,7 +119,7 @@ watch(weekKey, (key) => {
 
 const availability = computed(() => allWeeks[weekKey.value] || [[], [], [], [], [], [], []]);
 
-const toMin    = (str) => { if (!str) return 0; const [h, m] = str.split(':').map(Number); return h * 60 + m; };
+const toMin     = (str) => { if (!str) return 0; const [h, m] = str.split(':').map(Number); return h * 60 + m; };
 const minToTime = (min) => { const h = Math.floor(min / 60); const m = min % 60; return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`; };
 const toDisplay = (min) => { const h = Math.floor(min / 60) % 12 || 12; const m = min % 60; const ampm = Math.floor(min / 60) >= 12 ? 'PM' : 'AM'; return `${h}:${String(m).padStart(2, '0')} ${ampm}`; };
 
@@ -193,7 +207,18 @@ const previewStyle = (dayIdx) => {
   const e    = Math.max(dragStart.value, dragCur.value) + 1;
   const sMin = CAL_START + s * 30;
   const eMin = CAL_START + e * 30;
-  return { position: 'absolute', top: `${((sMin - CAL_START) / CAL_RANGE) * 100}%`, height: `${((eMin - sMin) / CAL_RANGE) * 100}%`, left: '3px', right: '3px', background: 'rgba(67, 97, 238, 0.2)', borderLeft: '3px solid #4361EE', borderRadius: '4px', zIndex: 5, pointerEvents: 'none', minHeight: '14px' };
+  return {
+    position: 'absolute',
+    top: `${((sMin - CAL_START) / CAL_RANGE) * 100}%`,
+    height: `${((eMin - sMin) / CAL_RANGE) * 100}%`,
+    left: '3px', right: '3px',
+    background: 'rgba(67, 97, 238, 0.2)',
+    borderLeft: '3px solid #4361EE',
+    borderRadius: '4px',
+    zIndex: 5,
+    pointerEvents: 'none',
+    minHeight: '14px',
+  };
 };
 
 // ── LOAD FROM BACKEND ─────────────────────────────────────────────────────
@@ -206,8 +231,8 @@ const loadAvailabilityForWeek = async () => {
     allWeeks[weekKey.value] = [[], [], [], [], [], [], []];
 
     avail.forEach(a => {
-      const dbDay  = a.day_of_week ?? a.dayOfWeek;
-      const calIdx = dbDay;
+      const dbDay  = a.day_of_week ?? a.dayOfWeek;  // 0=Sun, 1=Mon … 6=Sat
+      const calIdx = dbDayToCalIdx(dbDay);           // ✅ convert to 0=Mon … 6=Sun
       const s      = a.start_time ?? a.startTime;
       const e      = a.end_time   ?? a.endTime;
       if (calIdx >= 0 && calIdx <= 6 && s != null && e != null) {
@@ -227,9 +252,9 @@ const snackColor = ref('success');
 
 const submitAvailability = async () => {
   if (!selectedLocation.value) {
-    snackMsg.value = 'Please select a location first';
+    snackMsg.value   = 'Please select a location first';
     snackColor.value = 'error';
-    snackbar.value = true;
+    snackbar.value   = true;
     return;
   }
 
@@ -245,16 +270,17 @@ const submitAvailability = async () => {
       await EmployeeService.deleteAvailability(a.id ?? a.availability_id);
     }
 
+    // Submit — translate calIdx back to dbDay before sending
     for (let calIdx = 0; calIdx < weekData.length; calIdx++) {
-      const dbDay = calIdx;
+      const dbDay = calIdxToDbDay(calIdx);  // ✅ Mon(calIdx=0) → dbDay=1, Wed(calIdx=2) → dbDay=3
       for (const slot of weekData[calIdx]) {
         await EmployeeService.createAvailability({
           userId,
-          dayOfWeek:   dbDay,
+          dayOfWeek:   dbDay,           // ✅ correct JS day-of-week stored in DB
           startTime:   slot.s,
           endTime:     slot.e,
           isAvailable: true,
-          locationId:  selectedLocation.value,  // ✅ include location
+          locationId:  selectedLocation.value,
           createdAt:   Date.now(),
         });
       }
@@ -371,7 +397,7 @@ onUnmounted(() => {
           </v-card>
         </v-col>
 
-        <!-- ── RIGHT: Calendar (wider, all 7 days) ──────────────────────── -->
+        <!-- ── RIGHT: Calendar ──────────────────────────────────────────── -->
         <v-col cols="12" md="9">
           <v-card variant="outlined" rounded="lg" class="navy-card">
             <v-card-text class="pa-3">
