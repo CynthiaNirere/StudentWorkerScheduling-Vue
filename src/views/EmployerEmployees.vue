@@ -127,7 +127,7 @@ const loadEmployeeRoles = async (userId) => {
 
 // ── ADD DIALOG ────────────────────────────────────────────────────────────
 const openAddDialog = () => {
-  addStep.value          = 'search';
+  addStep.value          = 'manual';
   nameQuery.value        = '';
   searchResults.value    = [];
   searchDone.value       = false;
@@ -534,8 +534,8 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
         <!-- STEP 3: Manual entry -->
         <template v-if="addStep === 'manual'">
           <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4 navy-text d-flex align-center ga-2">
-            <v-btn icon size="x-small" variant="text" @click="addStep = 'search'" class="mr-1"><v-icon>mdi-arrow-left</v-icon></v-btn>
-            New Employee
+            <v-icon color="#12086F" class="mr-2">mdi-account-plus</v-icon>
+            Add Employee
           </v-card-title>
           <v-divider />
           <v-card-text class="pa-5">
@@ -551,7 +551,7 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
           </v-card-text>
           <v-divider />
           <v-card-actions class="pa-4">
-            <v-btn variant="text" @click="addStep = 'search'">Back</v-btn>
+            <v-btn variant="text" @click="showAddDialog = false">Cancel</v-btn>
             <v-spacer />
             <v-btn color="#12086F" variant="flat" :loading="saving" @click="handleAddEmployee">Create Employee</v-btn>
           </v-card-actions>
