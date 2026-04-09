@@ -118,7 +118,7 @@ const loadJobRoles = async () => {
 const loadEmployeeRoles = async (userId) => {
   loadingRoles.value = true;
   try {
-    const res = await EmployerService.getUserRoles(userId);
+    const res = await EmployerService.getUserRoles(userId, user.value?.work_location);
     employeeRoles.value = Array.isArray(res.data) ? res.data : [];
   } catch {
     employeeRoles.value = [];
