@@ -353,10 +353,10 @@ const confirmDelete = async () => {
   if (!employeeToDelete.value) return;
   deleting.value = true;
   try {
-    await EmployerService.deleteEmployee(employeeToDelete.value.user_id || employeeToDelete.value.userId);
-    showSnackbar("Employee deleted successfully", "success");
+    await EmployerService.removeFromWorkplace(employeeToDelete.value.user_id || employeeToDelete.value.userId);
+    showSnackbar("Employee removed from your workplace", "success");
     await loadEmployees();
-  } catch { showSnackbar("Error deleting employee", "error"); }
+  } catch { showSnackbar("Error removing employee", "error"); }
   finally { deleting.value = false; showDeleteDialog.value = false; employeeToDelete.value = null; }
 };
 

@@ -133,6 +133,15 @@ export default {
   deleteEmployee(id) {
     return apiClient.delete(`/users/${id}`, addDemoHeader());
   },
+  removeFromWorkplace(userId) {
+    return apiClient.delete(`/users/${userId}/workplace`, addDemoHeader());
+  },
+  searchEmployees(query) {
+    return apiClient.get(`/users/search?q=${encodeURIComponent(query)}`, addDemoHeader());
+  },
+  assignToWorkplace(userId) {
+    return apiClient.post(`/users/${userId}/assign`, {}, addDemoHeader());
+  },
 
   // Search existing users by name (for the assign-to-workplace flow)
   searchEmployeesByName(q) {
@@ -148,8 +157,9 @@ export default {
   addRoleToUser(userId, roleData) {
     return apiClient.post(`/user-job-roles/user/${userId}/roles`, roleData, addDemoHeader());
   },
-  getUserRoles(userId) {
-    return apiClient.get(`/user-job-roles/user/${userId}/roles`, addDemoHeader());
+  getUserRoles(userId, locationId) {
+    const params = locationId ? `?locationId=${locationId}` : '';
+    return apiClient.get(`/user-job-roles/user/${userId}/roles${params}`, addDemoHeader());
   },
   removeRoleFromUser(userId, roleId) {
     return apiClient.delete(`/user-job-roles/user/${userId}/roles/${roleId}`, addDemoHeader());
