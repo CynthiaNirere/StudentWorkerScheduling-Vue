@@ -75,7 +75,7 @@ export function useNotifications() {
             timestamp: formatTimestamp(swap.created_at || swap.createdAt),
             read: swap.status !== 'pending',
             urgent: false,
-            route: 'employeeTimeRequests',
+            route: 'employeeSwaps',
             action: 'View Swap',
           });
         });
@@ -160,7 +160,7 @@ export function useNotifications() {
     if (notif.route) {
       router.push({ name: notif.route });
     } else if (notif.type === 'swap') {
-      router.push({ name: 'employeeTimeRequests' });
+      router.push({ name: 'employeeSwaps' });
     } else if (notif.type === 'timeoff') {
       router.push({ name: 'employeeTimeRequests' });
     }
