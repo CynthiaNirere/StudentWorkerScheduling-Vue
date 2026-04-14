@@ -14,7 +14,7 @@ const snackbar   = ref(false);
 const snackMsg   = ref('');
 const snackColor = ref('success');
 
-// ── PAY PERIOD HELPERS ────────────────────────────────────────────────────────
+//This is the start of the current pay period ────────────────────────────────────────────────────────
 const ANCHOR = new Date('2025-01-06T00:00:00'); // known Monday
 
 function getPayPeriodStart(date) {
@@ -52,7 +52,7 @@ const recordsWithDetails = computed(() =>
       totalHours = parseFloat(r.totalHoursWorked || r.total_hours_worked).toFixed(2);
     }
     const rejectionComment = r.rejectionReason || r.rejection_reason || r.rejectReason || null;
-    return { ...r, inDate, outDate, totalHours, status: r.status || 'pending', rejectionComment };
+    return { ...r, inDate, outDate, totalHours, status: r.status || 'View pending', rejectionComment };
   })
 );
 
