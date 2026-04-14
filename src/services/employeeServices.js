@@ -105,6 +105,10 @@ export default {
     return apiClient.get(`/clock-records/user/${userId}`);
   },
 
+  updateClockRecord(id, data) {
+    return apiClient.put(`/clock-records/${id}/modify`, data);
+  },
+
   // ─── TASKS ────────────────────────────────────────────────────────────────
   getMyTaskLists() {
     return apiClient.get('/task-lists');
