@@ -246,7 +246,7 @@ const logout = () => {
         <v-list-item prepend-icon="mdi-calendar"       title="Schedule"    :to="isGuest ? { name: 'guestSchedule' }    : { name: 'employerSchedule' }"    color="white" class="nav-item" rounded="lg" />
         <v-list-item prepend-icon="mdi-calendar-text"  title="Templates"   :to="isGuest ? { name: 'guestTemplates' }   : { name: 'employerTemplates' }"   color="white" class="nav-item" rounded="lg" />
         <v-list-item prepend-icon="mdi-account-group"  title="Employees"   :to="isGuest ? { name: 'guestEmployees' }   : { name: 'employerEmployees' }"   color="white" class="nav-item" rounded="lg" />
-        <v-list-item prepend-icon="mdi-clock-outline"  title="Availability":to="isGuest ? { name: 'guestAvailability' } : { name: 'employerAvailability' }" color="white" class="nav-item" rounded="lg" />
+        <v-list-item prepend-icon="mdi-clock-outline"  title="Availability" :to="isGuest ? { name: 'guestAvailability' } : { name: 'employerAvailability' }" color="white" class="nav-item" rounded="lg" />
         <v-list-item prepend-icon="mdi-calendar-remove" title="Time Off"   :to="isGuest ? { name: 'guestTimeOff' }     : { name: 'employerTimeOff' }"     color="white" class="nav-item" rounded="lg" />
         <v-list-item prepend-icon="mdi-swap-horizontal" title="Swaps"      :to="isGuest ? { name: 'guestSwaps' }       : { name: 'employerSwaps' }"       color="white" class="nav-item" rounded="lg" />
         <v-list-item prepend-icon="mdi-message-text"   title="Messages"    :to="isGuest ? { name: 'guestMessages' }    : { name: 'employerMessages' }"    color="white" class="nav-item" rounded="lg">
