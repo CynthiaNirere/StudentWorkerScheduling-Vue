@@ -164,67 +164,67 @@ const router = createRouter({
       path: "/employee/hub",
       name: "employeeHub",
       component: EmployeeHub,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employee' },
     },
     {
       path: "/employee/dashboard",
       name: "employeeDashboard",
       component: EmployeeDashboard,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employee' },
     },
     {
       path: "/employee/availability",
       name: "employeeAvailability",
       component: EmployeeAvailability,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employee' },
     },
     {
       path: "/employee/schedule",
       name: "employeeSchedule",
       component: EmployeeSchedule,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employee' },
     },
     {
       path: "/employee/profile",
       name: "employeeProfile",
       component: EmployeeProfile,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employee' },
     },
     {
       path: "/employee/settings",
       name: "employeeSettings",
       component: EmployeeSettings,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employee' },
     },
     {
       path: "/employee/time-requests",
       name: "employeeTimeRequests",
       component: EmployeeTimeRequests,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employee' },
     },
     {
       path: "/employee/time-cards",
       name: "employeeTimeCards",
       component: EmployeeTimeCards,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employee' },
     },
     {
       path: "/employee/tasks",
       name: "employeeTasks",
       component: EmployeeTasks,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employee' },
     },
     {
       path: "/employee/messages",
       name: "employeeMessages",
       component: EmployeeMessages,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employee' },
     },
     {
       path: "/employee/swaps",
       name: "employeeSwaps",
       component: EmployeeSwaps,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employee' },
     },
     
     // ─── EMPLOYER ROUTES ────────────────────────────────────────────────
@@ -232,7 +232,7 @@ const router = createRouter({
       path: "/business-area-select",
       name: "businessAreaSelect",
       component: BusinessAreaSelect,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employer' },
     },
     {
       path: "/employer",
@@ -242,85 +242,85 @@ const router = createRouter({
       path: "/employer/dashboard",
       name: "employerDashboard",
       component: EmployerDashboard,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employer' },
     },
     {
       path: "/employer/schedule",
       name: "employerSchedule",
       component: EmployerSchedule,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employer' },
     },
     {
       path: "/employer/employees",
       name: "employerEmployees",
       component: EmployerEmployees,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employer' },
     },
     {
       path: "/employer/availability",
       name: "employerAvailability",
       component: EmployerAvailability,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employer' },
     },
     {
       path: "/employer/time-off",
       name: "employerTimeOff",
       component: EmployerTimeOff,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employer' },
     },
     {
       path: "/employer/tasks",
       name: "employerTasks",
       component: EmployerTasks,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employer' },
     },
     {
       path: "/employer/swaps",
       name: "employerSwaps",
       component: EmployerSwaps,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employer' },
     },
     {
       path: "/employer/alerts",
       name: "employerAlerts",
       component: EmployerAlerts,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employer' },
     },
     {
       path: "/employer/messages",
       name: "employerMessages",
       component: EmployerMessages,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employer' },
     },
     {
       path: "/employer/profile",
       name: "employerProfile",
       component: EmployerProfile,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employer' },
     },
     {
       path: "/employer/templates",
       name: "employerTemplates",
       component: TemplateManagement,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employer' },
     },
     {
       path: "/employer/settings",
       name: "employerSettings",
       component: EmployerSettings,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employer' },
     },
     {
       path: "/employer/time-cards",
       name: "employerTimeCards",
       component: EmployerTimeCards,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employer' },
     },
     {
       path: "/employer/clock-kiosk",
       name: "clockKiosk",
       component: ClockKiosk,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, role: 'employer' },
     },
     
     // ─── CATCH ALL ──────────────────────────────────────────────────────
@@ -331,27 +331,44 @@ const router = createRouter({
   ],
 });
 
-// ✅ SIMPLIFIED ROUTE GUARD
+//  ENHANCED ROUTE GUARD - Handles page refresh and prevents jumping
 router.beforeEach((to, from, next) => {
+  console.log('🔍 Navigation:', { from: from.name, to: to.name });
+  
   const user = Utils.getStore("user");
   const isGuest = localStorage.getItem("isGuest") === "true";
   const requiresAuth = to.meta.requiresAuth;
   const requiresAdmin = to.meta.requiresAdmin;
+  const requiredRole = to.meta.role;
 
-  // Allow ALL guest routes when in guest mode
-  if (to.name?.startsWith("guest") && isGuest) {
+  console.log('👤 User:', user);
+  console.log('🔐 Requires auth:', requiresAuth);
+  console.log('👁️ Is guest:', isGuest);
+
+  // PUBLIC ROUTES - Always allow
+  if (!requiresAuth) {
+    console.log(' Public route - allowing access');
     next();
     return;
   }
 
-  // Require authentication for protected routes
-  if (requiresAuth && !user) {
+  //  GUEST USERS - Redirect to guest dashboard
+  if (isGuest && requiresAuth) {
+    console.log(' Guest trying to access protected route');
+    next({ name: 'guestDashboard' });
+    return;
+  }
+
+  //  NOT LOGGED IN - Redirect to login
+  if (!user && requiresAuth) {
+    console.log(' No user - redirecting to login');
     next({ name: "login" });
     return;
   }
 
-  // Admin role check
+  //  ADMIN ROLE CHECK
   if (requiresAdmin && user?.role !== 'admin') {
+    console.log(' Not admin - redirecting based on role');
     if (user?.role === 'employer') {
       next({ name: 'employerDashboard' });
     } else if (user?.role === 'employee') {
@@ -362,6 +379,23 @@ router.beforeEach((to, from, next) => {
     return;
   }
 
+  if (requiredRole && user?.role !== requiredRole) {
+    console.log(` Wrong role: user is ${user?.role}, route requires ${requiredRole}`);
+    
+    // Redirect to appropriate dashboard based on actual role
+    if (user?.role === 'admin') {
+      next({ name: 'workplace' });
+    } else if (user?.role === 'employer') {
+      next({ name: 'employerDashboard' });
+    } else if (user?.role === 'employee') {
+      next({ name: 'employeeDashboard' });
+    } else {
+      next({ name: 'landing' });
+    }
+    return;
+  }
+
+  console.log(' Navigation allowed');
   next();
 });
 
