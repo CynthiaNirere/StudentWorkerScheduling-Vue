@@ -45,7 +45,8 @@ const templateName = ref("");
 const templateDescription = ref("");
 const selectedTemplateId = ref(null);
 const shiftCreationStep = ref(1);
-const showAllEmployees = ref(false);
+const showAllEmployees  = ref(false);
+const step1Mode         = ref('all');
 
 const shiftForm = ref({
   date: "", startHour: "9", startMinute: "00", startAmPm: "AM",
@@ -164,7 +165,7 @@ const availableEmployees = computed(() => {
       const aDayOfWeek = a.day_of_week !== undefined ? a.day_of_week : a.dayOfWeek;
       return String(aUserId) === String(empId) && Number(aDayOfWeek) === dayOfWeek;
     });
-    if (empAvail.length === 0) return true;
+    if (empAvail.length === 0) return false;
     return empAvail.some(slot => {
       const aStart = slot.start_time !== undefined ? slot.start_time : (slot.startTime || 0);
       const aEnd   = slot.end_time   !== undefined ? slot.end_time   : (slot.endTime   || 1440);
@@ -174,11 +175,24 @@ const availableEmployees = computed(() => {
 });
 
 const getEmployeePool = () => {
-  if (showAllEmployees.value || !shiftForm.value.jobRole) return employees.value;
+  if (step1Mode.value === 'all' || showAllEmployees.value || !shiftForm.value.jobRole) return employees.value;
+  const selectedRoleId = String(shiftForm.value.jobRole);
   return employees.value.filter(emp => {
     const roles = emp.jobRoles || [];
-    return roles.some(r => r.job_role_id === shiftForm.value.jobRole || r.jobRoleId === shiftForm.value.jobRole);
+    return roles.some(r => String(r.job_role_id) === selectedRoleId || String(r.jobRoleId) === selectedRoleId);
   });
+};
+
+const getEmpRoleNames = (emp) => {
+  const roles = emp.jobRoles || [];
+  const names = [...new Set(roles.map(r => r.role_title || r.title || '').filter(Boolean))];
+  return names.length ? names : (emp.job_role ? [emp.job_role] : []);
+};
+
+const getEmpDisplayName = (emp) => {
+  const name  = `${emp.fName || emp.first_name || ''} ${emp.lName || emp.last_name || ''}`.trim();
+  const names = getEmpRoleNames(emp);
+  return names.length ? `${name} (${names.join(' · ')})` : name;
 };
 
 const templateTaskLists = computed(() =>
@@ -274,12 +288,12 @@ const goToToday = () => { selectedWeek.value = new Date(); };
 
 // ── SHIFT ACTIONS ─────────────────────────────────────────────────────────
 const openCreateShiftForDay = (day) => {
-  editMode.value = false; selectedShift.value = null; shiftCreationStep.value = 1; showAllEmployees.value = false;
+  editMode.value = false; selectedShift.value = null; shiftCreationStep.value = 1; showAllEmployees.value = false; step1Mode.value = 'all';
   shiftForm.value = { date: day.dateString, startHour: "9", startMinute: "00", startAmPm: "AM", endHour: "5", endMinute: "00", endAmPm: "PM", userId: "", jobRole: "", notes: "", assignedTasks: [], allowEmpty: false };
   showShiftDialog.value = true;
 };
 
-const nextStep     = () => { if (shiftCreationStep.value === 1) { if (!shiftForm.value.jobRole) { showSnackbar("Please select a job role", "error"); return; } shiftCreationStep.value = 2; } };
+const nextStep     = () => { if (shiftCreationStep.value === 1) { shiftCreationStep.value = 2; } };
 const previousStep = () => { if (shiftCreationStep.value > 1) shiftCreationStep.value--; };
 
 const timeToMinutes = (hour, minute, ampm) => {
@@ -322,7 +336,7 @@ const checkForOverlaps = (shiftData) => {
 const handleSaveShift = async () => {
   if (creatingShift.value) return;
   if (!shiftForm.value.allowEmpty && !shiftForm.value.userId) { showSnackbar("Please assign an employee or enable 'Create Empty Shift'", "error"); return; }
-  if (!shiftForm.value.date || !shiftForm.value.jobRole) { showSnackbar("Please fill in all required fields", "error"); return; }
+  if (!shiftForm.value.date) { showSnackbar("Please select a date", "error"); return; }
   const startMinutes = timeToMinutes(shiftForm.value.startHour, shiftForm.value.startMinute, shiftForm.value.startAmPm);
   const endMinutes   = timeToMinutes(shiftForm.value.endHour,   shiftForm.value.endMinute,   shiftForm.value.endAmPm);
   if (endMinutes <= startMinutes) { showSnackbar("End time must be after start time", "error"); return; }
@@ -363,7 +377,7 @@ const doSaveShift = async (shiftData) => {
 };
 
 const openEditShift = async (shift) => {
-  editMode.value = true; selectedShift.value = shift; shiftCreationStep.value = 1; showAllEmployees.value = false;
+  editMode.value = true; selectedShift.value = shift; shiftCreationStep.value = 1; showAllEmployees.value = false; step1Mode.value = shift.job_role_id || shift.jobRoleId ? 'role' : 'all';
   const raw = shift.shift_time ?? shift.shiftTime;
   const shiftDate = new Date(Number(raw));
   const startTime = minutesToTime(shift.start_time ?? shift.startTime);
@@ -607,18 +621,76 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
         <v-divider />
         <v-card-text class="pa-5">
           <div v-if="shiftCreationStep === 1">
-            <v-alert type="info" variant="tonal" density="compact" color="#12086F" class="mb-4">
-              <div class="text-caption"><v-icon size="small" class="mr-1">mdi-information</v-icon>Select which job role this shift is for</div>
-            </v-alert>
-            <v-select v-model="shiftForm.jobRole" :items="jobRoles" item-title="title" item-value="job_role_id" label="Job Role *" variant="outlined" density="comfortable" color="#12086F" prepend-icon="mdi-briefcase" />
+            <div class="text-body-2 text-grey mb-3">Who do you want to assign this shift to?</div>
+            <v-row dense class="mb-4">
+              <v-col cols="6">
+                <div
+                  class="selection-card pa-4 rounded-lg d-flex flex-column align-center text-center cursor-pointer"
+                  :class="{ 'selection-card--active': !shiftForm.jobRole && step1Mode === 'all' }"
+                  style="border: 2px solid; border-color: inherit; min-height: 110px; justify-content: center;"
+                  :style="step1Mode === 'all' ? 'border-color:#12086F; background:#f0effe;' : 'border-color:#e0e0e0; background:#fafafa;'"
+                  @click="step1Mode = 'all'; shiftForm.jobRole = ''"
+                >
+                  <v-icon size="32" :color="step1Mode === 'all' ? '#12086F' : '#9e9e9e'" class="mb-2">mdi-account-group</v-icon>
+                  <div class="text-subtitle-2 font-weight-bold" :style="step1Mode === 'all' ? 'color:#12086F' : 'color:#616161'">All Employees</div>
+                  <div class="text-caption text-grey">See everyone available</div>
+                </div>
+              </v-col>
+              <v-col cols="6">
+                <div
+                  class="selection-card pa-4 rounded-lg d-flex flex-column align-center text-center cursor-pointer"
+                  :style="step1Mode === 'role' ? 'border: 2px solid #12086F; background:#f0effe;' : 'border: 2px solid #e0e0e0; background:#fafafa;'"
+                  style="min-height: 110px; justify-content: center;"
+                  @click="step1Mode = 'role'"
+                >
+                  <v-icon size="32" :color="step1Mode === 'role' ? '#12086F' : '#9e9e9e'" class="mb-2">mdi-briefcase-account</v-icon>
+                  <div class="text-subtitle-2 font-weight-bold" :style="step1Mode === 'role' ? 'color:#12086F' : 'color:#616161'">Filter by Role</div>
+                  <div class="text-caption text-grey">Only show qualified staff</div>
+                </div>
+              </v-col>
+            </v-row>
+            <v-select
+              v-if="step1Mode === 'role'"
+              v-model="shiftForm.jobRole"
+              :items="jobRoles"
+              item-title="title"
+              item-value="job_role_id"
+              label="Select Role"
+              variant="outlined"
+              density="comfortable"
+              color="#12086F"
+              prepend-icon="mdi-briefcase"
+              clearable
+              autofocus
+            />
           </div>
           <div v-if="shiftCreationStep === 2">
-            <v-alert v-if="selectedRoleName && !showAllEmployees" type="info" variant="tonal" density="compact" color="#4361EE" class="mb-4" icon="mdi-filter">
-              <div class="text-caption">Showing employees for role: <strong>{{ selectedRoleName }}</strong>. Check "Show all employees" below to see everyone.</div>
-            </v-alert>
-            <v-alert v-if="showAllEmployees" type="warning" variant="tonal" density="compact" color="#f57c00" class="mb-4" icon="mdi-account-group">
-              <div class="text-caption">Showing <strong>all employees</strong>. Their assigned roles are shown next to their names.</div>
-            </v-alert>
+            <div class="d-flex align-center justify-space-between mb-4">
+              <div class="d-flex align-center ga-1">
+                <template v-if="!shiftForm.jobRole">
+                  <v-icon size="16" color="#f57c00">mdi-account-group</v-icon>
+                  <span class="text-caption" style="color:#f57c00;">Showing all employees (no role filter)</span>
+                </template>
+                <template v-else-if="!showAllEmployees">
+                  <v-icon size="16" color="#4361EE">mdi-filter</v-icon>
+                  <span class="text-caption" style="color:#4361EE;">Filtered: <strong>{{ selectedRoleName }}</strong> only</span>
+                </template>
+                <template v-else>
+                  <v-icon size="16" color="#f57c00">mdi-account-group</v-icon>
+                  <span class="text-caption" style="color:#f57c00;">Showing all employees</span>
+                </template>
+              </div>
+              <v-btn
+                v-if="shiftForm.jobRole"
+                :color="showAllEmployees ? '#f57c00' : '#4361EE'"
+                :variant="showAllEmployees ? 'flat' : 'tonal'"
+                size="x-small"
+                :prepend-icon="showAllEmployees ? 'mdi-filter-off' : 'mdi-account-group'"
+                @click="showAllEmployees = !showAllEmployees"
+              >
+                {{ showAllEmployees ? 'Show role only' : 'Show all employees' }}
+              </v-btn>
+            </div>
             <v-text-field v-model="shiftForm.date" label="Date" type="date" variant="outlined" density="compact" class="mb-3" color="#12086F" readonly />
             <div class="mb-3">
               <div class="text-caption text-grey mb-2">Start Time</div>
@@ -636,12 +708,11 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
                 <v-col cols="4"><v-select v-model="shiftForm.endAmPm"   :items="timeOptions.ampm"    label="AM/PM" variant="outlined" density="compact" color="#12086F" /></v-col>
               </v-row>
             </div>
-            <v-checkbox v-model="shiftForm.allowEmpty" label="Create empty shift (assign employee later)" color="#12086F" density="compact" hide-details class="mb-2" />
-            <v-checkbox v-model="showAllEmployees" label="Show all employees (not just this role)" color="#f57c00" density="compact" hide-details class="mb-3" />
+            <v-checkbox v-model="shiftForm.allowEmpty" label="Create empty shift (assign employee later)" color="#12086F" density="compact" hide-details class="mb-3" />
             <v-select
               v-model="shiftForm.userId"
               :items="availableEmployees"
-              :item-title="(e) => { const name = `${e.fName || e.first_name || ''} ${e.lName || e.last_name || ''}`.trim(); const roles = (e.jobRoles || []); const primary = roles.find(r => r.is_primary); const rt = primary?.role_title || roles[0]?.role_title || e.job_role || ''; return rt ? `${name} (${rt})` : name; }"
+              :item-title="getEmpDisplayName"
               :item-value="(e) => e.user_id || e.userId"
               :label="shiftForm.allowEmpty ? 'Assign to Employee (optional)' : 'Assign to Employee *'"
               variant="outlined" density="compact" class="mb-3" color="#12086F" :disabled="shiftForm.allowEmpty" clearable
@@ -654,6 +725,23 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
                   </v-list-item-title>
                 </v-list-item>
                 <v-divider class="my-2" />
+              </template>
+              <template #item="{ item, props }">
+                <v-list-item v-bind="props" :title="undefined">
+                  <v-list-item-title class="text-body-2 font-weight-medium">
+                    {{ `${item.raw.fName || item.raw.first_name || ''} ${item.raw.lName || item.raw.last_name || ''}`.trim() }}
+                  </v-list-item-title>
+                  <v-list-item-subtitle v-if="getEmpRoleNames(item.raw).length">
+                    <v-chip
+                      v-for="role in getEmpRoleNames(item.raw)"
+                      :key="role"
+                      size="x-small"
+                      color="#12086F"
+                      variant="tonal"
+                      class="mr-1"
+                    >{{ role }}</v-chip>
+                  </v-list-item-subtitle>
+                </v-list-item>
               </template>
             </v-select>
             <v-divider class="mb-3" />
