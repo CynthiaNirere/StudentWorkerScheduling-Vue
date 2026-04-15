@@ -23,8 +23,8 @@ const showDeleteDialog = ref(false);
 const processing       = ref(false);
 const itemToDelete     = ref(null);
 
-const defaultForm = { userId: null, dayOfWeek: null, startTime: null, endTime: null };
-const addForm  = ref({ ...defaultForm });
+const defaultForm    = { userId: null, dayOfWeek: null, startTime: null, endTime: null };
+const addForm        = ref({ userIds: [], daysOfWeek: [], startTime: null, endTime: null });
 const editForm = ref({ ...defaultForm, id: null });
 
 const dayOptions = daysOfWeek.map((label, index) => ({ title: label, value: index }));
@@ -133,23 +133,34 @@ const showSnackbar = (message, color = "success") => {
 };
 
 const openAddDialog = () => {
-  addForm.value       = { ...defaultForm };
+  addForm.value       = { userIds: [], daysOfWeek: [], startTime: null, endTime: null };
   showAddDialog.value = true;
 };
 
 // ── ADD — includes locationId so the row is scoped to this workplace ──────
 const handleAdd = async () => {
-  if (!addForm.value.userId || addForm.value.dayOfWeek === null || !addForm.value.startTime || !addForm.value.endTime) {
-    showSnackbar('Please fill in all fields', 'error');
+  const { userIds, daysOfWeek, startTime, endTime } = addForm.value;
+  if (!userIds.length || !daysOfWeek.length || startTime === null || endTime === null) {
+    showSnackbar('Please select at least one employee, one day, and both times', 'error');
+    return;
+  }
+  if (startTime >= endTime) {
+    showSnackbar('End time must be after start time', 'error');
     return;
   }
   processing.value = true;
+  let created = 0;
   try {
-    await EmployerService.createAvailability({
-      ...addForm.value,
-      locationId: employerLocationId.value,   // ✅ scoped to this workplace
-    });
-    showSnackbar('Availability added successfully');
+    for (const userId of userIds) {
+      for (const dayOfWeek of daysOfWeek) {
+        await EmployerService.createAvailability({
+          userId, dayOfWeek, startTime, endTime,
+          locationId: employerLocationId.value,
+        });
+        created++;
+      }
+    }
+    showSnackbar(`${created} availability slot(s) added successfully`);
     showAddDialog.value = false;
     await loadAvailability();
   } catch (err) {
@@ -284,22 +295,72 @@ const handleDelete = async () => {
       </v-alert>
 
       <!-- Add Dialog -->
-      <v-dialog v-model="showAddDialog" max-width="500">
+      <v-dialog v-model="showAddDialog" max-width="560">
         <v-card rounded="lg">
-          <v-card-title class="navy-text font-weight-bold">Add Employee Availability</v-card-title>
-          <v-card-text>
-            <v-select v-model="addForm.userId" :items="employees"
+          <v-card-title class="navy-text font-weight-bold pa-5 pb-2">Add Employee Availability</v-card-title>
+          <v-card-text class="pa-5 pt-2">
+
+            <!-- Employees -->
+            <div class="text-caption font-weight-medium text-grey-darken-1 mb-1">Employees <span class="text-caption text-grey">(select one or more)</span></div>
+            <v-select
+              v-model="addForm.userIds"
+              :items="employees"
               :item-title="(e) => `${e.fName || e.first_name || ''} ${e.lName || e.last_name || ''}`"
               :item-value="(e) => e.user_id || e.userId"
-              label="Employee" variant="outlined" density="compact" class="mb-3" color="#12086F" />
-            <v-select v-model="addForm.dayOfWeek" :items="dayOptions" label="Day of Week" variant="outlined" density="compact" class="mb-3" color="#12086F" />
-            <v-select v-model="addForm.startTime" :items="timeOptions" label="Start Time"  variant="outlined" density="compact" class="mb-3" color="#12086F" />
-            <v-select v-model="addForm.endTime"   :items="timeOptions" label="End Time"    variant="outlined" density="compact" color="#12086F" />
+              label="Select employees"
+              variant="outlined"
+              density="compact"
+              class="mb-4"
+              color="#12086F"
+              multiple
+              chips
+              closable-chips
+            >
+              <template #item="{ item, props }">
+                <v-list-item v-bind="props">
+                  <template #prepend="{ isSelected }">
+                    <v-checkbox-btn :model-value="isSelected" color="#12086F" />
+                  </template>
+                </v-list-item>
+              </template>
+            </v-select>
+
+            <!-- Days of week -->
+            <div class="text-caption font-weight-medium text-grey-darken-1 mb-2">Days of Week <span class="text-caption text-grey">(select one or more)</span></div>
+            <div class="d-flex flex-wrap ga-2 mb-4">
+              <v-chip
+                v-for="opt in dayOptions"
+                :key="opt.value"
+                :color="addForm.daysOfWeek.includes(opt.value) ? '#12086F' : undefined"
+                :variant="addForm.daysOfWeek.includes(opt.value) ? 'flat' : 'outlined'"
+                :prepend-icon="addForm.daysOfWeek.includes(opt.value) ? 'mdi-check' : undefined"
+                size="small"
+                class="cursor-pointer"
+                @click="addForm.daysOfWeek.includes(opt.value)
+                  ? addForm.daysOfWeek.splice(addForm.daysOfWeek.indexOf(opt.value), 1)
+                  : addForm.daysOfWeek.push(opt.value)"
+              >{{ opt.title.slice(0, 3) }}</v-chip>
+            </div>
+
+            <!-- Times -->
+            <v-row dense>
+              <v-col cols="6">
+                <v-select v-model="addForm.startTime" :items="timeOptions" label="Start Time" variant="outlined" density="compact" color="#12086F" />
+              </v-col>
+              <v-col cols="6">
+                <v-select v-model="addForm.endTime" :items="timeOptions" label="End Time" variant="outlined" density="compact" color="#12086F" />
+              </v-col>
+            </v-row>
+
+            <div v-if="addForm.userIds.length && addForm.daysOfWeek.length" class="text-caption text-grey mt-3">
+              <v-icon size="14" class="mr-1" color="#12086F">mdi-information</v-icon>
+              This will create <strong>{{ addForm.userIds.length * addForm.daysOfWeek.length }}</strong> availability slot(s)
+            </div>
           </v-card-text>
-          <v-card-actions>
+          <v-card-actions class="pa-5 pt-0">
             <v-spacer />
             <v-btn variant="text" @click="showAddDialog = false">Cancel</v-btn>
-            <v-btn color="#12086F" :loading="processing" @click="handleAdd">Add</v-btn>
+            <v-btn color="#12086F" variant="flat" :loading="processing" @click="handleAdd">Add</v-btn>
           </v-card-actions>
         </v-card>
       </v-dialog>
