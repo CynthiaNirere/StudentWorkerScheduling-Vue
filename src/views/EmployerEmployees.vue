@@ -407,7 +407,22 @@ const confirmDelete = async () => {
   finally { deleting.value = false; showDeleteDialog.value = false; employeeToDelete.value = null; }
 };
 
-const openDetailsDialog    = (emp) => { selectedEmployee.value = emp; showDetailsDialog.value = true; };
+const employeeCerts     = ref([]);
+const certsLoading      = ref(false);
+const viewingCert       = ref(null);
+const showCertViewer    = ref(false);
+
+const openDetailsDialog = async (emp) => {
+  selectedEmployee.value = emp;
+  employeeCerts.value    = [];
+  showDetailsDialog.value = true;
+  certsLoading.value = true;
+  try {
+    const res = await EmployerService.getEmployeeById(emp.user_id || emp.userId);
+    employeeCerts.value = Array.isArray(res.data?.certifications) ? res.data.certifications : [];
+  } catch { employeeCerts.value = []; }
+  finally { certsLoading.value = false; }
+};
 const viewEmployeeSchedule = (emp) => router.push({ name: "employerSchedule", query: { employeeId: emp.user_id || emp.userId } });
 const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true; };
 </script>
@@ -842,12 +857,48 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
               <v-chip v-if="(selectedEmployee.jobRoles || []).length === 0" size="small" color="#9e9e9e" variant="tonal">No roles assigned</v-chip>
             </div>
           </div>
+          <v-divider class="my-3" />
+          <div class="text-caption text-grey mb-2">Certifications & Files</div>
+          <div v-if="certsLoading" class="d-flex align-center ga-2">
+            <v-progress-circular indeterminate size="16" width="2" color="#12086F" />
+            <span class="text-caption text-grey">Loading...</span>
+          </div>
+          <div v-else-if="employeeCerts.length === 0" class="text-caption text-grey">No certifications uploaded.</div>
+          <v-list v-else density="compact" class="pa-0">
+            <v-list-item v-for="(cert, i) in employeeCerts" :key="i"
+              :prepend-icon="cert.mimeType === 'application/pdf' ? 'mdi-file-pdf-box' : 'mdi-file-image'"
+              rounded="lg" class="mb-1" style="border: 1px solid #e0e0e0;">
+              <v-list-item-title class="text-body-2 font-weight-medium">{{ cert.name }}</v-list-item-title>
+              <v-list-item-subtitle class="text-caption text-grey">Uploaded {{ cert.date }}</v-list-item-subtitle>
+              <template #append>
+                <v-btn icon="mdi-eye" size="small" variant="text" color="#4361EE"
+                  @click="viewingCert = cert; showCertViewer = true" />
+              </template>
+            </v-list-item>
+          </v-list>
         </v-card-text>
         <v-divider />
         <v-card-actions class="pa-4">
           <v-btn variant="tonal" color="#12086F" @click="viewEmployeeSchedule(selectedEmployee)">View Schedule</v-btn>
           <v-spacer /><v-btn variant="text" @click="showDetailsDialog = false">Close</v-btn>
         </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Cert Viewer -->
+    <v-dialog v-model="showCertViewer" max-width="800">
+      <v-card rounded="lg" v-if="viewingCert">
+        <v-card-title class="pa-4 d-flex align-center justify-space-between navy-text">
+          {{ viewingCert.name }}
+          <v-btn icon="mdi-close" size="small" variant="text" @click="showCertViewer = false" />
+        </v-card-title>
+        <v-divider />
+        <v-card-text class="pa-4">
+          <img v-if="viewingCert.mimeType !== 'application/pdf'" :src="viewingCert.dataUrl"
+            style="max-width:100%; border-radius:8px;" />
+          <iframe v-else :src="viewingCert.dataUrl"
+            style="width:100%; height:520px; border:none; border-radius:8px;" />
+        </v-card-text>
       </v-card>
     </v-dialog>
 
