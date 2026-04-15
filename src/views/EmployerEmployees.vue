@@ -47,7 +47,10 @@ const searchDone       = ref(false);
 const selectedExisting = ref(null);
 const assigning        = ref(false);
 
-const newEmployee = ref({ first_name: '', last_name: '', email: '', phone_number: '', job_role: '' });
+const emailCheckLoading = ref(false);
+const foundByEmail      = ref(null);
+
+const newEmployee = ref({ first_name: '', last_name: '', email: '', phone_number: '', selectedRoles: [] });
 const editForm    = ref({ first_name: '', last_name: '', email: '', phone_number: '', job_role: '' });
 
 const headers = [
@@ -127,12 +130,14 @@ const loadEmployeeRoles = async (userId) => {
 
 // ── ADD DIALOG ────────────────────────────────────────────────────────────
 const openAddDialog = () => {
-  addStep.value          = 'manual';
+  addStep.value          = 'search';
   nameQuery.value        = '';
   searchResults.value    = [];
   searchDone.value       = false;
   selectedExisting.value = null;
-  newEmployee.value      = { first_name: '', last_name: '', email: '', phone_number: '', job_role: '' };
+  foundByEmail.value     = null;
+  emailCheckLoading.value = false;
+  newEmployee.value      = { first_name: '', last_name: '', email: '', phone_number: '', selectedRoles: [] };
   showAddDialog.value    = true;
 };
 
@@ -162,7 +167,7 @@ const goManual = () => {
   const parts = nameQuery.value.trim().split(/\s+/);
   newEmployee.value = {
     first_name: parts[0] || '', last_name: parts.slice(1).join(' ') || '',
-    email: '', phone_number: '', job_role: '',
+    email: '', phone_number: '', selectedRoles: [],
   };
   addStep.value = 'manual';
 };
@@ -174,11 +179,33 @@ const handleAssignExisting = async () => {
     await EmployerService.assignEmployeeToWorkplace(selectedExisting.value.user_id || selectedExisting.value.userId);
     showSnackbar(`${selectedExisting.value.fName} ${selectedExisting.value.lName} added to your workplace!`, 'success');
     showAddDialog.value = false;
+    foundByEmail.value  = null;
     await loadEmployees();
   } catch (err) {
     showSnackbar(err.response?.data?.message || 'Error assigning employee', 'error');
   } finally {
     assigning.value = false;
+  }
+};
+
+const handleEmailCheck = async () => {
+  const email = newEmployee.value.email?.trim();
+  if (!email || !email.includes('@')) { foundByEmail.value = null; return; }
+  emailCheckLoading.value = true;
+  foundByEmail.value      = null;
+  try {
+    const res = await EmployerService.findByEmail(email);
+    if (res.data?.user_id) {
+      foundByEmail.value = res.data;
+      newEmployee.value.first_name   = res.data.fName        || res.data.first_name   || newEmployee.value.first_name;
+      newEmployee.value.last_name    = res.data.lName        || res.data.last_name    || newEmployee.value.last_name;
+      newEmployee.value.phone_number = res.data.phone_number || newEmployee.value.phone_number;
+    }
+  } catch (err) {
+    if (err.response?.status !== 404) console.warn('Email check error:', err.message);
+    foundByEmail.value = null;
+  } finally {
+    emailCheckLoading.value = false;
   }
 };
 
@@ -192,25 +219,34 @@ const handleAddEmployee = async () => {
     const createdUser = res.data?.user || res.data;
     const newUserId   = createdUser?.user_id || createdUser?.userId;
 
-    // Backend returns alreadyExisted:true when the person already had an account
-    // and was auto-assigned to this workplace — treat it as a success, just no role assignment
     if (res.data?.alreadyExisted) {
       showSnackbar(`${createdUser?.fName || newEmployee.value.first_name} already has an account — added to your workplace!`, "success");
       showAddDialog.value = false;
-      newEmployee.value   = { first_name: '', last_name: '', email: '', phone_number: '', job_role: '' };
+      newEmployee.value   = { first_name: '', last_name: '', email: '', phone_number: '', selectedRoles: [] };
       await loadEmployees();
       return;
     }
 
-    if (newEmployee.value.job_role && newUserId) {
-      const matched = jobRoles.value.find(r => r.title === newEmployee.value.job_role);
-      if (matched) {
-        try { await EmployerService.addRoleToUser(newUserId, { jobRoleId: matched.job_role_id, isPrimary: true }); } catch {}
+    if (newUserId && newEmployee.value.selectedRoles.length > 0) {
+      const locationId = user.value?.work_location || user.value?.impersonatedLocation;
+      for (let i = 0; i < newEmployee.value.selectedRoles.length; i++) {
+        const role      = newEmployee.value.selectedRoles[i];
+        const isPrimary = i === 0;
+        try {
+          if (typeof role === 'string') {
+            const created = await EmployerService.createJobRole({ title: role.trim(), location_id: locationId });
+            await EmployerService.addRoleToUser(newUserId, { jobRoleId: created.data.job_role_id, isPrimary });
+          } else {
+            await EmployerService.addRoleToUser(newUserId, { jobRoleId: role.job_role_id, isPrimary });
+          }
+        } catch {}
       }
+      await loadJobRoles();
     }
+
     showSnackbar("Employee added successfully!", "success");
     showAddDialog.value = false;
-    newEmployee.value   = { first_name: '', last_name: '', email: '', phone_number: '', job_role: '' };
+    newEmployee.value   = { first_name: '', last_name: '', email: '', phone_number: '', selectedRoles: [] };
     await loadEmployees();
   } catch (err) {
     showSnackbar(err.response?.data?.message || err.message || "Error adding employee", "error");
@@ -220,7 +256,7 @@ const handleAddEmployee = async () => {
 };
 
 // ── EDIT ──────────────────────────────────────────────────────────────────
-const openEditDialog = (employee) => {
+const openEditDialog = async (employee) => {
   selectedEmployee.value = employee;
   editForm.value = {
     first_name: employee.fName || employee.first_name || '',
@@ -230,6 +266,7 @@ const openEditDialog = (employee) => {
     job_role:   employee.job_role || '',
   };
   showEditDialog.value = true;
+  await loadEmployeeRoles(employee.user_id || employee.userId);
 };
 
 const handleEditEmployee = async () => {
@@ -553,11 +590,44 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
               <v-col cols="6"><v-text-field v-model="newEmployee.first_name" label="First Name *" variant="outlined" density="compact" color="#12086F" /></v-col>
               <v-col cols="6"><v-text-field v-model="newEmployee.last_name"  label="Last Name"   variant="outlined" density="compact" color="#12086F" /></v-col>
             </v-row>
-            <v-text-field v-model="newEmployee.email"        label="Email *"       type="email" variant="outlined" density="compact" class="mb-3" color="#12086F" />
+            <v-text-field v-model="newEmployee.email" label="Email *" type="email" variant="outlined" density="compact" color="#12086F"
+              :loading="emailCheckLoading" @blur="handleEmailCheck" @keyup.enter="handleEmailCheck" />
+            <v-alert v-if="foundByEmail" type="info" variant="tonal" density="compact" class="mb-3 mt-1 text-body-2" rounded="lg">
+              <v-icon start size="small">mdi-account-check</v-icon>
+              Details pre-filled from an existing account. They'll be a fresh member here — no roles carried over.
+            </v-alert>
+            <div v-else class="mb-3" />
             <v-text-field v-model="newEmployee.phone_number" label="Phone Number"              variant="outlined" density="compact" class="mb-3" color="#12086F" />
-            <v-autocomplete v-model="newEmployee.job_role" :items="jobRoleSuggestions" label="Job Role (optional)"
-              variant="outlined" density="compact" hint="You can manage roles after creating the employee"
-              persistent-hint color="#12086F" clearable :loading="loadingRoles" />
+            <v-combobox
+              v-model="newEmployee.selectedRoles"
+              :items="jobRoles"
+              item-title="title"
+              return-object
+              multiple
+              chips
+              closable-chips
+              label="Assign Roles (optional)"
+              variant="outlined"
+              density="compact"
+              color="#12086F"
+              :loading="loadingRoles"
+              hint="Select from the list or type a new role name and press Enter"
+              persistent-hint
+            >
+              <template #item="{ item, props }">
+                <v-list-item v-bind="props">
+                  <template #prepend="{ isSelected }">
+                    <v-checkbox-btn :model-value="isSelected" color="#12086F" />
+                  </template>
+                </v-list-item>
+              </template>
+              <template #chip="{ item, props }">
+                <v-chip v-bind="props" :color="typeof item.raw === 'string' ? '#4361EE' : '#12086F'" variant="tonal" size="small">
+                  <v-icon v-if="typeof item.raw === 'string'" start size="x-small">mdi-plus</v-icon>
+                  {{ typeof item.raw === 'string' ? item.raw : item.raw.title }}
+                </v-chip>
+              </template>
+            </v-combobox>
           </v-card-text>
           <v-divider />
           <v-card-actions class="pa-4">
@@ -580,10 +650,26 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
             <v-col cols="6"><v-text-field v-model="editForm.last_name"  label="Last Name"   variant="outlined" density="compact" color="#12086F" /></v-col>
           </v-row>
           <v-text-field v-model="editForm.email"        label="Email *"     type="email" variant="outlined" density="compact" class="mb-3" color="#12086F" />
-          <v-text-field v-model="editForm.phone_number" label="Phone Number"             variant="outlined" density="compact" class="mb-3" color="#12086F" />
-          <v-autocomplete v-model="editForm.job_role" :items="jobRoleSuggestions" label="Job Role"
-            variant="outlined" density="compact" hint="Use 'Manage Roles' for multiple roles"
-            persistent-hint color="#12086F" clearable :loading="loadingRoles" />
+          <v-text-field v-model="editForm.phone_number" label="Phone Number" variant="outlined" density="compact" class="mb-3" color="#12086F" />
+          <div class="text-caption text-grey mb-1">Assigned Roles</div>
+          <div v-if="loadingRoles" class="d-flex align-center ga-2 mb-3">
+            <v-progress-circular indeterminate size="16" width="2" color="#12086F" />
+            <span class="text-caption text-grey">Loading roles...</span>
+          </div>
+          <div v-else-if="employeeRoles.length === 0" class="mb-3">
+            <v-chip size="small" color="grey" variant="tonal">No roles assigned</v-chip>
+          </div>
+          <div v-else class="d-flex flex-wrap ga-1 mb-3">
+            <v-chip v-for="role in employeeRoles" :key="role.user_job_role_id"
+              size="small" :color="role.is_primary ? '#12086F' : '#4361EE'" variant="tonal">
+              {{ role.role_title }}
+              <v-icon v-if="role.is_primary" size="x-small" class="ml-1">mdi-star</v-icon>
+            </v-chip>
+          </div>
+          <v-btn size="small" variant="tonal" color="#12086F" prepend-icon="mdi-briefcase-account"
+            @click="showEditDialog = false; openManageRolesDialog(selectedEmployee)">
+            Manage Roles
+          </v-btn>
         </v-card-text>
         <v-divider />
         <v-card-actions class="pa-4">
@@ -723,7 +809,7 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
         <v-divider />
         <v-card-text class="pa-5">
           <p class="text-body-1">Remove <strong>{{ (employeeToDelete?.fName || employeeToDelete?.first_name || '') }} {{ (employeeToDelete?.lName || employeeToDelete?.last_name || '') }}</strong> from your workplace?</p>
-          <p class="text-body-2 text-grey mt-2">This will delete their account entirely. If they work at multiple locations, consider reassigning instead.</p>
+          <p class="text-body-2 text-grey mt-2">They'll be removed from your workplace only. Their account and any other workplace assignments remain untouched.</p>
         </v-card-text>
         <v-divider />
         <v-card-actions class="pa-4">
