@@ -24,15 +24,9 @@ const employeeToDelete      = ref(null);
 const saving   = ref(false);
 const deleting = ref(false);
 
-const employeeRoles   = ref([]);
-const selectedNewRole = ref(null);
-const makePrimary     = ref(false);
-const addingRole      = ref(false);
-
-// ── INLINE ROLE CREATION STATE ────────────────────────────────────────────
-const showCreateRoleField = ref(false);   // toggles the "new role" text input
-const newRoleTitle        = ref('');       // what the employer types
-const creatingRole        = ref(false);    // spinner while saving
+const employeeRoles = ref([]);
+const rolesToAdd    = ref([]);
+const addingRole    = ref(false);
 
 const snackbar        = ref(false);
 const snackbarMessage = ref("");
@@ -292,85 +286,33 @@ const handleEditEmployee = async () => {
 
 // ── MANAGE ROLES ──────────────────────────────────────────────────────────
 const openManageRolesDialog = async (employee) => {
-  selectedEmployee.value    = employee;
-  selectedNewRole.value     = null;
-  makePrimary.value         = false;
-  showCreateRoleField.value = false;
-  newRoleTitle.value        = '';
-  await loadEmployeeRoles(employee.user_id || employee.userId);
+  selectedEmployee.value      = employee;
   showManageRolesDialog.value = true;
+  rolesToAdd.value            = [];
+  await loadEmployeeRoles(employee.user_id || employee.userId);
 };
 
-// Toggle between "pick existing role" and "create new role"
-const toggleCreateRole = () => {
-  showCreateRoleField.value = !showCreateRoleField.value;
-  if (showCreateRoleField.value) {
-    selectedNewRole.value = null; // clear dropdown when switching to create mode
-  } else {
-    newRoleTitle.value = '';
-  }
-};
-
-// Create a brand-new role for this location, then immediately assign it
-const handleCreateAndAssignRole = async () => {
-  if (!newRoleTitle.value.trim()) {
-    showSnackbar("Please enter a role title", "error"); return;
-  }
-
-  const locationId = user.value?.work_location || user.value?.impersonatedLocation;
-  if (!locationId) {
-    showSnackbar("No workplace location found", "error"); return;
-  }
-
-  creatingRole.value = true;
-  try {
-    // 1. Create the role scoped to this location
-    const createRes = await EmployerService.createJobRole({
-      title:       newRoleTitle.value.trim(),
-      location_id: locationId,
-    });
-
-    const newRole = createRes.data;
-    const newRoleId = newRole.job_role_id;
-
-    // 2. Assign it to the employee
-    await EmployerService.addRoleToUser(
-      selectedEmployee.value.user_id || selectedEmployee.value.userId,
-      { jobRoleId: newRoleId, isPrimary: makePrimary.value }
-    );
-
-    showSnackbar(`Role "${newRoleTitle.value.trim()}" created and assigned!`, "success");
-
-    // 3. Refresh everything
-    newRoleTitle.value        = '';
-    showCreateRoleField.value = false;
-    makePrimary.value         = false;
-    await loadJobRoles(); // reload so new role appears in dropdown next time
-    await loadEmployeeRoles(selectedEmployee.value.user_id || selectedEmployee.value.userId);
-    await loadEmployees();
-
-  } catch (err) {
-    showSnackbar(err.response?.data?.message || "Error creating role", "error");
-  } finally {
-    creatingRole.value = false;
-  }
-};
-
-const handleAddRole = async () => {
-  if (!selectedNewRole.value) { showSnackbar("Please select a role", "error"); return; }
+const handleAssignRoles = async () => {
+  if (rolesToAdd.value.length === 0) { showSnackbar("Please select or type at least one role", "error"); return; }
   addingRole.value = true;
+  const locationId = user.value?.work_location || user.value?.impersonatedLocation;
+  const empId      = selectedEmployee.value.user_id || selectedEmployee.value.userId;
   try {
-    await EmployerService.addRoleToUser(
-      selectedEmployee.value.user_id || selectedEmployee.value.userId,
-      { jobRoleId: selectedNewRole.value, isPrimary: makePrimary.value }
-    );
-    showSnackbar("Role added successfully!", "success");
-    selectedNewRole.value = null;
-    makePrimary.value     = false;
-    await loadEmployeeRoles(selectedEmployee.value.user_id || selectedEmployee.value.userId);
+    for (const role of rolesToAdd.value) {
+      if (typeof role === 'string') {
+        const created = await EmployerService.createJobRole({ title: role.trim(), location_id: locationId });
+        await EmployerService.addRoleToUser(empId, { jobRoleId: created.data.job_role_id, isPrimary: false });
+      } else {
+        await EmployerService.addRoleToUser(empId, { jobRoleId: role.job_role_id, isPrimary: false });
+      }
+    }
+    showSnackbar("Role(s) assigned successfully!", "success");
+    rolesToAdd.value = [];
+    await loadJobRoles();
+    await loadEmployeeRoles(empId);
     await loadEmployees();
   } catch (err) {
-    showSnackbar(err.response?.data?.message || "Error adding role", "error");
+    showSnackbar(err.response?.data?.message || "Error assigning roles", "error");
   } finally { addingRole.value = false; }
 };
 
@@ -744,70 +686,53 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
 
           <!-- Add role section -->
           <div>
-            <div class="d-flex align-center justify-space-between mb-3">
-              <div class="text-subtitle-2 navy-text">Add Role</div>
-              <!-- Toggle between pick existing / create new -->
-              <v-btn
-                size="x-small"
-                :variant="showCreateRoleField ? 'flat' : 'tonal'"
-                :color="showCreateRoleField ? '#4361EE' : '#12086F'"
-                @click="toggleCreateRole"
-                prepend-icon="mdi-plus-circle"
-              >
-                {{ showCreateRoleField ? 'Cancel new role' : 'Create new role' }}
-              </v-btn>
-            </div>
+            <div class="text-subtitle-2 navy-text mb-2">Add Roles</div>
 
-            <!-- MODE A: Pick from existing roles for this location -->
-            <template v-if="!showCreateRoleField">
-              <div v-if="availableRolesToAdd.length === 0" class="text-caption text-grey mb-3 pa-3 rounded-lg" style="background:#f5f5f5;">
-                <v-icon size="16" class="mr-1">mdi-information-outline</v-icon>
-                All available roles for this location are already assigned.
-                Use "Create new role" to add a custom one.
-              </div>
-              <v-select
-                v-else
-                v-model="selectedNewRole"
-                :items="availableRolesToAdd"
-                item-title="title"
-                item-value="job_role_id"
-                label="Select an existing role"
-                variant="outlined"
-                density="compact"
-                class="mb-3"
-                color="#12086F"
-              />
-              <v-checkbox v-model="makePrimary" label="Set as primary role" color="#12086F"
-                density="compact" hide-details class="mb-3" :disabled="!selectedNewRole" />
-              <v-btn color="#12086F" variant="flat" block :loading="addingRole"
-                :disabled="!selectedNewRole" @click="handleAddRole" prepend-icon="mdi-plus">
-                Assign Role
-              </v-btn>
-            </template>
+            <v-alert type="info" variant="tonal" density="compact" color="#4361EE"
+              class="mb-3 text-body-2" rounded="lg" icon="mdi-lightbulb-outline">
+              <strong>Pick from the list</strong> or <strong>type a new name</strong> and press
+              <kbd style="background:#e8eaf6;padding:1px 5px;border-radius:4px;font-size:11px;">Enter</kbd>
+              to create it — new roles are saved to your workplace automatically.
+              The <strong>first role</strong> you add will be set as primary.
+            </v-alert>
 
-            <!-- MODE B: Create a brand-new role for this location -->
-            <template v-else>
-              <v-alert type="info" variant="tonal" density="compact" class="mb-3 text-body-2">
-                This will create a new role for your workplace and immediately assign it to this employee.
-              </v-alert>
-              <v-text-field
-                v-model="newRoleTitle"
-                label="New role title *"
-                placeholder="e.g. Barista, Swim Guard, Front Desk"
-                variant="outlined"
-                density="compact"
-                color="#12086F"
-                class="mb-3"
-                @keyup.enter="handleCreateAndAssignRole"
-              />
-              <v-checkbox v-model="makePrimary" label="Set as primary role" color="#12086F"
-                density="compact" hide-details class="mb-3" :disabled="!newRoleTitle.trim()" />
-              <v-btn color="#4361EE" variant="flat" block :loading="creatingRole"
-                :disabled="!newRoleTitle.trim()" @click="handleCreateAndAssignRole"
-                prepend-icon="mdi-briefcase-plus">
-                Create & Assign Role
-              </v-btn>
-            </template>
+            <v-combobox
+              v-model="rolesToAdd"
+              :items="availableRolesToAdd"
+              item-title="title"
+              return-object
+              multiple
+              chips
+              closable-chips
+              label="Select or create roles"
+              variant="outlined"
+              density="compact"
+              color="#12086F"
+              :loading="loadingRoles"
+              class="mb-3"
+            >
+              <template #item="{ item, props }">
+                <v-list-item v-bind="props">
+                  <template #prepend="{ isSelected }">
+                    <v-checkbox-btn :model-value="isSelected" color="#12086F" />
+                  </template>
+                </v-list-item>
+              </template>
+              <template #chip="{ item, props }">
+                <v-chip v-bind="props"
+                  :color="typeof item.raw === 'string' ? '#4361EE' : '#12086F'"
+                  variant="tonal" size="small">
+                  <v-icon v-if="typeof item.raw === 'string'" start size="x-small">mdi-plus</v-icon>
+                  {{ typeof item.raw === 'string' ? item.raw : item.raw.title }}
+                </v-chip>
+              </template>
+            </v-combobox>
+
+            <v-btn color="#12086F" variant="flat" block :loading="addingRole"
+              :disabled="rolesToAdd.length === 0" @click="handleAssignRoles"
+              prepend-icon="mdi-briefcase-check">
+              Assign {{ rolesToAdd.length > 1 ? `${rolesToAdd.length} Roles` : 'Role' }}
+            </v-btn>
           </div>
         </v-card-text>
         <v-divider />
