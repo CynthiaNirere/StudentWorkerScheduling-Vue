@@ -148,6 +148,11 @@ export default {
     return apiClient.get(`/users/search?q=${encodeURIComponent(q)}`, addDemoHeader());
   },
 
+  // Look up a single user by exact email — returns 404 if not found
+  findByEmail(email) {
+    return apiClient.get(`/users/email/${encodeURIComponent(email)}`, addDemoHeader());
+  },
+
   // Assign an existing user to the employer's workplace — no duplicate record created
   assignEmployeeToWorkplace(userId) {
     return apiClient.post(`/users/${userId}/assign`, {}, addDemoHeader());
