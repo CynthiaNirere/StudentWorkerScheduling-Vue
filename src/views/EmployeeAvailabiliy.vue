@@ -39,16 +39,8 @@ const selectedLocationName = computed(() => {
 });
 
 // ── DAY INDEX HELPERS ─────────────────────────────────────────────────────
-// The calendar displays Mon–Sun as calIdx 0–6.
-// The database uses JS standard: 0=Sun, 1=Mon, 2=Tue, ... 6=Sat.
-// These two helpers translate between them so the employer grid always
-// sees the correct day_of_week integer.
-
-// calIdx (0=Mon … 6=Sun)  →  dbDay (0=Sun, 1=Mon … 6=Sat)
 const calIdxToDbDay = (calIdx) => (calIdx + 1) % 7;
-
-// dbDay (0=Sun … 6=Sat)  →  calIdx (0=Mon … 6=Sun)
-const dbDayToCalIdx = (dbDay) => (dbDay + 6) % 7;
+const dbDayToCalIdx = (dbDay)  => (dbDay  + 6) % 7;
 
 // ── WEEK NAVIGATION ───────────────────────────────────────────────────────
 const currentWeekStart = ref(getMonday(new Date()));
@@ -74,7 +66,6 @@ const prevWeek = () => {
   currentWeekStart.value = d;
   loadAvailabilityForWeek();
 };
-
 const nextWeek = () => {
   const d = new Date(currentWeekStart.value);
   d.setDate(d.getDate() + 7);
@@ -103,7 +94,6 @@ const timeLabels = computed(() =>
 const allWeeks = reactive({});
 const weekKey  = computed(() => currentWeekStart.value.toISOString().split('T')[0]);
 
-// Calendar columns: Mon=0, Tue=1, Wed=2, Thu=3, Fri=4, Sat=5, Sun=6
 const weekDays = computed(() => {
   const labels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   return labels.map((label, i) => {
@@ -138,12 +128,29 @@ const blockStyle = (slot) => ({
   minHeight: '14px',
 });
 
-// ── EDIT DIALOG ───────────────────────────────────────────────────────────
+// ── EDIT DIALOG with "Apply to multiple days" ─────────────────────────────
 const showEditDialog  = ref(false);
 const editingDay      = ref(-1);
 const editingSlotIdx  = ref(-1);
 const editStart       = ref('');
 const editEnd         = ref('');
+
+// Multi-day apply: checkboxes for each day of the week
+const applyToDays = ref([false, false, false, false, false, false, false]);
+const DAY_LABELS  = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+// Quick presets for multi-day apply
+const applyPresets = [
+  { label: 'Mon–Fri', days: [0,1,2,3,4] },
+  { label: 'Mon/Wed/Fri', days: [0,2,4] },
+  { label: 'Tue/Thu', days: [1,3] },
+  { label: 'Weekends', days: [5,6] },
+];
+
+const applyPreset = (preset) => {
+  applyToDays.value = [false, false, false, false, false, false, false];
+  preset.days.forEach(i => { applyToDays.value[i] = true; });
+};
 
 const openEditSlot = (dayIdx, slotIdx, e) => {
   if (e) e.stopPropagation();
@@ -152,6 +159,9 @@ const openEditSlot = (dayIdx, slotIdx, e) => {
   editingSlotIdx.value = slotIdx;
   editStart.value      = minToTime(slot.s);
   editEnd.value        = minToTime(slot.e);
+  // Pre-check the current day
+  applyToDays.value = [false, false, false, false, false, false, false];
+  applyToDays.value[dayIdx] = true;
   showEditDialog.value = true;
 };
 
@@ -159,13 +169,72 @@ const saveEditSlot = () => {
   const s = toMin(editStart.value);
   const e = toMin(editEnd.value);
   if (!editStart.value || !editEnd.value || e <= s) return;
-  allWeeks[weekKey.value][editingDay.value][editingSlotIdx.value] = { s, e };
+
+  // Apply to all selected days
+  const selectedDays = applyToDays.value
+    .map((checked, i) => checked ? i : -1)
+    .filter(i => i >= 0);
+
+  if (selectedDays.length === 0) {
+    // fallback: just update the original day/slot
+    allWeeks[weekKey.value][editingDay.value][editingSlotIdx.value] = { s, e };
+  } else {
+    selectedDays.forEach(dayIdx => {
+      if (dayIdx === editingDay.value) {
+        // Update existing slot
+        allWeeks[weekKey.value][dayIdx][editingSlotIdx.value] = { s, e };
+      } else {
+        // Add new slot to other days (avoid duplicates)
+        const existing = allWeeks[weekKey.value][dayIdx];
+        const dupe = existing.find(slot => slot.s === s && slot.e === e);
+        if (!dupe) existing.push({ s, e });
+      }
+    });
+  }
+
   showEditDialog.value = false;
 };
 
 const deleteEditSlot = () => {
   allWeeks[weekKey.value][editingDay.value].splice(editingSlotIdx.value, 1);
   showEditDialog.value = false;
+};
+
+// ── ADD NEW SLOT DIALOG (separate from edit, with multi-day support) ──────
+const showAddDialog  = ref(false);
+const addStart       = ref('09:00');
+const addEnd         = ref('17:00');
+const addToDays      = ref([false, false, false, false, false, false, false]);
+
+const openAddDialog = (dayIdx) => {
+  addStart.value  = '09:00';
+  addEnd.value    = '17:00';
+  addToDays.value = [false, false, false, false, false, false, false];
+  addToDays.value[dayIdx] = true;
+  showAddDialog.value = true;
+};
+
+const applyAddPreset = (preset) => {
+  addToDays.value = [false, false, false, false, false, false, false];
+  preset.days.forEach(i => { addToDays.value[i] = true; });
+};
+
+const saveAddSlot = () => {
+  const s = toMin(addStart.value);
+  const e = toMin(addEnd.value);
+  if (!addStart.value || !addEnd.value || e <= s) return;
+
+  const selectedDays = addToDays.value
+    .map((checked, i) => checked ? i : -1)
+    .filter(i => i >= 0);
+
+  selectedDays.forEach(dayIdx => {
+    const existing = allWeeks[weekKey.value][dayIdx];
+    const dupe = existing.find(slot => slot.s === s && slot.e === e);
+    if (!dupe) existing.push({ s, e });
+  });
+
+  showAddDialog.value = false;
 };
 
 // ── DRAG ──────────────────────────────────────────────────────────────────
@@ -201,7 +270,14 @@ const onWindowMouseUp = () => {
   const e    = Math.max(dragStart.value, dragCur.value) + 1;
   const sMin = CAL_START + s * 30;
   const eMin = CAL_START + e * 30;
-  if (eMin > sMin) allWeeks[weekKey.value][dragDay.value].push({ s: sMin, e: eMin });
+  if (eMin > sMin) {
+    // After dragging, open the add dialog pre-filled with those times so user can apply to multiple days
+    addStart.value  = minToTime(sMin);
+    addEnd.value    = minToTime(eMin);
+    addToDays.value = [false, false, false, false, false, false, false];
+    addToDays.value[dragDay.value] = true;
+    showAddDialog.value = true;
+  }
   dragging.value = false;
   dragDay.value  = -1;
 };
@@ -232,12 +308,10 @@ const loadAvailabilityForWeek = async () => {
     const userId = user.value?.user_id || user.value?.userId;
     const res    = await EmployeeService.getMyAvailability(userId, selectedLocation.value);
     const avail  = Array.isArray(res.data) ? res.data : [];
-
     allWeeks[weekKey.value] = [[], [], [], [], [], [], []];
-
     avail.forEach(a => {
-      const dbDay  = a.day_of_week ?? a.dayOfWeek;  // 0=Sun, 1=Mon … 6=Sat
-      const calIdx = dbDayToCalIdx(dbDay);           // ✅ convert to 0=Mon … 6=Sun
+      const dbDay  = a.day_of_week ?? a.dayOfWeek;
+      const calIdx = dbDayToCalIdx(dbDay);
       const s      = a.start_time ?? a.startTime;
       const e      = a.end_time   ?? a.endTime;
       if (calIdx >= 0 && calIdx <= 6 && s != null && e != null) {
@@ -257,31 +331,25 @@ const snackColor = ref('success');
 
 const submitAvailability = async () => {
   if (!selectedLocation.value) {
-    snackMsg.value   = 'Please select a location first';
-    snackColor.value = 'error';
-    snackbar.value   = true;
-    return;
+    snackMsg.value = 'Please select a location first'; snackColor.value = 'error'; snackbar.value = true; return;
   }
-
   submitting.value = true;
   try {
     const userId   = user.value?.user_id || user.value?.userId;
     const weekData = allWeeks[weekKey.value];
 
-    // Delete existing availability for this user at the selected location only
     const existing     = await EmployeeService.getMyAvailability(userId, selectedLocation.value);
     const existingList = Array.isArray(existing.data) ? existing.data : [];
     for (const a of existingList) {
       await EmployeeService.deleteAvailability(a.id ?? a.availability_id);
     }
 
-    // Submit — translate calIdx back to dbDay before sending
     for (let calIdx = 0; calIdx < weekData.length; calIdx++) {
-      const dbDay = calIdxToDbDay(calIdx);  // ✅ Mon(calIdx=0) → dbDay=1, Wed(calIdx=2) → dbDay=3
+      const dbDay = calIdxToDbDay(calIdx);
       for (const slot of weekData[calIdx]) {
         await EmployeeService.createAvailability({
           userId,
-          dayOfWeek:   dbDay,           // ✅ correct JS day-of-week stored in DB
+          dayOfWeek:   dbDay,
           startTime:   slot.s,
           endTime:     slot.e,
           isAvailable: true,
@@ -291,7 +359,6 @@ const submitAvailability = async () => {
       }
     }
 
-    // Notify employer
     try {
       await EmployeeService.createNotification({
         userId,
@@ -301,10 +368,9 @@ const submitAvailability = async () => {
       });
     } catch {}
 
-    snackMsg.value   = `Availability saved for ${selectedLocationName.value}! Your employer has been notified.`;
+    snackMsg.value   = `Availability saved for ${selectedLocationName.value}!`;
     snackColor.value = 'success';
     await loadAvailabilityForWeek();
-
   } catch (err) {
     console.error('Error submitting availability:', err);
     snackMsg.value   = 'Failed to save availability';
@@ -333,10 +399,12 @@ onUnmounted(() => {
   <EmployeeLayout>
     <v-container fluid class="pa-6">
 
-      <!-- Header -->
       <div class="mb-4">
         <h1 class="text-h4 font-weight-bold navy-text">My Availability</h1>
-        <p class="text-body-2 text-grey mb-0">Drag on the calendar to mark your available hours. You can update anytime.</p>
+        <p class="text-body-2 text-grey mb-0">
+          Drag on the calendar to mark your available hours, or use the
+          <strong>+ Add</strong> button to set the same time across multiple days at once.
+        </p>
       </div>
 
       <!-- Week navigation -->
@@ -352,7 +420,7 @@ onUnmounted(() => {
 
       <v-row align="start">
 
-        <!-- ── LEFT: Summary ────────────────────────────────────────────── -->
+        <!-- LEFT: Summary -->
         <v-col cols="12" md="3">
           <v-card variant="outlined" rounded="lg" class="navy-card mb-4">
             <v-card-title class="text-subtitle-1 font-weight-bold pa-4 navy-text d-flex align-center ga-2">
@@ -371,14 +439,20 @@ onUnmounted(() => {
                     </span>
                     <div class="d-flex">
                       <v-btn icon="mdi-pencil" size="x-small" variant="plain" density="compact" @click="openEditSlot(dayIdx, slotIdx)" />
-                      <v-btn icon="mdi-close" size="x-small" variant="plain" density="compact" @click="removeSlot(dayIdx, slotIdx)" />
+                      <v-btn icon="mdi-close"  size="x-small" variant="plain" density="compact" @click="removeSlot(dayIdx, slotIdx)" />
                     </div>
                   </div>
                 </div>
               </div>
             </v-card-text>
             <v-divider />
-            <v-card-actions class="pa-3">
+            <!-- Quick add button with multi-day support -->
+            <v-card-text class="pa-3 pb-2">
+              <v-btn block color="#4361EE" variant="tonal" prepend-icon="mdi-plus" @click="openAddDialog(0)" size="small">
+                Add Time Slot (multiple days)
+              </v-btn>
+            </v-card-text>
+            <v-card-actions class="pa-3 pt-1">
               <v-btn
                 block
                 color="#12086F"
@@ -396,30 +470,26 @@ onUnmounted(() => {
             <v-card-text class="pa-4">
               <v-alert density="compact" variant="tonal" color="#12086F" class="mb-0 text-caption">
                 <template #prepend><v-icon size="14">mdi-lightbulb-outline</v-icon></template>
-                You can update your availability at any time. Changes are saved per location.
+                Tip: Use "Add Time Slot" to apply the same hours to Mon, Wed, Fri or any combination at once.
               </v-alert>
             </v-card-text>
           </v-card>
         </v-col>
 
-        <!-- ── RIGHT: Calendar ──────────────────────────────────────────── -->
+        <!-- RIGHT: Calendar -->
         <v-col cols="12" md="9">
           <v-card variant="outlined" rounded="lg" class="navy-card">
             <v-card-text class="pa-3">
               <div class="cal-outer" :style="{ height: (CAL_H + 42) + 'px' }">
-
-                <!-- Time axis -->
                 <div class="time-axis" :style="{ height: CAL_H + 'px', marginTop: '42px' }">
                   <div v-for="lbl in timeLabels" :key="lbl.text" class="time-lbl" :style="{ top: lbl.topPct + '%' }">{{ lbl.text }}</div>
                 </div>
-
-                <!-- Day columns -->
                 <div class="cal-grid">
-                  <div v-for="day in weekDays" :key="'h'+day.label" class="cal-hdr">
+                  <div v-for="(day, dayIdx) in weekDays" :key="'h'+day.label" class="cal-hdr" @click="openAddDialog(dayIdx)" style="cursor:pointer;">
                     <span class="hdr-name">{{ day.label }}</span>
                     <span class="hdr-num">{{ day.dateNum }}</span>
+                    <v-icon size="10" color="rgba(255,255,255,0.5)" class="mt-1">mdi-plus</v-icon>
                   </div>
-
                   <div
                     v-for="(day, dayIdx) in weekDays"
                     :key="'b'+day.label"
@@ -431,7 +501,6 @@ onUnmounted(() => {
                     <div v-for="n in ROWS + 1" :key="n" class="grid-line"
                       :class="{ 'grid-line--hour': (n - 1) % 2 === 0 }"
                       :style="{ top: ((n - 1) * ROW_H) + 'px' }" />
-
                     <div
                       v-for="(slot, slotIdx) in availability[dayIdx]"
                       :key="slotIdx"
@@ -443,7 +512,6 @@ onUnmounted(() => {
                       <span class="block-text">{{ toDisplay(slot.s) }}<br>{{ toDisplay(slot.e) }}</span>
                       <v-icon class="block-edit-icon" size="12" color="#1e3a5f">mdi-pencil</v-icon>
                     </div>
-
                     <div v-if="previewStyle(dayIdx)" :style="previewStyle(dayIdx)" />
                   </div>
                 </div>
@@ -454,13 +522,13 @@ onUnmounted(() => {
       </v-row>
     </v-container>
 
-    <!-- Edit Dialog -->
-    <v-dialog v-model="showEditDialog" max-width="360">
+    <!-- EDIT EXISTING SLOT DIALOG (with multi-day apply) -->
+    <v-dialog v-model="showEditDialog" max-width="420">
       <v-card rounded="lg">
-        <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4 navy-text">Edit Availability</v-card-title>
+        <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4 navy-text">Edit Availability Slot</v-card-title>
         <v-divider />
         <v-card-text class="pa-5">
-          <v-row dense>
+          <v-row dense class="mb-4">
             <v-col cols="6">
               <v-text-field v-model="editStart" label="Start Time" type="time" variant="outlined" density="compact" color="#12086F" />
             </v-col>
@@ -468,6 +536,37 @@ onUnmounted(() => {
               <v-text-field v-model="editEnd" label="End Time" type="time" variant="outlined" density="compact" color="#12086F" />
             </v-col>
           </v-row>
+
+          <!-- Apply to multiple days -->
+          <div class="text-caption font-weight-bold text-grey-darken-2 mb-2">Apply this time to:</div>
+
+          <!-- Quick presets -->
+          <div class="d-flex flex-wrap ga-1 mb-3">
+            <v-chip
+              v-for="preset in applyPresets"
+              :key="preset.label"
+              size="x-small"
+              variant="tonal"
+              color="#12086F"
+              style="cursor:pointer;"
+              @click="applyPreset(preset)"
+            >
+              {{ preset.label }}
+            </v-chip>
+          </div>
+
+          <!-- Day checkboxes -->
+          <div class="day-checkbox-grid">
+            <v-checkbox
+              v-for="(label, i) in DAY_LABELS"
+              :key="i"
+              v-model="applyToDays[i]"
+              :label="label"
+              color="#12086F"
+              density="compact"
+              hide-details
+            />
+          </div>
         </v-card-text>
         <v-divider />
         <v-card-actions class="pa-4">
@@ -475,6 +574,64 @@ onUnmounted(() => {
           <v-spacer />
           <v-btn variant="text" @click="showEditDialog = false">Cancel</v-btn>
           <v-btn color="#12086F" variant="flat" @click="saveEditSlot">Save</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- ADD NEW SLOT DIALOG (multi-day) -->
+    <v-dialog v-model="showAddDialog" max-width="420">
+      <v-card rounded="lg">
+        <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4 navy-text">Add Availability</v-card-title>
+        <v-divider />
+        <v-card-text class="pa-5">
+          <v-row dense class="mb-4">
+            <v-col cols="6">
+              <v-text-field v-model="addStart" label="Start Time" type="time" variant="outlined" density="compact" color="#12086F" />
+            </v-col>
+            <v-col cols="6">
+              <v-text-field v-model="addEnd" label="End Time" type="time" variant="outlined" density="compact" color="#12086F" />
+            </v-col>
+          </v-row>
+
+          <div class="text-caption font-weight-bold text-grey-darken-2 mb-2">Apply to which days:</div>
+
+          <!-- Quick presets -->
+          <div class="d-flex flex-wrap ga-1 mb-3">
+            <v-chip
+              v-for="preset in applyPresets"
+              :key="preset.label"
+              size="x-small"
+              variant="tonal"
+              color="#12086F"
+              style="cursor:pointer;"
+              @click="applyAddPreset(preset)"
+            >
+              {{ preset.label }}
+            </v-chip>
+          </div>
+
+          <!-- Day checkboxes -->
+          <div class="day-checkbox-grid">
+            <v-checkbox
+              v-for="(label, i) in DAY_LABELS"
+              :key="i"
+              v-model="addToDays[i]"
+              :label="label"
+              color="#12086F"
+              density="compact"
+              hide-details
+            />
+          </div>
+
+          <v-alert v-if="!addToDays.some(Boolean)" type="warning" variant="tonal" density="compact" class="mt-3">
+            <div class="text-caption">Select at least one day.</div>
+          </v-alert>
+        </v-card-text>
+        <v-divider />
+        <v-card-actions class="pa-4">
+          <v-spacer />
+          <v-btn variant="text" @click="showAddDialog = false">Cancel</v-btn>
+          <v-btn color="#12086F" variant="flat" :disabled="!addToDays.some(Boolean)" @click="saveAddSlot">Add Slot</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -493,24 +650,28 @@ onUnmounted(() => {
 .summary-slots { flex: 1; min-width: 0; }
 .summary-slot { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
 
+/* Multi-day checkboxes in a grid */
+.day-checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
 .cal-outer { display: flex; gap: 0; overflow-x: auto; position: relative; }
 .time-axis { flex-shrink: 0; width: 36px; position: relative; }
 .time-lbl { position: absolute; right: 4px; font-size: 0.58rem; color: #9ca3af; transform: translateY(-50%); line-height: 1; white-space: nowrap; }
 
 .cal-grid {
-  flex: 1;
-  display: grid;
+  flex: 1; display: grid;
   grid-template-columns: repeat(7, 1fr);
   grid-template-rows: 42px auto;
   min-width: 420px;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #e0e0e0;
-  gap: 1px;
+  border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;
+  background: #e0e0e0; gap: 1px;
 }
 
 .cal-hdr { background: linear-gradient(135deg, #12086F 0%, #2B354F 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 5px 4px; gap: 1px; }
+.cal-hdr:hover { background: linear-gradient(135deg, #2B354F 0%, #4361EE 100%); }
 .hdr-name { font-size: 0.62rem; font-weight: 700; color: rgba(255,255,255,0.85); letter-spacing: .08em; text-transform: uppercase; }
 .hdr-num  { font-size: 1rem; font-weight: 800; color: rgba(255,255,255,0.5); line-height: 1; }
 

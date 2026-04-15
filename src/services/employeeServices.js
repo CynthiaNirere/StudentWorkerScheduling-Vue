@@ -1,11 +1,6 @@
 import apiClient from "./services.js";
 import Utils from "../config/utils.js";
 
-const getAuthHeader = () => {
-  const user = Utils.getStore('user');
-  return user ? {} : {};
-};
-
 export default {
 
   // ─── PROFILE ────────────────────────────────────────────────────────────
@@ -14,13 +9,27 @@ export default {
   },
 
   updateProfile(userId, data) {
-    // Employee can only update phone_number
     return apiClient.put(`/users/${userId}`, { phone_number: data.phone_number });
   },
 
   // ─── SHIFTS ─────────────────────────────────────────────────────────────
-  getMyShifts() {
+  // My shifts only (filtered by userId on backend)
+  getMyShifts(userId) {
+    if (userId) return apiClient.get(`/shifts?userId=${userId}`);
     return apiClient.get('/shifts');
+  },
+
+  // All shifts (for team schedule view)
+  getAllShifts() {
+    return apiClient.get('/shifts');
+  },
+
+  // Today's shifts for this employee
+  getMyShiftsToday(userId) {
+    const today = new Date();
+    const start = new Date(today); start.setHours(0,0,0,0);
+    const end   = new Date(today); end.setHours(23,59,59,999);
+    return apiClient.get(`/shifts?userId=${userId}&startDate=${start.getTime()}&endDate=${end.getTime()}`);
   },
 
   getShiftsByWeek(startDate, endDate) {
@@ -102,11 +111,17 @@ export default {
   },
 
   getClockRecordsByUser(userId) {
-    return apiClient.get(`/clock-records/user/${userId}`);
+    return apiClient.get(`/clock-records?userId=${userId}`);
   },
 
   updateClockRecord(id, data) {
     return apiClient.put(`/clock-records/${id}/modify`, data);
+  },
+
+  // Submit timecard for the current pay period
+  // Backend should mark all pending records for this user/period as submitted
+  submitTimecard(data) {
+    return apiClient.post('/clock-records/submit-timecard', data);
   },
 
   // ─── TASKS ────────────────────────────────────────────────────────────────
@@ -114,10 +129,16 @@ export default {
     return apiClient.get('/task-lists');
   },
 
+  // Get task lists linked to a specific shift (for today's tasks filter)
+  getTaskListsByShift(shiftId) {
+    return apiClient.get(`/shift-tasks/shift/${shiftId}`);
+  },
+
   getTaskItems(tasklistId) {
     return apiClient.get(`/task-list-items?tasklistId=${tasklistId}`);
   },
 
+  // Complete a task item — backend records completedBy from the auth token
   completeTaskItem(id) {
     return apiClient.put(`/task-list-items/${id}/complete`, {});
   },

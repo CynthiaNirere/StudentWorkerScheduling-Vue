@@ -4,25 +4,44 @@ import Utils from '../config/utils.js';
 import EmployeeService from '../services/employeeServices.js';
 import EmployeeLayout from '../components/EmployeeLayout.vue';
 
-const user    = ref(null);
-const loading = ref(false);
-const taskLists = ref([]);
+const user        = ref(null);
+const loading     = ref(false);
+const taskLists   = ref([]);
+const todayShifts = ref([]); // my shifts today
+
 const showItemsDialog = ref(false);
-const selectedTask = ref(null);
-const selectedItems = ref([]);
-const loadingItems = ref(false);
+const selectedTask    = ref(null);
+const selectedItems   = ref([]);
+const loadingItems    = ref(false);
 
 const snackbar   = ref(false);
 const snackMsg   = ref('');
 const snackColor = ref('success');
 
+// ── TODAY'S DATE STRING ───────────────────────────────────────────────────
+const todayStr = new Date().toISOString().split('T')[0];
+
 // ── COMPUTED ──────────────────────────────────────────────────────────────
+// Only show tasks linked to the employee's shift today.
+// Falls back to showing all unassigned tasks if no shift today.
+const myTodayShiftIds = computed(() =>
+  todayShifts.value.map(s => s.shift_id || s.id).filter(Boolean).map(String)
+);
+
 const assignedTasks = computed(() => {
   const userId = user.value?.user_id || user.value?.userId;
+
   return taskLists.value.filter(t => {
+    // If linked to a shift, only show if that shift is one of my shifts today
+    const taskShiftId = t.shiftId || t.shift_id;
+    if (taskShiftId) {
+      return myTodayShiftIds.value.includes(String(taskShiftId));
+    }
+    // If no shift link but assigned to me directly, show it
     const assignedTo = t.assignedTo || t.assigned_to;
-    // Show tasks assigned to this user OR tasks with no specific assignment (general tasks)
-    return !assignedTo || assignedTo === userId;
+    if (assignedTo) return String(assignedTo) === String(userId);
+    // General unlinked tasks — show only if I have a shift today
+    return myTodayShiftIds.value.length > 0;
   });
 });
 
@@ -42,17 +61,45 @@ const getPriorityIcon  = p => priorityConfig[p]?.icon  || 'mdi-flag';
 const getItemId = (item) => item?.item_id ?? item?.id ?? null;
 const getTaskId = (task) => task?.tasklist_id ?? task?.tasklistId ?? task?.id ?? null;
 
+// Get name of who completed an item
+const getCompleterName = (item) => {
+  const completedBy = item.completedBy || item.completed_by;
+  if (!completedBy) return null;
+  const myId = user.value?.user_id || user.value?.userId;
+  if (String(completedBy) === String(myId)) return 'You';
+  // Otherwise show generic reference — full name would need a users lookup
+  return `Team member #${completedBy}`;
+};
+
 // ── LIFECYCLE ─────────────────────────────────────────────────────────────
 onMounted(async () => {
   user.value = Utils.getStore('user');
-  await loadTasks();
+  await loadAll();
 });
 
-const loadTasks = async () => {
+const loadAll = async () => {
   loading.value = true;
   try {
-    const res = await EmployeeService.getMyTaskLists();
-    taskLists.value = Array.isArray(res.data) ? res.data : [];
+    const userId = user.value?.user_id || user.value?.userId;
+
+    // Load shifts and tasks in parallel
+    const [shiftRes, taskRes] = await Promise.all([
+      EmployeeService.getMyShifts(),
+      EmployeeService.getMyTaskLists(),
+    ]);
+
+    const allShifts = Array.isArray(shiftRes.data) ? shiftRes.data : [];
+
+    // Filter to only today's shifts for this employee
+    todayShifts.value = allShifts.filter(s => {
+      const shiftDate = new Date(Number(s.shiftTime || s.shift_time));
+      const isToday   = shiftDate.toISOString().split('T')[0] === todayStr;
+      const isMine    = String(s.user_id || s.userId) === String(userId);
+      return isToday && isMine;
+    });
+
+    taskLists.value = Array.isArray(taskRes.data) ? taskRes.data : [];
+
   } catch (err) {
     console.error('Error loading tasks:', err);
     showSnackbar('Error loading tasks', 'error');
@@ -62,12 +109,12 @@ const loadTasks = async () => {
 };
 
 const openTask = async (task) => {
-  selectedTask.value = task;
+  selectedTask.value  = task;
   selectedItems.value = [];
   showItemsDialog.value = true;
-  loadingItems.value = true;
+  loadingItems.value  = true;
   try {
-    const id = getTaskId(task);
+    const id  = getTaskId(task);
     const res = await EmployeeService.getTaskItems(id);
     selectedItems.value = Array.isArray(res.data) ? res.data : [];
   } catch (err) {
@@ -78,24 +125,43 @@ const openTask = async (task) => {
   }
 };
 
-const toggleItem = async (item) => {
+// Mark done — records who completed it
+const markDone = async (item) => {
   const itemId = getItemId(item);
-  if (!itemId) return;
-  const isCompleting = item.status !== 'completed';
+  if (!itemId || item.status === 'completed') return;
   try {
-    if (isCompleting) {
-      await EmployeeService.completeTaskItem(itemId);
-    } else {
-      await EmployeeService.updateTaskItem(itemId, { status: 'active', completedAt: null });
-    }
-    // Update locally
+    const myId = user.value?.user_id || user.value?.userId;
+    // Use the complete endpoint which records completedBy on the backend
+    await EmployeeService.completeTaskItem(itemId);
+    // Update locally with current user as completer
     const idx = selectedItems.value.findIndex(i => getItemId(i) === itemId);
     if (idx !== -1) {
-      selectedItems.value[idx] = { ...selectedItems.value[idx], status: isCompleting ? 'completed' : 'active' };
+      selectedItems.value[idx] = {
+        ...selectedItems.value[idx],
+        status:      'completed',
+        completedBy: myId,
+        completedAt: Date.now(),
+      };
     }
-    showSnackbar(isCompleting ? 'Task item completed!' : 'Task item reopened', 'success');
+    showSnackbar('Task marked as done!', 'success');
   } catch (err) {
-    showSnackbar('Error updating task item', 'error');
+    showSnackbar('Error completing task', 'error');
+  }
+};
+
+// Reopen a completed task
+const reopenItem = async (item) => {
+  const itemId = getItemId(item);
+  if (!itemId) return;
+  try {
+    await EmployeeService.updateTaskItem(itemId, { status: 'active', completedBy: null, completedAt: null });
+    const idx = selectedItems.value.findIndex(i => getItemId(i) === itemId);
+    if (idx !== -1) {
+      selectedItems.value[idx] = { ...selectedItems.value[idx], status: 'active', completedBy: null };
+    }
+    showSnackbar('Task reopened', 'info');
+  } catch (err) {
+    showSnackbar('Error reopening task', 'error');
   }
 };
 
@@ -108,8 +174,35 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
 
       <div class="mb-5">
         <h1 class="text-h4 font-weight-bold navy-text">My Tasks</h1>
-        <p class="text-body-2 text-grey">Tasks assigned to you by your manager</p>
+        <p class="text-body-2 text-grey">Tasks for your shift today</p>
       </div>
+
+      <!-- Today's shift context -->
+      <v-alert
+        v-if="todayShifts.length > 0"
+        type="success"
+        variant="tonal"
+        density="compact"
+        color="#12086F"
+        class="mb-4"
+        icon="mdi-calendar-check"
+      >
+        <div class="text-caption">
+          You have {{ todayShifts.length }} shift{{ todayShifts.length > 1 ? 's' : '' }} today.
+          Showing tasks assigned to your shift{{ todayShifts.length > 1 ? 's' : '' }}.
+        </div>
+      </v-alert>
+      <v-alert
+        v-else-if="!loading"
+        type="info"
+        variant="tonal"
+        density="compact"
+        color="#4361EE"
+        class="mb-4"
+        icon="mdi-calendar-blank"
+      >
+        <div class="text-caption">You have no shifts scheduled for today.</div>
+      </v-alert>
 
       <div v-if="loading" class="text-center py-12">
         <v-progress-circular indeterminate color="#12086F" size="40" />
@@ -118,8 +211,8 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
       <template v-else>
         <div v-if="assignedTasks.length === 0" class="text-center py-16">
           <v-icon size="72" color="grey-lighten-2" class="mb-4">mdi-clipboard-check-outline</v-icon>
-          <div class="text-h6 text-grey mb-2">No tasks assigned</div>
-          <p class="text-body-2 text-grey">Your manager will assign tasks that appear here</p>
+          <div class="text-h6 text-grey mb-2">No tasks for today</div>
+          <p class="text-body-2 text-grey">Tasks assigned to your shift will appear here</p>
         </div>
 
         <v-row v-else>
@@ -142,7 +235,9 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
                 </div>
                 <div class="d-flex flex-wrap ga-1 mt-3">
                   <v-chip size="x-small" :color="getPriorityColor(task.priority)" variant="tonal">{{ task.priority || 'medium' }}</v-chip>
-                  <v-chip v-if="task.recursDaily || task.recurs_daily" size="x-small" color="teal" variant="tonal">Daily</v-chip>
+                  <v-chip v-if="task.recursDaily || task.recurs_daily" size="x-small" color="teal" variant="tonal">
+                    <v-icon start size="x-small">mdi-repeat</v-icon>Daily
+                  </v-chip>
                   <v-chip size="x-small" color="grey" variant="tonal">
                     {{ (task.shiftType || task.shift_type || 'all day').replace('_', ' ') }}
                   </v-chip>
@@ -187,23 +282,49 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
               :class="{ 'task-item-done': item.status === 'completed' }"
             >
               <div class="d-flex align-center ga-3">
-                <v-checkbox
-                  :model-value="item.status === 'completed'"
-                  @update:model-value="toggleItem(item)"
-                  hide-details
-                  density="compact"
-                  color="#12086F"
-                />
                 <div class="flex-grow-1">
                   <div
-                    class="text-body-2 font-weight-medium"
+                    class="text-body-2 font-weight-medium mb-1"
                     :class="item.status === 'completed' ? 'text-decoration-line-through text-grey' : 'navy-text'"
                   >
                     {{ item.title }}
                   </div>
-                  <div v-if="item.description" class="text-caption text-grey">{{ item.description }}</div>
+                  <div v-if="item.description" class="text-caption text-grey mb-1">{{ item.description }}</div>
+
+                  <!-- Who completed it -->
+                  <div v-if="item.status === 'completed'" class="d-flex align-center ga-1 mt-1">
+                    <v-icon size="12" color="success">mdi-account-check</v-icon>
+                    <span class="text-caption" style="color:#2e7d32;">
+                      Completed by <strong>{{ getCompleterName(item) || 'a team member' }}</strong>
+                    </span>
+                  </div>
                 </div>
-                <v-chip v-if="item.status === 'completed'" size="x-small" color="success" variant="tonal">Done</v-chip>
+
+                <!-- Action buttons -->
+                <div class="flex-shrink-0">
+                  <v-btn
+                    v-if="item.status !== 'completed'"
+                    size="small"
+                    color="#12086F"
+                    variant="flat"
+                    prepend-icon="mdi-check"
+                    class="text-none"
+                    @click="markDone(item)"
+                  >
+                    Mark Done
+                  </v-btn>
+                  <v-btn
+                    v-else
+                    size="small"
+                    color="success"
+                    variant="tonal"
+                    prepend-icon="mdi-check-circle"
+                    class="text-none"
+                    @click="reopenItem(item)"
+                  >
+                    Done
+                  </v-btn>
+                </div>
               </div>
             </div>
           </div>
@@ -236,5 +357,10 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
 .task-item-row { border-bottom: 1px solid #f0f0f0; transition: background 0.15s; }
 .task-item-row:hover { background: #fafafa; }
 .task-item-row:last-child { border-bottom: none; }
-.task-item-done { background: #f9f9f9; }
+.task-item-done { background: #f0fdf4; }
+
+/* Dark mode */
+.v-theme--dark .task-item-done { background: #1a2e1a; }
+.v-theme--dark .task-item-row:hover { background: #2a2a3e; }
+.v-theme--dark .navy-text { color: #a8b4ff !important; }
 </style>

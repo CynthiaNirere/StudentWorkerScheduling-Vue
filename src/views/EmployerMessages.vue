@@ -6,13 +6,13 @@ import EmployerLayout from '../components/EmployerLayout.vue';
 
 const user      = ref(null);
 const employees = ref([]);
-const threads   = ref([]); // grouped conversations
+const threads   = ref([]);
 const loading   = ref(false);
 const composing = ref(false);
 
 // ── THREAD / CHAT VIEW ────────────────────────────────────────────────────
-const openThread    = ref(null); // the thread currently open
-const threadMessages = ref([]);   // messages in that thread
+const openThread    = ref(null);
+const threadMessages = ref([]);
 const replyText     = ref('');
 const sendingReply  = ref(false);
 
@@ -77,7 +77,6 @@ const loadMessages = async () => {
 };
 
 const buildThreads = (messages) => {
-  // Deduplicate by message_id — prevents inbox+sent overlap
   const seen = new Set();
   const unique = messages.filter(m => {
     if (seen.has(m.message_id)) return false;
@@ -88,9 +87,6 @@ const buildThreads = (messages) => {
   const me = myId.value;
   const map = new Map();
   unique.forEach(m => {
-    // Thread key: use thread_id if available, otherwise group by
-    // the pair of participants + subject so different conversations
-    // with the same subject between different people don't merge
     const pair = [m.sender_id, m.recipient_id].filter(Boolean).sort().join('-');
     const key  = m.thread_id || `conv-${pair}-${m.subject || 'no-subject'}`;
     if (!map.has(key)) {
@@ -110,7 +106,6 @@ const buildThreads = (messages) => {
     const ts = Number(m.created_at || 0);
     if (ts > t.latestAt) { t.latestAt = ts; t.lastMessage = m; }
     if (!m.is_read && m.sender_id !== me) t.unreadCount++;
-    // Only add the OTHER person's name (like a phone — you don't see your own name)
     if (m.sender_name && m.sender_id !== me)       t.participants.add(m.sender_name);
     if (m.recipient_name && m.recipient_id !== me)  t.participants.add(m.recipient_name);
   });
@@ -124,7 +119,6 @@ const openChat = async (thread) => {
   threadMessages.value = thread.messages.sort((a, b) => Number(a.created_at) - Number(b.created_at));
   replyText.value = '';
   const me = myId.value;
-  // Only mark messages from OTHER people as read — never mark our own outgoing messages
   const toMark = thread.messages.filter(m => !m.is_read && (m.sender_id || m.senderId) !== me);
   for (const m of toMark) {
     try {
@@ -139,7 +133,6 @@ const sendReply = async () => {
   if (!replyText.value.trim() || !openThread.value) return;
   sendingReply.value = true;
   try {
-    // Find the other participant to reply to
     const lastMsg = openThread.value.messages[openThread.value.messages.length - 1];
     const recipientId = lastMsg?.sender_id !== myId.value ? lastMsg?.sender_id : lastMsg?.recipient_id;
 
@@ -157,7 +150,6 @@ const sendReply = async () => {
     });
     replyText.value = '';
     await loadMessages();
-    // Refresh open thread
     const refreshed = threads.value.find(t => t.threadKey === openThread.value.threadKey);
     if (refreshed) openChat(refreshed);
   } catch (err) { console.error('Reply error:', err); showSnackbar('Error sending reply', 'error'); }
@@ -202,28 +194,8 @@ const sendBroadcast = async () => {
   finally { composing.value = false; }
 };
 
-const deleteThread = async (thread) => {
-  let deleted = 0;
-  let failed  = 0;
-  for (const m of thread.messages) {
-    try {
-      await EmployerService.deleteMessage(m.message_id);
-      deleted++;
-    } catch (err) {
-      console.error('Delete message error:', m.message_id, err?.response?.data || err);
-      failed++;
-    }
-  }
-  if (openThread.value?.threadKey === thread.threadKey) openThread.value = null;
-  if (failed === 0) {
-    showSnackbar('Conversation deleted', 'success');
-  } else if (deleted > 0) {
-    showSnackbar(`Partially deleted (${failed} failed)`, 'warning');
-  } else {
-    showSnackbar('Error deleting conversation', 'error');
-  }
-  await loadMessages();
-};
+// NOTE: deleteThread removed — messages are not deleted, only archived/hidden
+// This preserves the message record for accountability
 
 const formatTimestamp = (ts) => {
   if (!ts) return '';
@@ -236,7 +208,6 @@ const formatTimestamp = (ts) => {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
-// ── BACKGROUND POLL ──────────────────────────────────────────────────────
 const pollMessages = async () => {
   try {
     const [inboxRes, sentRes] = await Promise.all([
@@ -271,15 +242,16 @@ const showSnackbar = (msg, color = 'success') => { snackbarMessage.value = msg; 
           <p class="text-body-2 text-grey">Communicate with your team</p>
         </div>
         <div class="d-flex ga-2">
-          <v-btn color="#9C27B0" variant="flat" prepend-icon="mdi-bullhorn" @click="showBroadcastDialog = true">Broadcast All</v-btn>
+          <!-- Renamed from "Broadcast All" to "New Broadcast" -->
+          <v-btn color="#9C27B0" variant="flat" prepend-icon="mdi-bullhorn" @click="showBroadcastDialog = true">New Broadcast</v-btn>
           <v-btn color="#12086F" variant="flat" prepend-icon="mdi-email-plus" @click="showComposeDialog = true">New Message</v-btn>
         </div>
       </div>
 
-      <!-- Two-pane layout: thread list + chat -->
+      <!-- Two-pane layout -->
       <v-row style="height: calc(100vh - 200px); min-height: 500px;">
 
-        <!-- ── LEFT: Thread list ──────────────────────────────────────────── -->
+        <!-- LEFT: Thread list -->
         <v-col cols="12" md="4" style="height:100%; overflow-y:auto;">
           <v-card variant="outlined" rounded="lg" class="navy-card" style="height:100%;">
 
@@ -289,7 +261,7 @@ const showSnackbar = (msg, color = 'success') => { snackbarMessage.value = msg; 
                 <v-chip v-if="directUnreadCount > 0" size="x-small" color="#f57c00" variant="tonal" class="ml-1">{{ directUnreadCount }}</v-chip>
               </v-tab>
               <v-tab value="broadcast">
-                Broadcast
+                Broadcasts
                 <v-chip v-if="broadcastUnreadCount > 0" size="x-small" color="#f57c00" variant="tonal" class="ml-1">{{ broadcastUnreadCount }}</v-chip>
               </v-tab>
             </v-tabs>
@@ -326,7 +298,7 @@ const showSnackbar = (msg, color = 'success') => { snackbarMessage.value = msg; 
                   </div>
                   <div class="d-flex flex-column align-end ga-1 ml-2">
                     <v-badge v-if="thread.unreadCount > 0" :content="thread.unreadCount" color="#f57c00" inline />
-                    <v-btn icon="mdi-delete" size="x-small" variant="text" color="error" @click.stop="deleteThread(thread)" />
+                    <!-- Delete button removed: messages are kept for accountability -->
                   </div>
                 </div>
               </div>
@@ -334,7 +306,7 @@ const showSnackbar = (msg, color = 'success') => { snackbarMessage.value = msg; 
           </v-card>
         </v-col>
 
-        <!-- ── RIGHT: Chat window ─────────────────────────────────────────── -->
+        <!-- RIGHT: Chat window -->
         <v-col cols="12" md="8" style="height:100%; display:flex; flex-direction:column;">
           <v-card variant="outlined" rounded="lg" class="navy-card" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
             <div v-if="!openThread" class="d-flex flex-column align-center justify-center" style="flex:1; color:#9ca3af;">
@@ -375,7 +347,7 @@ const showSnackbar = (msg, color = 'success') => { snackbarMessage.value = msg; 
                 </div>
               </div>
 
-              <!-- Reply box — not shown for broadcast (one-way) -->
+              <!-- Reply box — not shown for broadcasts -->
               <div v-if="openThread.type !== 'broadcast'" class="pa-3" style="border-top:1px solid #e0e0e0;">
                 <div class="d-flex ga-2 align-end">
                   <v-textarea
@@ -394,7 +366,7 @@ const showSnackbar = (msg, color = 'success') => { snackbarMessage.value = msg; 
                 <div class="text-caption text-grey mt-1">Ctrl+Enter to send</div>
               </div>
               <div v-else class="pa-3 text-center" style="border-top:1px solid #e0e0e0;">
-                <div class="text-caption text-grey">Broadcasts are one-way — you cannot reply to this message.</div>
+                <div class="text-caption text-grey">Broadcasts are one-way — employees receive this but cannot reply.</div>
               </div>
             </template>
           </v-card>
@@ -433,12 +405,12 @@ const showSnackbar = (msg, color = 'success') => { snackbarMessage.value = msg; 
       </v-card>
     </v-dialog>
 
-    <!-- Broadcast Dialog -->
+    <!-- New Broadcast Dialog (renamed from "Broadcast All") -->
     <v-dialog v-model="showBroadcastDialog" fullscreen transition="dialog-bottom-transition">
       <v-card rounded="0" class="d-flex flex-column" style="height:100%;">
         <v-toolbar color="#9C27B0" density="compact">
           <v-btn icon="mdi-close" variant="text" @click="showBroadcastDialog = false" />
-          <v-toolbar-title class="text-body-1 font-weight-bold">Broadcast to All Employees</v-toolbar-title>
+          <v-toolbar-title class="text-body-1 font-weight-bold">New Broadcast</v-toolbar-title>
           <v-spacer />
           <v-btn variant="text" class="text-none" @click="showBroadcastDialog = false">Cancel</v-btn>
           <v-btn variant="flat" color="white" class="text-none" :loading="composing" @click="sendBroadcast">Send Broadcast</v-btn>
@@ -479,4 +451,12 @@ const showSnackbar = (msg, color = 'success') => { snackbarMessage.value = msg; 
 .bubble-theirs { background: white; border: 1px solid #e0e0e0; border-bottom-left-radius: 4px; }
 .opacity-70 { opacity: 0.7; }
 .min-width-0 { min-width: 0; }
+
+/* Dark mode */
+.v-theme--dark .thread-row:hover { background: #2a2a3e; }
+.v-theme--dark .thread-active { background: #1a1f3a !important; }
+.v-theme--dark .thread-unread { background: #2e1f0a; }
+.v-theme--dark .chat-messages { background: #1a1a2e; }
+.v-theme--dark .bubble-theirs { background: #2a2a3e; border-color: #444; color: #e0e0e0; }
+.v-theme--dark .navy-text { color: #a8b4ff !important; }
 </style>
