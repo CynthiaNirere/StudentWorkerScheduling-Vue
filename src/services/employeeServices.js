@@ -12,6 +12,10 @@ export default {
     return apiClient.put(`/users/${userId}`, { phone_number: data.phone_number });
   },
 
+  updateCertifications(userId, certifications) {
+    return apiClient.patch(`/users/${userId}/certifications`, { certifications });
+  },
+
   // ─── SHIFTS ─────────────────────────────────────────────────────────────
   // My shifts only (filtered by userId on backend)
   getMyShifts(userId) {
