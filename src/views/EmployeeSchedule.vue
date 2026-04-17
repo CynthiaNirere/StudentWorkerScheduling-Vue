@@ -317,11 +317,11 @@ const getShiftBorderColor = (shift) => {
 
       <!-- Legend -->
       <div class="d-flex flex-wrap ga-3 align-center">
-        <div class="legend-item" style="border-color:#1976D2; background:#E3F2FD;">
+        <div class="legend-item legend-item--shift">
           <span class="legend-dot" style="background:#1976D2;" />
           <span class="legend-label">My Shift</span>
         </div>
-        <div class="legend-item" style="border-color:#2e7d32; background:#E8F5E9;">
+        <div class="legend-item legend-item--open">
           <span class="legend-dot" style="background:#2e7d32;" />
           <span class="legend-label">Open (claimable)</span>
         </div>
@@ -410,6 +410,8 @@ const getShiftBorderColor = (shift) => {
 }
 .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .legend-label { font-size: 11px; font-weight: 500; color: #374151; }
+.legend-item--shift { border-color: #1976D2; background: #E3F2FD; }
+.legend-item--open  { border-color: #2e7d32; background: #E8F5E9; }
 
 /* Dark mode */
 .v-theme--dark .calendar-day { background: #1e1e2e; border-color: #333; }
@@ -417,5 +419,7 @@ const getShiftBorderColor = (shift) => {
 .v-theme--dark .shift-card { background: #2a2a3e; }
 .v-theme--dark .shift-time-val { color: #a8b4ff; }
 .v-theme--dark .navy-text { color: #a8b4ff !important; }
-.v-theme--dark .legend-label { color: #e0e0e0; }
+.v-theme--dark .legend-label { color: #E8EAF6; }
+.v-theme--dark .legend-item--shift { border-color: #64B5F6; background: rgba(25, 118, 210, 0.25); }
+.v-theme--dark .legend-item--open  { border-color: #66BB6A; background: rgba(46, 125, 50, 0.25); }
 </style>

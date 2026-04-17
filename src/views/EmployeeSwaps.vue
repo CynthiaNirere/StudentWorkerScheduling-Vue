@@ -367,7 +367,7 @@ const showSnackbar = (msg, color = "success") => { snackMsg.value = msg; snackCo
             You are accepting to take over this shift from
             <strong>{{ swapToAccept.requestingEmployee }}</strong>.
           </p>
-          <div class="mt-3 pa-3" style="background: #f5f5f5; border-radius: 8px;">
+          <div class="mt-3 pa-3 shift-preview-box">
             <div class="text-body-2 font-weight-bold">{{ swapToAccept.shiftDate }}</div>
             <div class="text-body-2">{{ swapToAccept.shiftTime }}</div>
             <div v-if="swapToAccept.reason" class="text-caption text-grey mt-1">{{ swapToAccept.reason }}</div>
@@ -494,8 +494,13 @@ const showSnackbar = (msg, color = "success") => { snackMsg.value = msg; snackCo
   border: 1px solid #c7d2fe;
 }
 
+.shift-preview-box { background: #f5f5f5; border-radius: 8px; }
+
 /* Dark mode */
 .v-theme--dark .swap-item { background: #2a2a3e; border-color: #444; }
 .v-theme--dark .swap-taker-row { background: #1a1f3a; border-color: #333; }
 .v-theme--dark .navy-text { color: #a8b4ff !important; }
+.v-theme--dark .shift-preview-box { background: #263238 !important; }
+.v-theme--dark .shift-preview-box .text-body-2 { color: #E8EAF6 !important; }
+.v-theme--dark .shift-preview-box .text-caption { color: #90A4AE !important; }
 </style>
