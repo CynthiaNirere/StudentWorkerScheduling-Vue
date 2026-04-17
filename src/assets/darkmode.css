@@ -63,3 +63,21 @@
 
 /* Dividers */
 .v-theme--dark .v-divider { border-color: #37474F !important; }
+
+/* Notifications panel */
+.v-theme--dark .notif-row { border-bottom: 1px solid #37474F !important; background: #1E1E2E !important; color: #E8EAF6 !important; }
+.v-theme--dark .notif-row:hover { background: #263238 !important; }
+.v-theme--dark .notif-unread { border-left: 3px solid #f57c00 !important; background: #1a1500 !important; }
+.v-theme--dark .notif-row .text-body-2 { color: #E8EAF6 !important; }
+.v-theme--dark .notif-row .text-grey { color: #90A4AE !important; }
+.v-theme--dark .notif-row .text-caption { color: #90A4AE !important; }
+
+/* Time Requests page */
+.v-theme--dark .request-item { background: #1E1E2E !important; border-color: #37474F !important; color: #E8EAF6 !important; }
+.v-theme--dark .request-item:hover { border-color: #7B68EE !important; }
+.v-theme--dark .request-pending { border-left: 4px solid #f57c00 !important; background: #1a1200 !important; }
+.v-theme--dark .request-item .navy-text { color: #C5CAE9 !important; }
+
+/* EmployeeSchedule legend badges */
+.v-theme--dark .legend-item--shift { border-color: #64B5F6 !important; background: rgba(25,118,210,0.25) !important; color: #E8EAF6 !important; }
+.v-theme--dark .legend-item--open  { border-color: #66BB6A !important; background: rgba(46,125,50,0.25) !important; color: #E8EAF6 !important; }
