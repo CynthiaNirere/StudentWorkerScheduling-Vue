@@ -1,0 +1,56 @@
+/* Global dark mode overrides — applies to all employee & employer pages */
+
+.v-theme--dark .navy-text {
+  color: #C5CAE9 !important;
+}
+
+.v-theme--dark h1,
+.v-theme--dark h2,
+.v-theme--dark h3,
+.v-theme--dark h4,
+.v-theme--dark .text-h4,
+.v-theme--dark .text-h5,
+.v-theme--dark .text-h6 {
+  color: #E8EAF6 !important;
+}
+
+.v-theme--dark .text-grey {
+  color: #90A4AE !important;
+}
+
+/* Cards */
+.v-theme--dark .navy-card {
+  border-color: #37474F !important;
+  background-color: #1E1E2E !important;
+}
+
+.v-theme--dark .v-card {
+  background-color: #1E1E2E !important;
+}
+
+.v-theme--dark .v-card-title,
+.v-theme--dark .v-card-subtitle {
+  color: #E8EAF6 !important;
+}
+
+/* Body text */
+.v-theme--dark .text-body-1,
+.v-theme--dark .text-body-2 {
+  color: #CFD8DC;
+}
+
+.v-theme--dark .text-caption {
+  color: #90A4AE;
+}
+
+/* Shift cards — My Schedule */
+.v-theme--dark .shift-card {
+  background: #1E1E2E !important;
+  border-color: #37474F !important;
+}
+
+/* Entry badges */
+.v-theme--dark .entry-badge {
+  background: #1a237e;
+  color: #C5CAE9;
+}
