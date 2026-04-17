@@ -77,7 +77,7 @@ const nextWeek = () => {
 const CAL_START = 6 * 60;
 const CAL_END   = 23 * 60;
 const CAL_RANGE = CAL_END - CAL_START;
-const ROW_H     = 24;
+const ROW_H     = 32;
 const ROWS      = CAL_RANGE / 30;
 const CAL_H     = ROWS * ROW_H;
 
@@ -480,15 +480,15 @@ onUnmounted(() => {
         <v-col cols="12" md="9">
           <v-card variant="outlined" rounded="lg" class="navy-card">
             <v-card-text class="pa-3">
-              <div class="cal-outer" :style="{ height: (CAL_H + 42) + 'px' }">
-                <div class="time-axis" :style="{ height: CAL_H + 'px', marginTop: '42px' }">
+              <div class="cal-outer" :style="{ height: (CAL_H + 60) + 'px' }">
+                <div class="time-axis" :style="{ height: CAL_H + 'px', marginTop: '60px' }">
                   <div v-for="lbl in timeLabels" :key="lbl.text" class="time-lbl" :style="{ top: lbl.topPct + '%' }">{{ lbl.text }}</div>
                 </div>
                 <div class="cal-grid">
                   <div v-for="(day, dayIdx) in weekDays" :key="'h'+day.label" class="cal-hdr" @click="openAddDialog(dayIdx)" style="cursor:pointer;">
                     <span class="hdr-name">{{ day.label }}</span>
                     <span class="hdr-num">{{ day.dateNum }}</span>
-                    <v-icon size="10" color="rgba(255,255,255,0.5)" class="mt-1">mdi-plus</v-icon>
+                    <v-icon size="14" color="rgba(255,255,255,0.8)" class="mt-1">mdi-plus</v-icon>
                   </div>
                   <div
                     v-for="(day, dayIdx) in weekDays"
@@ -664,7 +664,7 @@ onUnmounted(() => {
 .cal-grid {
   flex: 1; display: grid;
   grid-template-columns: repeat(7, 1fr);
-  grid-template-rows: 42px auto;
+  grid-template-rows: 60px auto;
   min-width: 420px;
   border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;
   background: #e0e0e0; gap: 1px;
@@ -672,8 +672,8 @@ onUnmounted(() => {
 
 .cal-hdr { background: linear-gradient(135deg, #12086F 0%, #2B354F 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 5px 4px; gap: 1px; }
 .cal-hdr:hover { background: linear-gradient(135deg, #2B354F 0%, #4361EE 100%); }
-.hdr-name { font-size: 0.62rem; font-weight: 700; color: rgba(255,255,255,0.85); letter-spacing: .08em; text-transform: uppercase; }
-.hdr-num  { font-size: 1rem; font-weight: 800; color: rgba(255,255,255,0.5); line-height: 1; }
+.hdr-name { font-size: 0.7rem; font-weight: 700; color: rgba(255,255,255,0.9); letter-spacing: .08em; text-transform: uppercase; }
+.hdr-num  { font-size: 1.3rem; font-weight: 800; color: white; line-height: 1; }
 
 .cal-body { background: white; position: relative; cursor: crosshair; user-select: none; }
 .grid-line { position: absolute; left: 0; right: 0; height: 1px; background: #f3f4f6; pointer-events: none; }
@@ -684,4 +684,17 @@ onUnmounted(() => {
 .block-text { font-size: 0.52rem; font-weight: 600; color: #1e3a5f; line-height: 1.3; }
 .block-edit-icon { opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
 .avail-block:hover .block-edit-icon { opacity: 1; }
+
+/* Dark mode */
+.v-theme--dark .navy-text { color: #C5CAE9 !important; }
+.v-theme--dark .navy-card { border-color: #37474F !important; }
+.v-theme--dark .summary-day { border-bottom-color: #37474F; }
+.v-theme--dark .summary-day-lbl { color: #C5CAE9; }
+.v-theme--dark .cal-body { background: #1E1E2E; }
+.v-theme--dark .grid-line { background: #2a2a3e; }
+.v-theme--dark .grid-line--hour { background: #37474F; }
+.v-theme--dark .avail-block { background: linear-gradient(135deg, #1a237e55, #1a237e88); border-left-color: #7B68EE; }
+.v-theme--dark .block-text { color: #C5CAE9; }
+.v-theme--dark .time-lbl { color: #78909C; }
+.v-theme--dark .cal-grid { background: #37474F; border-color: #37474F; }
 </style>
