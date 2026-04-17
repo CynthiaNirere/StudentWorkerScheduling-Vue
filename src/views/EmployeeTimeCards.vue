@@ -327,6 +327,54 @@ const isToday     = (d) => { const t = new Date(); return d.getDate()===t.getDat
 const weekHours   = (days) => days.reduce((s,d)=>s+d.records.reduce((ss,r)=>ss+(parseFloat(r.totalHours)||0),0),0).toFixed(2);
 
 const showSnackbar = (msg, color='success') => { snackMsg.value=msg; snackColor.value=color; snackbar.value=true; };
+
+const DayRow = {
+  name: 'DayRow',
+  props: { day: Object, isToday: Boolean, dayShort: String, formatTime: Function, readonly: { type: Boolean, default: false } },
+  emits: ['edit'],
+  template: `
+    <div>
+      <template v-if="day.records.length > 0">
+        <div v-for="(r, ri) in day.records" :key="r.id || r.clock_id" class="day-row px-5 pt-3" :class="{ 'today-row': isToday, 'rejected-row': r.status === 'rejected' }">
+          <div class="d-flex align-center pb-3 ga-4">
+            <div style="flex:0 0 150px">
+              <template v-if="ri === 0">
+                <div class="d-flex align-center ga-2">
+                  <div class="day-badge" :class="{ 'day-badge--today': isToday }">{{ dayShort }}</div>
+                  <div>
+                    <div class="text-body-2" :class="isToday ? 'navy-text font-weight-medium' : ''">{{ day.date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }}</div>
+                    <div v-if="isToday" class="text-caption navy-text" style="font-weight:600">Today</div>
+                  </div>
+                </div>
+              </template>
+            </div>
+            <div style="flex:0 0 100px" class="text-body-2">{{ formatTime(r.inDate) }}</div>
+            <div style="flex:0 0 110px" class="text-body-2" :class="!r.outDate ? 'text-grey' : ''">{{ r.outDate ? formatTime(r.outDate) : 'Not clocked out' }}</div>
+            <div style="flex:1" class="text-body-2 font-weight-medium navy-text">{{ r.totalHours ? r.totalHours + ' hrs' : '—' }}</div>
+            <div v-if="!readonly && (r.status === 'pending' || r.status === 'rejected' || r.status === 'clocked_out')">
+              <v-btn size="x-small" variant="tonal" color="#12086F" @click="$emit('edit', r)">Edit</v-btn>
+            </div>
+          </div>
+          <div v-if="r.status === 'rejected' && r.rejectionComment" class="rejection-note mb-3 d-flex align-start ga-2">
+            <v-icon size="13" color="#d32f2f" style="margin-top:2px">mdi-message-alert-outline</v-icon>
+            <span class="text-caption" style="color:#b71c1c"><strong>Manager:</strong> {{ r.rejectionComment }}</span>
+          </div>
+        </div>
+      </template>
+      <template v-else>
+        <div class="day-row day-row--empty d-flex align-center px-5 py-3" :class="{ 'today-row': isToday }">
+          <div style="flex:0 0 150px">
+            <div class="d-flex align-center ga-2">
+              <div class="day-badge" :class="{ 'day-badge--today': isToday }">{{ dayShort }}</div>
+              <div class="text-body-2 text-grey">{{ day.date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }}</div>
+            </div>
+          </div>
+          <div class="text-caption text-grey" style="flex:1">No shifts</div>
+        </div>
+      </template>
+    </div>
+  `,
+};
 </script>
 
 <template>
@@ -599,56 +647,6 @@ const showSnackbar = (msg, color='success') => { snackMsg.value=msg; snackColor.
   </EmployeeLayout>
 </template>
 
-<script>
-const DayRow = {
-  name: 'DayRow',
-  props: { day: Object, isToday: Boolean, dayShort: String, formatTime: Function, readonly: { type: Boolean, default: false } },
-  emits: ['edit'],
-  template: `
-    <div>
-      <template v-if="day.records.length > 0">
-        <div v-for="(r, ri) in day.records" :key="r.id || r.clock_id" class="day-row px-5 pt-3" :class="{ 'today-row': isToday, 'rejected-row': r.status === 'rejected' }">
-          <div class="d-flex align-center pb-3 ga-4">
-            <div style="flex:0 0 150px">
-              <template v-if="ri === 0">
-                <div class="d-flex align-center ga-2">
-                  <div class="day-badge" :class="{ 'day-badge--today': isToday }">{{ dayShort }}</div>
-                  <div>
-                    <div class="text-body-2" :class="isToday ? 'navy-text font-weight-medium' : ''">{{ day.date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }}</div>
-                    <div v-if="isToday" class="text-caption navy-text" style="font-weight:600">Today</div>
-                  </div>
-                </div>
-              </template>
-            </div>
-            <div style="flex:0 0 100px" class="text-body-2">{{ formatTime(r.inDate) }}</div>
-            <div style="flex:0 0 110px" class="text-body-2" :class="!r.outDate ? 'text-grey' : ''">{{ r.outDate ? formatTime(r.outDate) : 'Not clocked out' }}</div>
-            <div style="flex:1" class="text-body-2 font-weight-medium navy-text">{{ r.totalHours ? r.totalHours + ' hrs' : '—' }}</div>
-            <div v-if="!readonly && (r.status === 'pending' || r.status === 'rejected' || r.status === 'clocked_out')">
-              <v-btn size="x-small" variant="tonal" color="#12086F" @click="$emit('edit', r)">Edit</v-btn>
-            </div>
-          </div>
-          <div v-if="r.status === 'rejected' && r.rejectionComment" class="rejection-note mb-3 d-flex align-start ga-2">
-            <v-icon size="13" color="#d32f2f" style="margin-top:2px">mdi-message-alert-outline</v-icon>
-            <span class="text-caption" style="color:#b71c1c"><strong>Manager:</strong> {{ r.rejectionComment }}</span>
-          </div>
-        </div>
-      </template>
-      <template v-else>
-        <div class="day-row day-row--empty d-flex align-center px-5 py-3" :class="{ 'today-row': isToday }">
-          <div style="flex:0 0 150px">
-            <div class="d-flex align-center ga-2">
-              <div class="day-badge" :class="{ 'day-badge--today': isToday }">{{ dayShort }}</div>
-              <div class="text-body-2 text-grey">{{ day.date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }}</div>
-            </div>
-          </div>
-          <div class="text-caption text-grey" style="flex:1">No shifts</div>
-        </div>
-      </template>
-    </div>
-  `,
-};
-export default { components: { DayRow } };
-</script>
 
 <style scoped>
 .navy-text  { color: #12086F !important; }
