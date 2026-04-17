@@ -429,47 +429,35 @@ const showSnackbar = (msg, color='success') => { snackMsg.value=msg; snackColor.
             </div>
             <template v-if="pendingWeeksOpen.w1">
               <v-divider />
-              <template v-for="(day, idx) in pendingWeek1" :key="'p1-'+idx">
-                <template v-if="day.records.length > 0">
-                  <div v-for="(r, ri) in day.records" :key="r.id || r.clock_id" class="day-row px-5 pt-3" :class="{ 'today-row': isToday(day.date), 'rejected-row': r.status === 'rejected' }">
-                    <div class="d-flex align-center pb-3 ga-4">
-                      <div style="flex:0 0 150px">
-                        <template v-if="ri === 0">
-                          <div class="d-flex align-center ga-2">
-                            <div class="day-badge" :class="{ 'day-badge--today': isToday(day.date) }">{{ dayShort(day.date) }}</div>
-                            <div>
-                              <div class="text-body-2" :class="isToday(day.date) ? 'navy-text font-weight-medium' : ''">{{ day.date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }}</div>
-                              <div v-if="isToday(day.date)" class="text-caption navy-text" style="font-weight:600">Today</div>
-                            </div>
-                          </div>
-                        </template>
+              <div class="pa-4 d-flex flex-column ga-3">
+                <template v-for="day in pendingWeek1" :key="day.date.getTime()">
+                  <div v-for="r in day.records" :key="r.id || r.clock_id" class="shift-card d-flex align-center pa-4" :class="{ 'rejected-card': r.status === 'rejected' }">
+                    <div class="shift-icon-circle mr-4" :class="isToday(day.date) ? 'shift-icon-circle--today' : ''">
+                      <v-icon color="white" size="20">mdi-clock-outline</v-icon>
+                    </div>
+                    <div style="flex:1">
+                      <div class="d-flex align-center ga-2 mb-1">
+                        <span class="entry-badge">Clock Entry</span>
+                        <span v-if="isToday(day.date)" class="today-pill">Today</span>
                       </div>
-                      <div style="flex:0 0 100px" class="text-body-2">{{ formatTime(r.inDate) }}</div>
-                      <div style="flex:0 0 110px" class="text-body-2" :class="!r.outDate ? 'text-grey' : ''">{{ r.outDate ? formatTime(r.outDate) : 'Not clocked out' }}</div>
-                      <div style="flex:1" class="text-body-2 font-weight-medium navy-text">{{ r.totalHours ? r.totalHours + ' hrs' : '—' }}</div>
-                      <div v-if="r.status === 'pending' || r.status === 'rejected' || r.status === 'clocked_out'">
-                        <v-btn size="x-small" variant="tonal" color="#12086F" @click="openEdit(r)">Edit</v-btn>
+                      <div class="text-body-2 font-weight-bold navy-text mb-1">{{ day.date.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'}) }}</div>
+                      <div class="text-caption text-grey">
+                        In: <strong>{{ formatTime(r.inDate) }}</strong> → Out: <strong>{{ r.outDate ? formatTime(r.outDate) : 'Not clocked out' }}</strong>
+                        <span v-if="r.totalHours"> · <span class="navy-text font-weight-bold">{{ r.totalHours }} hrs</span></span>
+                      </div>
+                      <div v-if="r.status === 'rejected' && r.rejectionComment" class="rejection-note mt-2 d-flex align-start ga-2">
+                        <v-icon size="13" color="#d32f2f" style="margin-top:2px">mdi-message-alert-outline</v-icon>
+                        <span class="text-caption" style="color:#b71c1c"><strong>Manager:</strong> {{ r.rejectionComment }}</span>
                       </div>
                     </div>
-                    <div v-if="r.status === 'rejected' && r.rejectionComment" class="rejection-note mb-3 d-flex align-start ga-2">
-                      <v-icon size="13" color="#d32f2f" style="margin-top:2px">mdi-message-alert-outline</v-icon>
-                      <span class="text-caption" style="color:#b71c1c"><strong>Manager:</strong> {{ r.rejectionComment }}</span>
+                    <div class="d-flex flex-column align-end ga-2">
+                      <v-chip size="x-small" :color="r.status==='approved'?'#2e7d32':r.status==='rejected'?'#d32f2f':'#f57c00'" variant="tonal">{{ r.status }}</v-chip>
+                      <v-btn v-if="r.status==='pending'||r.status==='rejected'||r.status==='clocked_out'" size="x-small" variant="tonal" color="#12086F" @click="openEdit(r)">Edit</v-btn>
                     </div>
                   </div>
                 </template>
-                <template v-else>
-                  <div class="day-row day-row--empty d-flex align-center px-5 py-3" :class="{ 'today-row': isToday(day.date) }">
-                    <div style="flex:0 0 150px">
-                      <div class="d-flex align-center ga-2">
-                        <div class="day-badge" :class="{ 'day-badge--today': isToday(day.date) }">{{ dayShort(day.date) }}</div>
-                        <div class="text-body-2 text-grey">{{ day.date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }}</div>
-                      </div>
-                    </div>
-                    <div class="text-caption text-grey" style="flex:1">No shifts</div>
-                  </div>
-                </template>
-                <v-divider v-if="idx < 6" style="opacity:.35" />
-              </template>
+                <div v-if="pendingWeek1.every(d => d.records.length === 0)" class="text-center py-4 text-caption text-grey">No shifts logged this week</div>
+              </div>
             </template>
           </v-card>
 
@@ -487,47 +475,35 @@ const showSnackbar = (msg, color='success') => { snackMsg.value=msg; snackColor.
             </div>
             <template v-if="pendingWeeksOpen.w2">
               <v-divider />
-              <template v-for="(day, idx) in pendingWeek2" :key="'p2-'+idx">
-                <template v-if="day.records.length > 0">
-                  <div v-for="(r, ri) in day.records" :key="r.id || r.clock_id" class="day-row px-5 pt-3" :class="{ 'today-row': isToday(day.date), 'rejected-row': r.status === 'rejected' }">
-                    <div class="d-flex align-center pb-3 ga-4">
-                      <div style="flex:0 0 150px">
-                        <template v-if="ri === 0">
-                          <div class="d-flex align-center ga-2">
-                            <div class="day-badge" :class="{ 'day-badge--today': isToday(day.date) }">{{ dayShort(day.date) }}</div>
-                            <div>
-                              <div class="text-body-2" :class="isToday(day.date) ? 'navy-text font-weight-medium' : ''">{{ day.date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }}</div>
-                              <div v-if="isToday(day.date)" class="text-caption navy-text" style="font-weight:600">Today</div>
-                            </div>
-                          </div>
-                        </template>
+              <div class="pa-4 d-flex flex-column ga-3">
+                <template v-for="day in pendingWeek2" :key="day.date.getTime()">
+                  <div v-for="r in day.records" :key="r.id || r.clock_id" class="shift-card d-flex align-center pa-4" :class="{ 'rejected-card': r.status === 'rejected' }">
+                    <div class="shift-icon-circle mr-4" :class="isToday(day.date) ? 'shift-icon-circle--today' : ''">
+                      <v-icon color="white" size="20">mdi-clock-outline</v-icon>
+                    </div>
+                    <div style="flex:1">
+                      <div class="d-flex align-center ga-2 mb-1">
+                        <span class="entry-badge">Clock Entry</span>
+                        <span v-if="isToday(day.date)" class="today-pill">Today</span>
                       </div>
-                      <div style="flex:0 0 100px" class="text-body-2">{{ formatTime(r.inDate) }}</div>
-                      <div style="flex:0 0 110px" class="text-body-2" :class="!r.outDate ? 'text-grey' : ''">{{ r.outDate ? formatTime(r.outDate) : 'Not clocked out' }}</div>
-                      <div style="flex:1" class="text-body-2 font-weight-medium navy-text">{{ r.totalHours ? r.totalHours + ' hrs' : '—' }}</div>
-                      <div v-if="r.status === 'pending' || r.status === 'rejected' || r.status === 'clocked_out'">
-                        <v-btn size="x-small" variant="tonal" color="#12086F" @click="openEdit(r)">Edit</v-btn>
+                      <div class="text-body-2 font-weight-bold navy-text mb-1">{{ day.date.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'}) }}</div>
+                      <div class="text-caption text-grey">
+                        In: <strong>{{ formatTime(r.inDate) }}</strong> → Out: <strong>{{ r.outDate ? formatTime(r.outDate) : 'Not clocked out' }}</strong>
+                        <span v-if="r.totalHours"> · <span class="navy-text font-weight-bold">{{ r.totalHours }} hrs</span></span>
+                      </div>
+                      <div v-if="r.status === 'rejected' && r.rejectionComment" class="rejection-note mt-2 d-flex align-start ga-2">
+                        <v-icon size="13" color="#d32f2f" style="margin-top:2px">mdi-message-alert-outline</v-icon>
+                        <span class="text-caption" style="color:#b71c1c"><strong>Manager:</strong> {{ r.rejectionComment }}</span>
                       </div>
                     </div>
-                    <div v-if="r.status === 'rejected' && r.rejectionComment" class="rejection-note mb-3 d-flex align-start ga-2">
-                      <v-icon size="13" color="#d32f2f" style="margin-top:2px">mdi-message-alert-outline</v-icon>
-                      <span class="text-caption" style="color:#b71c1c"><strong>Manager:</strong> {{ r.rejectionComment }}</span>
+                    <div class="d-flex flex-column align-end ga-2">
+                      <v-chip size="x-small" :color="r.status==='approved'?'#2e7d32':r.status==='rejected'?'#d32f2f':'#f57c00'" variant="tonal">{{ r.status }}</v-chip>
+                      <v-btn v-if="r.status==='pending'||r.status==='rejected'||r.status==='clocked_out'" size="x-small" variant="tonal" color="#12086F" @click="openEdit(r)">Edit</v-btn>
                     </div>
                   </div>
                 </template>
-                <template v-else>
-                  <div class="day-row day-row--empty d-flex align-center px-5 py-3" :class="{ 'today-row': isToday(day.date) }">
-                    <div style="flex:0 0 150px">
-                      <div class="d-flex align-center ga-2">
-                        <div class="day-badge" :class="{ 'day-badge--today': isToday(day.date) }">{{ dayShort(day.date) }}</div>
-                        <div class="text-body-2 text-grey">{{ day.date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }}</div>
-                      </div>
-                    </div>
-                    <div class="text-caption text-grey" style="flex:1">No shifts</div>
-                  </div>
-                </template>
-                <v-divider v-if="idx < 6" style="opacity:.35" />
-              </template>
+                <div v-if="pendingWeek2.every(d => d.records.length === 0)" class="text-center py-4 text-caption text-grey">No shifts logged this week</div>
+              </div>
             </template>
           </v-card>
 
@@ -561,75 +537,33 @@ const showSnackbar = (msg, color='success') => { snackMsg.value=msg; snackColor.
 
               <template v-if="expandedPeriods[period.start.getTime()]">
                 <v-divider />
-                <div class="px-5 pt-4 pb-1">
-                  <span class="text-caption font-weight-bold text-grey-darken-2">WEEK 1</span>
+                <div class="pa-4 d-flex flex-column ga-3">
+                  <div class="text-caption font-weight-bold text-grey-darken-2 mb-1">WEEK 1</div>
+                  <template v-for="day in buildWeekDays(period.start, 0)" :key="'ps1-'+day.date.getTime()">
+                    <div v-for="r in day.records" :key="r.id || r.clock_id" class="shift-card d-flex align-center pa-4">
+                      <div class="shift-icon-circle mr-4"><v-icon color="white" size="20">mdi-clock-outline</v-icon></div>
+                      <div style="flex:1">
+                        <div class="d-flex align-center ga-2 mb-1"><span class="entry-badge">Clock Entry</span></div>
+                        <div class="text-body-2 font-weight-bold navy-text mb-1">{{ day.date.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'}) }}</div>
+                        <div class="text-caption text-grey">In: <strong>{{ formatTime(r.inDate) }}</strong> → Out: <strong>{{ r.outDate ? formatTime(r.outDate) : 'Not clocked out' }}</strong><span v-if="r.totalHours"> · <span class="navy-text font-weight-bold">{{ r.totalHours }} hrs</span></span></div>
+                      </div>
+                      <v-chip size="x-small" :color="r.status==='approved'?'#2e7d32':r.status==='rejected'?'#d32f2f':'#f57c00'" variant="tonal">{{ r.status }}</v-chip>
+                    </div>
+                  </template>
+                  <v-divider style="border-style:dashed;opacity:.4" />
+                  <div class="text-caption font-weight-bold text-grey-darken-2 mb-1">WEEK 2</div>
+                  <template v-for="day in buildWeekDays(period.start, 7)" :key="'ps2-'+day.date.getTime()">
+                    <div v-for="r in day.records" :key="r.id || r.clock_id" class="shift-card d-flex align-center pa-4">
+                      <div class="shift-icon-circle mr-4"><v-icon color="white" size="20">mdi-clock-outline</v-icon></div>
+                      <div style="flex:1">
+                        <div class="d-flex align-center ga-2 mb-1"><span class="entry-badge">Clock Entry</span></div>
+                        <div class="text-body-2 font-weight-bold navy-text mb-1">{{ day.date.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'}) }}</div>
+                        <div class="text-caption text-grey">In: <strong>{{ formatTime(r.inDate) }}</strong> → Out: <strong>{{ r.outDate ? formatTime(r.outDate) : 'Not clocked out' }}</strong><span v-if="r.totalHours"> · <span class="navy-text font-weight-bold">{{ r.totalHours }} hrs</span></span></div>
+                      </div>
+                      <v-chip size="x-small" :color="r.status==='approved'?'#2e7d32':r.status==='rejected'?'#d32f2f':'#f57c00'" variant="tonal">{{ r.status }}</v-chip>
+                    </div>
+                  </template>
                 </div>
-                <template v-for="(day, idx) in buildWeekDays(period.start, 0)" :key="'s1-'+period.start.getTime()+'-'+idx">
-                  <template v-if="day.records.length > 0">
-                    <div v-for="(r, ri) in day.records" :key="r.id || r.clock_id" class="day-row px-5 pt-3">
-                      <div class="d-flex align-center pb-3 ga-4">
-                        <div style="flex:0 0 150px">
-                          <template v-if="ri === 0">
-                            <div class="d-flex align-center ga-2">
-                              <div class="day-badge">{{ dayShort(day.date) }}</div>
-                              <div class="text-body-2">{{ day.date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }}</div>
-                            </div>
-                          </template>
-                        </div>
-                        <div style="flex:0 0 100px" class="text-body-2">{{ formatTime(r.inDate) }}</div>
-                        <div style="flex:0 0 110px" class="text-body-2" :class="!r.outDate ? 'text-grey' : ''">{{ r.outDate ? formatTime(r.outDate) : 'Not clocked out' }}</div>
-                        <div style="flex:1" class="text-body-2 font-weight-medium navy-text">{{ r.totalHours ? r.totalHours + ' hrs' : '—' }}</div>
-                      </div>
-                    </div>
-                  </template>
-                  <template v-else>
-                    <div class="day-row day-row--empty d-flex align-center px-5 py-3">
-                      <div style="flex:0 0 150px">
-                        <div class="d-flex align-center ga-2">
-                          <div class="day-badge">{{ dayShort(day.date) }}</div>
-                          <div class="text-body-2 text-grey">{{ day.date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }}</div>
-                        </div>
-                      </div>
-                      <div class="text-caption text-grey" style="flex:1">No shifts</div>
-                    </div>
-                  </template>
-                  <v-divider v-if="idx < 6" style="opacity:.35" />
-                </template>
-                <v-divider class="my-1" style="border-style:dashed;opacity:.4" />
-                <div class="px-5 pt-3 pb-1">
-                  <span class="text-caption font-weight-bold text-grey-darken-2">WEEK 2</span>
-                </div>
-                <template v-for="(day, idx) in buildWeekDays(period.start, 7)" :key="'s2-'+period.start.getTime()+'-'+idx">
-                  <template v-if="day.records.length > 0">
-                    <div v-for="(r, ri) in day.records" :key="r.id || r.clock_id" class="day-row px-5 pt-3">
-                      <div class="d-flex align-center pb-3 ga-4">
-                        <div style="flex:0 0 150px">
-                          <template v-if="ri === 0">
-                            <div class="d-flex align-center ga-2">
-                              <div class="day-badge">{{ dayShort(day.date) }}</div>
-                              <div class="text-body-2">{{ day.date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }}</div>
-                            </div>
-                          </template>
-                        </div>
-                        <div style="flex:0 0 100px" class="text-body-2">{{ formatTime(r.inDate) }}</div>
-                        <div style="flex:0 0 110px" class="text-body-2" :class="!r.outDate ? 'text-grey' : ''">{{ r.outDate ? formatTime(r.outDate) : 'Not clocked out' }}</div>
-                        <div style="flex:1" class="text-body-2 font-weight-medium navy-text">{{ r.totalHours ? r.totalHours + ' hrs' : '—' }}</div>
-                      </div>
-                    </div>
-                  </template>
-                  <template v-else>
-                    <div class="day-row day-row--empty d-flex align-center px-5 py-3">
-                      <div style="flex:0 0 150px">
-                        <div class="d-flex align-center ga-2">
-                          <div class="day-badge">{{ dayShort(day.date) }}</div>
-                          <div class="text-body-2 text-grey">{{ day.date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }}</div>
-                        </div>
-                      </div>
-                      <div class="text-caption text-grey" style="flex:1">No shifts</div>
-                    </div>
-                  </template>
-                  <v-divider v-if="idx < 6" style="opacity:.35" />
-                </template>
                 <v-divider />
                 <div class="d-flex align-center justify-space-between px-5 py-3" style="background:#f5f4ff">
                   <span class="text-body-2 font-weight-bold navy-text">Period Total</span>
@@ -745,5 +679,12 @@ const showSnackbar = (msg, color='success') => { snackMsg.value=msg; snackColor.
 .log-day-row { border-bottom: 1px solid #f0f0f0; }
 .log-day-row:last-child { border-bottom: none; }
 .log-day--today { background: #f5f4ff; }
-.rejection-note { margin-left: 46px; background: #fff3f3; border-left: 3px solid #ef9a9a; border-radius: 0 4px 4px 0; padding: 5px 10px; }
+.rejection-note { background: #fff3f3; border-left: 3px solid #ef9a9a; border-radius: 0 4px 4px 0; padding: 5px 10px; }
+.shift-card { background: white; border: 1px solid #e8e8f0; border-radius: 12px; }
+.shift-card:hover { background: #fafbff; }
+.rejected-card { border-color: #ffcdd2; background: #fff8f8; }
+.shift-icon-circle { width: 40px; height: 40px; border-radius: 10px; background: #12086F; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.shift-icon-circle--today { background: #4361EE; }
+.entry-badge { background: #ede9ff; color: #12086F; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+.today-pill { background: #12086F; color: white; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; }
 </style>
