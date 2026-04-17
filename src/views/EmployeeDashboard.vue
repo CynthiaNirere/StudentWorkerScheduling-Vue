@@ -17,38 +17,46 @@ const pendingTimeOff = ref([]);
 const pendingSwaps   = ref([]);
 
 // ── CLOCK STATE ───────────────────────────────────────────────────────────
-const currentTime      = ref('');
-const currentDate      = ref('');
-const activeClockRecord = ref(null);
-const clockLoading = ref(false);
-const clockedInAt = ref(null);
-const isWorkDevice = ref(false);
-const hoursRemaining = ref('');
-const minutesRemaining = ref(0);
+const currentTime     = ref('');
+const currentDate     = ref('');
+const shiftStatus     = ref('none'); // 'none' | 'upcoming' | 'active' | 'ended'
+const shiftElapsed    = ref('');
+const shiftWorkedHours = ref('');
+const shiftCountdown  = ref('');
 
 const updateTime = () => {
   const now = new Date();
   currentTime.value = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
   currentDate.value = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-  if (activeClockRecord.value && todayDay.value?.shifts?.length) {
+  if (todayDay.value?.shifts?.length) {
     const shift = todayDay.value.shifts[0];
-    const shiftEndMinutes = shift.endTime || shift.end_time;
-    if (shiftEndMinutes != null) {
-      const shiftDate = new Date(Number(shift.shiftTime || shift.shift_time));
-      const endMs = new Date(shiftDate.getFullYear(), shiftDate.getMonth(), shiftDate.getDate(),
-        Math.floor(shiftEndMinutes / 60), shiftEndMinutes % 60, 0).getTime();
-      const diffMs = endMs - now.getTime();
-      if (diffMs > 0) {
-        const h = Math.floor(diffMs / 3600000);
-        const m = Math.floor((diffMs % 3600000) / 60000);
-        hoursRemaining.value = h > 0 ? `${h}h ${m}m` : `${m}m`;
-        minutesRemaining.value = Math.floor(diffMs / 60000);
-      } else {
-        hoursRemaining.value = '0m';
-        minutesRemaining.value = 0;
-      }
+    const shiftDate = new Date(Number(shift.shiftTime || shift.shift_time));
+    const startMin = shift.startTime ?? shift.start_time ?? 0;
+    const endMin   = shift.endTime   ?? shift.end_time;
+    const startMs  = new Date(shiftDate.getFullYear(), shiftDate.getMonth(), shiftDate.getDate(), Math.floor(startMin / 60), startMin % 60, 0).getTime();
+    const endMs    = endMin != null ? new Date(shiftDate.getFullYear(), shiftDate.getMonth(), shiftDate.getDate(), Math.floor(endMin / 60), endMin % 60, 0).getTime() : null;
+    const nowMs    = now.getTime();
+    const pad      = n => String(n).padStart(2, '0');
+
+    if (nowMs < startMs) {
+      shiftStatus.value = 'upcoming';
+      const d = startMs - nowMs;
+      const h = Math.floor(d / 3600000), m = Math.floor((d % 3600000) / 60000);
+      shiftCountdown.value = h > 0 ? `${h}h ${m}m` : `${m}m`;
+    } else if (endMs && nowMs <= endMs) {
+      shiftStatus.value = 'active';
+      const d = nowMs - startMs;
+      shiftElapsed.value = `${pad(Math.floor(d/3600000))}:${pad(Math.floor((d%3600000)/60000))}:${pad(Math.floor((d%60000)/1000))}`;
+      shiftWorkedHours.value = (d / 3600000).toFixed(2);
+    } else if (endMs && nowMs > endMs) {
+      shiftStatus.value = 'ended';
+      const d = endMs - startMs;
+      shiftElapsed.value = `${pad(Math.floor(d/3600000))}:${pad(Math.floor((d%3600000)/60000))}:00`;
+      shiftWorkedHours.value = (d / 3600000).toFixed(2);
     }
+  } else {
+    shiftStatus.value = 'none';
   }
 };
 
@@ -121,17 +129,20 @@ const nextShift = computed(() => {
 });
 
 // ── DATA LOADING ──────────────────────────────────────────────────────────
+const completedTasks = ref(new Set());
+const completeTask = (task) => {
+  const id = task.tasklist_id || task.id;
+  const next = new Set(completedTasks.value);
+  if (next.has(id)) next.delete(id); else next.add(id);
+  completedTasks.value = next;
+};
+
 onMounted(async () => {
   user.value = Utils.getStore('user');
-  isWorkDevice.value = localStorage.getItem('isWorkDevice') === 'true';
   updateTime();
   setInterval(updateTime, 1000);
   await Promise.all([loadShifts(), loadTasks(), loadRequests()]);
   loading.value = false;
-  // Auto clock-in on work device if shift today and not already clocked in
-  if (isWorkDevice.value && !activeClockRecord.value && todayDay.value?.shifts?.length) {
-    await handleClockIn();
-  }
 });
 
 const loadShifts = async () => {
@@ -170,49 +181,6 @@ const loadRequests = async () => {
   } catch (err) { console.error('Requests error:', err); }
 };
 
-// ── CLOCK ACTIONS ─────────────────────────────────────────────────────────
-const handleClockIn = async () => {
-  const todayShifts = todayDay.value.shifts;
-  if (!todayShifts.length) {
-    snackMsg.value = 'No shifts scheduled for today';
-    snackColor.value = 'error';
-    snackbar.value = true;
-    return;
-  }
-  clockLoading.value = true;
-  try {
-    const shiftId = todayShifts[0].shift_id || todayShifts[0].id;
-    const res = await EmployeeService.clockIn({ shiftId });
-    activeClockRecord.value = res.data;
-    clockedInAt.value = new Date();
-    snackMsg.value = 'Clocked in successfully!';
-    snackColor.value = 'success';
-    snackbar.value = true;
-  } catch (err) {
-    snackMsg.value = err.response?.data?.message || 'Error clocking in';
-    snackColor.value = 'error';
-    snackbar.value = true;
-  } finally { clockLoading.value = false; }
-};
-
-const handleClockOut = async () => {
-  if (!activeClockRecord.value) return;
-  clockLoading.value = true;
-  try {
-    const id = activeClockRecord.value.id || activeClockRecord.value.clock_id;
-    await EmployeeService.clockOut(id);
-    activeClockRecord.value = null;
-    clockedInAt.value = null;
-    hoursRemaining.value = '';
-    snackMsg.value = 'Clocked out successfully!';
-    snackColor.value = 'success';
-    snackbar.value = true;
-  } catch (err) {
-    snackMsg.value = 'Error clocking out';
-    snackColor.value = 'error';
-    snackbar.value = true;
-  } finally { clockLoading.value = false; }
-};
 
 // ── HELPERS ───────────────────────────────────────────────────────────────
 const getSunday = (date) => {
@@ -270,77 +238,38 @@ const snackColor = ref('success');
 
                 <v-divider class="my-3" />
 
-                <!-- Next shift -->
-                <div v-if="nextShift" class="text-center mb-4 pa-3 rounded-lg" style="background:#f0f4ff;">
-                  <p class="text-caption text-grey mb-1">Next Shift</p>
-                  <p class="text-body-2 font-weight-bold navy-text mb-0">
-                    {{ nextShift.dateLabel }} · {{ formatTime(nextShift.shift.startTime || nextShift.shift.start_time) }}
-                  </p>
+                <!-- Shift status -->
+                <div v-if="shiftStatus === 'upcoming'" class="shift-status-card pa-3 rounded-lg text-center">
+                  <p class="text-caption text-grey mb-1">Shift starts in</p>
+                  <p class="text-h5 font-weight-bold navy-text mb-1">{{ shiftCountdown }}</p>
+                  <p class="text-caption text-grey">{{ formatTime(todayDay.shifts[0].startTime ?? todayDay.shifts[0].start_time) }} – {{ formatTime(todayDay.shifts[0].endTime ?? todayDay.shifts[0].end_time) }}</p>
                 </div>
 
-                <!-- Clock in/out -->
-                <v-alert
-                  v-if="!isWorkDevice"
-                  type="warning"
-                  variant="tonal"
-                  density="compact"
-                  class="mb-3"
-                >
-                  <v-icon start size="16">mdi-laptop-off</v-icon>
-                  Clock-in is only available on a registered work device.
-                </v-alert>
-                <v-btn
-                  v-if="!activeClockRecord"
-                  block color="#12086F" variant="flat" size="large"
-                  :loading="clockLoading"
-                  :disabled="!isWorkDevice"
-                  @click="handleClockIn"
-                >
-                  <v-icon start>mdi-login</v-icon>Clock In
-                </v-btn>
-                <div v-else>
-                  <!-- Clocked-in status card -->
-                  <div class="clocked-in-card pa-4 rounded-lg mb-3">
-                    <div class="d-flex align-center ga-2 mb-3">
-                      <v-icon color="#2e7d32" size="20">mdi-check-circle</v-icon>
-                      <span class="text-body-2 font-weight-bold" style="color:#2e7d32;">You are clocked in</span>
-                    </div>
-                    <div v-if="clockedInAt" class="info-row mb-2">
-                      <span class="text-caption text-grey">Clocked in at</span>
-                      <span class="text-body-2 font-weight-bold navy-text">
-                        {{ clockedInAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) }}
-                      </span>
-                    </div>
-                    <div v-if="todayDay.shifts.length" class="info-row mb-2">
-                      <span class="text-caption text-grey">Clock out at</span>
-                      <span class="text-body-2 font-weight-bold navy-text">
-                        {{ formatTime(todayDay.shifts[0].endTime || todayDay.shifts[0].end_time) }}
-                      </span>
-                    </div>
-                    <div v-if="hoursRemaining" class="info-row">
-                      <span class="text-caption text-grey">Time remaining</span>
-                      <v-chip
-                        size="small"
-                        :color="minutesRemaining <= 30 ? '#f57c00' : '#12086F'"
-                        variant="tonal"
-                        class="font-weight-bold"
-                      >
-                        {{ hoursRemaining }}
-                      </v-chip>
-                    </div>
+                <div v-else-if="shiftStatus === 'active'" class="shift-active-card pa-4 rounded-lg">
+                  <div class="d-flex align-center ga-2 mb-3">
+                    <v-icon color="#2e7d32" size="18">mdi-circle</v-icon>
+                    <span class="text-body-2 font-weight-bold" style="color:#2e7d32">Shift in progress</span>
                   </div>
-                  <v-btn block color="error" variant="flat" :loading="clockLoading" @click="handleClockOut">
-                    <v-icon start>mdi-logout</v-icon>Clock Out
-                  </v-btn>
+                  <p class="text-caption text-grey mb-1">Time worked</p>
+                  <p class="text-h5 font-weight-bold navy-text mb-1">{{ shiftElapsed }}</p>
+                  <p class="text-caption text-grey">{{ shiftWorkedHours }} hrs so far</p>
                 </div>
+
+                <div v-else-if="shiftStatus === 'ended'" class="shift-ended-card pa-4 rounded-lg text-center">
+                  <v-icon color="#2e7d32" size="28" class="mb-2">mdi-check-circle</v-icon>
+                  <p class="text-body-2 font-weight-bold mb-2" style="color:#2e7d32">Shift completed</p>
+                  <p class="text-caption text-grey mb-1">Total hours worked</p>
+                  <p class="text-h5 font-weight-bold navy-text">{{ shiftWorkedHours }} hrs</p>
+                </div>
+
+                <div v-else class="text-center pa-3 text-caption text-grey">No shift scheduled today</div>
               </v-card-text>
             </v-card>
 
             <!-- Tasks preview -->
             <v-card variant="outlined" rounded="lg" class="navy-card">
-              <v-card-title class="text-body-1 font-weight-bold pa-4 d-flex align-center justify-space-between navy-text">
-                <span><v-icon start size="18">mdi-checkbox-marked-circle-outline</v-icon>My Tasks</span>
-                <v-btn size="x-small" variant="tonal" color="#12086F" @click="router.push({ name: 'employeeTasks' })">View All</v-btn>
+              <v-card-title class="text-body-1 font-weight-bold pa-4 navy-text">
+                <v-icon start size="18">mdi-checkbox-marked-circle-outline</v-icon>My Tasks
               </v-card-title>
               <v-divider />
               <v-card-text class="pa-4">
@@ -348,18 +277,33 @@ const snackColor = ref('success');
                   <v-icon size="40" color="grey-lighten-2" class="mb-2">mdi-clipboard-check-outline</v-icon>
                   <p class="text-caption text-grey">No tasks assigned</p>
                 </div>
-                <div v-for="task in assignedTasks" :key="task.tasklist_id || task.id" class="task-row pa-2 mb-2 rounded">
-                  <div class="d-flex align-center ga-2">
-                    <v-icon size="16" :color="task.priority === 'urgent' ? 'error' : task.priority === 'high' ? 'warning' : '#12086F'">
-                      mdi-flag
-                    </v-icon>
-                    <span class="text-body-2 font-weight-medium">{{ task.title }}</span>
-                  </div>
+                <div
+                  v-for="task in assignedTasks"
+                  :key="task.tasklist_id || task.id"
+                  class="task-row pa-3 mb-2 rounded d-flex align-center ga-2"
+                  :class="{ 'task-row--done': completedTasks.has(task.tasklist_id || task.id) }"
+                >
+                  <v-checkbox
+                    density="compact"
+                    hide-details
+                    color="#12086F"
+                    :model-value="completedTasks.has(task.tasklist_id || task.id)"
+                    @update:model-value="completeTask(task)"
+                  />
+                  <v-icon size="14" :color="task.priority === 'urgent' ? 'error' : task.priority === 'high' ? 'warning' : '#12086F'">mdi-flag</v-icon>
+                  <span class="text-body-2 font-weight-medium task-title" :class="{ 'text-decoration-line-through text-grey': completedTasks.has(task.tasklist_id || task.id) }">
+                    {{ task.title }}
+                  </span>
+                  <v-spacer />
+                  <v-btn
+                    size="x-small"
+                    :color="completedTasks.has(task.tasklist_id || task.id) ? 'success' : '#12086F'"
+                    variant="tonal"
+                    @click="completeTask(task)"
+                  >
+                    {{ completedTasks.has(task.tasklist_id || task.id) ? 'Done' : 'Complete' }}
+                  </v-btn>
                 </div>
-                <v-btn v-if="assignedTasks.length > 0" block variant="tonal" color="#12086F" size="small" class="mt-2"
-                  @click="router.push({ name: 'employeeTasks' })">
-                  Go to Tasks
-                </v-btn>
               </v-card-text>
             </v-card>
           </v-col>
@@ -494,25 +438,25 @@ const snackColor = ref('success');
 .navy-text { color: #12086F !important; }
 .navy-card { border-color: #e0e0e0; box-shadow: 0 1px 3px rgba(18,8,111,0.05); }
 .clock-display { background: linear-gradient(135deg, #12086F 0%, #1c10a8 100%); }
-.timer-display { background: linear-gradient(135deg, #2e7d32 0%, #388e3c 100%); }
 
 .schedule-grid {
   display: grid;
-  gap: 4px;
-  background: #f5f5f5;
-  padding: 6px;
+  gap: 0;
+  border: 1px solid #e0e0e0;
   border-radius: 8px;
+  overflow: hidden;
 }
 .sched-header {
   background: linear-gradient(135deg, #12086F, #2B354F);
   color: white;
   padding: 8px 4px;
   text-align: center;
-  border-radius: 6px 6px 0 0;
+  border-right: 1px solid rgba(255,255,255,0.15);
   display: flex;
   flex-direction: column;
   align-items: center;
 }
+.sched-header:last-child { border-right: none; }
 .sched-header--today { background: linear-gradient(135deg, #4361EE, #5B73F0); }
 .day-label { font-size: 10px; font-weight: 700; opacity: 0.85; text-transform: uppercase; }
 .day-num { font-size: 18px; font-weight: 800; }
@@ -521,10 +465,13 @@ const snackColor = ref('success');
   background: white;
   min-height: 80px;
   padding: 6px;
-  border-radius: 0 0 6px 6px;
+  border-right: 1px solid #e8e8e8;
+  border-top: 1px solid #e8e8e8;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.03);
 }
+.sched-body:last-child { border-right: none; }
 .sched-body--today { background: #f0f4ff; }
-.no-shift-text { text-align: center; color: #9ca3af; font-size: 11px; padding: 12px 0; }
+.no-shift-text { text-align: center; color: #b0b0b0; font-size: 11px; padding: 18px 0; letter-spacing: .02em; }
 .shift-pill {
   background: linear-gradient(135deg, #e3f2fd, #bbdefb);
   border-left: 3px solid #4361EE;
@@ -535,18 +482,31 @@ const snackColor = ref('success');
 .shift-pill-time { font-size: 11px; font-weight: 700; color: #12086F; }
 .shift-pill-end { color: #666; }
 
-.task-row { background: #f9f9f9; border-left: 3px solid #12086F; }
+.task-row { background: #f5f6ff; border-left: 3px solid #12086F; }
+.task-row--done { opacity: .6; }
+.task-title { color: #1a1a2e; }
 .request-row { background: #fafafa; border: 1px solid #e0e0e0; cursor: pointer; transition: all 0.15s; }
 .request-row:hover { background: #f0f4ff; border-color: #12086F; }
 .cursor-pointer { cursor: pointer; }
 
-.clocked-in-card {
-  background: #f1faf3;
-  border: 1px solid #a5d6a7;
-}
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+.shift-status-card { background: #f0f4ff; border: 1px solid #c5cae9; }
+.shift-active-card { background: #f1faf3; border: 1px solid #a5d6a7; }
+.shift-ended-card  { background: #f1faf3; border: 1px solid #a5d6a7; }
+
+/* Dark mode overrides */
+.v-theme--dark .navy-text { color: #C5CAE9 !important; }
+.v-theme--dark .navy-card { border-color: #37474F !important; }
+.v-theme--dark .sched-body { background: #1E1E2E; border-color: #37474F; }
+.v-theme--dark .sched-body--today { background: #252540; }
+.v-theme--dark .sched-header { border-right-color: rgba(255,255,255,0.08); }
+.v-theme--dark .schedule-grid { border-color: #37474F; }
+.v-theme--dark .no-shift-text { color: #78909C; }
+.v-theme--dark .shift-pill { background: linear-gradient(135deg, #1a237e44, #1a237e66); border-left-color: #7B68EE; }
+.v-theme--dark .shift-pill-time { color: #C5CAE9; }
+.v-theme--dark .task-row { background: #2a2a3e; border-left-color: #7B68EE; }
+.v-theme--dark .task-title { color: #E8EAF6; }
+.v-theme--dark .request-row { background: #1E1E2E; border-color: #37474F; }
+.v-theme--dark .request-row:hover { background: #252540; }
+.v-theme--dark .shift-status-card { background: #1a1a3e; border-color: #3949AB; }
+.v-theme--dark .shift-active-card, .v-theme--dark .shift-ended-card { background: #1a2e1a; border-color: #2e7d32; }
 </style>
