@@ -52,6 +52,7 @@ const recordsWithDetails = computed(() =>
       status: r.status || 'pending',
       _clockInTime: clockIn,
       _clockOutTime: clockOut,
+      rejectionReason: r.rejectionReason || r.rejection_reason || r.reason || r.denial_reason || null,
     };
   })
 );
@@ -210,9 +211,9 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
           <div class="mb-3"><div class="text-caption text-grey">Total Hours</div><div class="text-h6 font-weight-bold navy-text">{{ selectedRecord.totalHours }}</div></div>
           <div v-if="selectedRecord.notes" class="mb-3"><div class="text-caption text-grey">Notes</div><div class="text-body-2">{{ selectedRecord.notes }}</div></div>
           <div class="mb-3"><div class="text-caption text-grey">Status</div><v-chip :color="statusColor(selectedRecord.status)" size="small" variant="tonal" class="mt-1">{{ statusLabel(selectedRecord.status) }}</v-chip></div>
-          <div v-if="selectedRecord.status === 'rejected' && (selectedRecord.rejectionReason || selectedRecord.rejection_reason)" class="pa-3 rejection-box">
+          <div v-if="selectedRecord.status === 'rejected' && selectedRecord.rejectionReason" class="pa-3 rejection-box">
             <div class="text-caption font-weight-bold mb-1" style="color:#b71c1c">Manager's Note:</div>
-            <div class="text-body-2" style="color:#b71c1c">{{ selectedRecord.rejectionReason || selectedRecord.rejection_reason }}</div>
+            <div class="text-body-2" style="color:#b71c1c">{{ selectedRecord.rejectionReason }}</div>
           </div>
         </v-card-text>
         <v-divider />

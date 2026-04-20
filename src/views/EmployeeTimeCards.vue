@@ -56,7 +56,7 @@ const recordsWithDetails = computed(() =>
     } else if (r.totalHoursWorked || r.total_hours_worked) {
       totalHours = parseFloat(r.totalHoursWorked || r.total_hours_worked).toFixed(2);
     }
-    const rejectionComment = r.rejectionReason || r.rejection_reason || r.rejectReason || null;
+    const rejectionComment = r.rejectionReason || r.rejection_reason || r.rejectReason || r.reason || null;
     return { ...r, inDate, outDate, totalHours, status: r.status || 'pending', rejectionComment };
   })
 );
