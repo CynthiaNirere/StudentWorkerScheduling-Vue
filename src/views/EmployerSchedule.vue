@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import Utils from "../config/utils";
 import EmployerService from "../services/employerServices.js";
@@ -241,6 +241,13 @@ const getBorderByRoleId = (id) => SHIFT_BORDER_COLORS[(id || 0) % 6];
 onMounted(async () => {
   user.value = Utils.getStore("user");
   await Promise.all([loadShifts(), loadEmployees(), loadAvailability(), loadJobRoles(), loadTaskLists(), loadTemplates()]);
+  window.addEventListener('mousemove', onDragMove);
+  window.addEventListener('mouseup',   onDragEnd);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('mousemove', onDragMove);
+  window.removeEventListener('mouseup',   onDragEnd);
 });
 
 const loadShifts = async () => {
@@ -335,6 +342,7 @@ const checkForOverlaps = (shiftData) => {
 
 const handleSaveShift = async () => {
   if (creatingShift.value) return;
+  if (step1Mode.value === 'role' && !shiftForm.value.jobRole) { showSnackbar("Please select a job role for this shift", "error"); return; }
   if (!shiftForm.value.allowEmpty && !shiftForm.value.userId) { showSnackbar("Please assign an employee or enable 'Create Empty Shift'", "error"); return; }
   if (!shiftForm.value.date) { showSnackbar("Please select a date", "error"); return; }
   const startMinutes = timeToMinutes(shiftForm.value.startHour, shiftForm.value.startMinute, shiftForm.value.startAmPm);
@@ -345,7 +353,7 @@ const handleSaveShift = async () => {
     shiftTime:  new Date(year, month - 1, day, 12, 0, 0, 0).getTime(),
     startTime:  startMinutes, endTime: endMinutes,
     userId:     shiftForm.value.allowEmpty ? null : shiftForm.value.userId,
-    jobRoleId:  shiftForm.value.jobRole,
+    jobRoleId:  shiftForm.value.jobRole || null,
     notes:      shiftForm.value.notes || "", status: 'draft',
     locationId: user.value?.work_location || 1,
     createdBy:  user.value?.user_id || user.value?.userId
@@ -453,6 +461,215 @@ const formatTime = (minutes) => { if (minutes === undefined || minutes === null)
 const getShiftColor       = (shift) => getColorByRoleId(shift.job_role_id || shift.jobRoleId || 0);
 const getShiftBorderColor = (shift) => getBorderByRoleId(shift.job_role_id || shift.jobRoleId || 0);
 const showSnackbar = (message, color = "success") => { snackbarMessage.value = message; snackbarColor.value = color; snackbar.value = true; };
+
+// ── GOOGLE CALENDAR TIME GRID ──────────────────────────────────────────────
+const GRID_START_HOUR = 5;   // 5 AM
+const GRID_END_HOUR   = 23;  // 11 PM
+const HOUR_HEIGHT_PX  = 60;  // px per hour (1 min = 1 px)
+
+const timeGridHours = computed(() => {
+  const hours = [];
+  for (let h = GRID_START_HOUR; h <= GRID_END_HOUR; h++) {
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12  = h % 12 || 12;
+    hours.push({ label: `${h12} ${ampm}`, minutes: h * 60 });
+  }
+  return hours;
+});
+
+// ── DRAG-TO-CREATE ───────────────────────────────────────────────────────
+const SNAP_MINUTES   = 15;
+const dragActive     = ref(false);
+const dragDayStr     = ref('');
+const dragStartMin   = ref(0);
+const dragCurrentMin = ref(0);
+const dayColRefs     = {};
+
+const minutesFromY = (dateStr, clientY) => {
+  const el = dayColRefs[dateStr];
+  if (!el) return GRID_START_HOUR * 60;
+  const rect   = el.getBoundingClientRect();
+  const relY   = Math.max(0, clientY - rect.top);
+  const rawMin = GRID_START_HOUR * 60 + (relY / HOUR_HEIGHT_PX) * 60;
+  return Math.max(
+    GRID_START_HOUR * 60,
+    Math.min(GRID_END_HOUR * 60, Math.round(rawMin / SNAP_MINUTES) * SNAP_MINUTES)
+  );
+};
+
+const onColMouseDown = (day, e) => {
+  if (e.target.closest('.gcal-shift') || e.target.closest('.gcal-add-shift')) return;
+  e.preventDefault();
+  dragActive.value     = true;
+  dragDayStr.value     = day.dateString;
+  dragStartMin.value   = minutesFromY(day.dateString, e.clientY);
+  dragCurrentMin.value = dragStartMin.value;
+};
+
+const onDragMove = (e) => {
+  if (!dragActive.value) return;
+  dragCurrentMin.value = minutesFromY(dragDayStr.value, e.clientY);
+};
+
+const onDragEnd = () => {
+  if (!dragActive.value) return;
+  dragActive.value = false;
+  let sMin = Math.min(dragStartMin.value, dragCurrentMin.value);
+  let eMin = Math.max(dragStartMin.value, dragCurrentMin.value);
+  if (eMin - sMin < SNAP_MINUTES) eMin = sMin + 60; // short tap → 1-hour default
+  eMin = Math.min(eMin, GRID_END_HOUR * 60);
+
+  const day = displayDays.value.find(d => d.dateString === dragDayStr.value);
+  dragDayStr.value = '';
+  if (!day) return;
+
+  const s  = minutesToTime(sMin);
+  const en = minutesToTime(eMin);
+  editMode.value = false; selectedShift.value = null;
+  shiftCreationStep.value = 1; showAllEmployees.value = false; step1Mode.value = 'all';
+  shiftForm.value = {
+    date: day.dateString,
+    startHour: s.hour, startMinute: s.minute, startAmPm: s.ampm,
+    endHour: en.hour, endMinute: en.minute, endAmPm: en.ampm,
+    userId: '', jobRole: '', notes: '', assignedTasks: [], allowEmpty: false,
+  };
+  showShiftDialog.value = true;
+};
+
+const dragGhostStyle = computed(() => {
+  if (!dragActive.value) return null;
+  const sMin = Math.min(dragStartMin.value, dragCurrentMin.value);
+  const eMin = Math.max(dragStartMin.value, dragCurrentMin.value);
+  const GRID_START = GRID_START_HOUR * 60;
+  const timeLabel = `${formatTime(sMin)} – ${formatTime(eMin)}`;
+  return {
+    position: 'absolute',
+    top:    `${(sMin - GRID_START) * (HOUR_HEIGHT_PX / 60)}px`,
+    height: `${Math.max((eMin - sMin) * (HOUR_HEIGHT_PX / 60), 4)}px`,
+    left: '2px', right: '2px',
+    background:   'rgba(67,97,238,0.18)',
+    border:       '2px solid #4361EE',
+    borderRadius: '5px',
+    zIndex: 6,
+    pointerEvents: 'none',
+    overflow: 'hidden',
+    '--drag-label': JSON.stringify(timeLabel),
+  };
+});
+
+const dragTimeLabel = computed(() => {
+  if (!dragActive.value) return '';
+  const sMin = Math.min(dragStartMin.value, dragCurrentMin.value);
+  const eMin = Math.max(dragStartMin.value, dragCurrentMin.value);
+  return `${formatTime(sMin)} – ${formatTime(eMin)}`;
+});
+
+// ── HOVER DETAIL CARD ────────────────────────────────────────────────────
+const hoveredShift = ref(null);
+const hoverRect    = ref(null);
+let   hoverTimer   = null;
+
+const showShiftHover = (e, shift) => {
+  clearTimeout(hoverTimer);
+  hoveredShift.value = shift;
+  hoverRect.value    = e.currentTarget.getBoundingClientRect();
+};
+const hideShiftHover = () => {
+  hoverTimer = setTimeout(() => { hoveredShift.value = null; }, 150);
+};
+const keepShiftHover = () => { clearTimeout(hoverTimer); };
+
+const getDuration = (shift) => {
+  const mins = (shift.end_time ?? shift.endTime ?? 0) - (shift.start_time ?? shift.startTime ?? 0);
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h && m ? `${h}h ${m}m` : h ? `${h}h` : `${m}m`;
+};
+
+const hoverCardStyle = computed(() => {
+  if (!hoverRect.value) return {};
+  const r     = hoverRect.value;
+  const vW    = window.innerWidth;
+  const vH    = window.innerHeight;
+  const cardW = 270;
+  const cardH = 290; // generous estimate — covers all content variants
+
+  // Horizontal: prefer right of shift, flip left when not enough room
+  const left = r.right + 14 + cardW <= vW ? r.right + 14 : r.left - cardW - 14;
+
+  // Vertical: center card on the shift's midpoint, then clamp to viewport
+  const shiftMid   = r.top + r.height / 2;
+  const idealTop   = shiftMid - cardH / 2;
+  const clampedTop = Math.max(8, Math.min(idealTop, vH - cardH - 8));
+
+  return {
+    position: 'fixed',
+    top:  clampedTop + 'px',
+    left: Math.max(8, left) + 'px',
+    zIndex: 3000,
+    width: cardW + 'px',
+  };
+});
+
+const getPositionedShifts = (dayShifts) => {
+  if (!dayShifts.length) return [];
+  const GRID_START = GRID_START_HOUR * 60;
+
+  // Step 1 — greedy column assignment (sort by start time)
+  const sorted = [...dayShifts].sort((a, b) =>
+    (a.start_time ?? a.startTime ?? 0) - (b.start_time ?? b.startTime ?? 0)
+  );
+  const columns = [];
+  const items = sorted.map(shift => {
+    const start = shift.start_time ?? shift.startTime ?? 0;
+    const end   = shift.end_time   ?? shift.endTime   ?? 0;
+    let col = columns.findIndex(colEnd => colEnd <= start);
+    if (col === -1) { col = columns.length; columns.push(end); }
+    else { columns[col] = end; }
+    return { shift, col, start, end };
+  });
+
+  // Step 2 — connected-component clustering via BFS
+  // Two shifts are connected if they overlap (directly or transitively).
+  // All shifts in the same cluster must share the same _totalCols so
+  // no visual collision occurs even through indirect chains (A-B-C).
+  const n = items.length;
+  const clusterOf = new Array(n).fill(-1);
+  const overlaps  = (i, j) => items[i].start < items[j].end && items[i].end > items[j].start;
+  let clusterId = 0;
+
+  for (let i = 0; i < n; i++) {
+    if (clusterOf[i] !== -1) continue;
+    const queue = [i];
+    clusterOf[i] = clusterId;
+    let qi = 0;
+    while (qi < queue.length) {
+      const cur = queue[qi++];
+      for (let j = 0; j < n; j++) {
+        if (clusterOf[j] === -1 && overlaps(cur, j)) {
+          clusterOf[j] = clusterId;
+          queue.push(j);
+        }
+      }
+    }
+    clusterId++;
+  }
+
+  // Step 3 — _totalCols per cluster = highest column index in cluster + 1
+  const clusterMaxCol = new Array(clusterId).fill(0);
+  items.forEach((item, i) => {
+    clusterMaxCol[clusterOf[i]] = Math.max(clusterMaxCol[clusterOf[i]], item.col + 1);
+  });
+
+  // Step 4 — build positioned shift objects
+  return items.map(({ shift, col, start, end }, i) => ({
+    ...shift,
+    _top:       Math.max(0, start - GRID_START) * (HOUR_HEIGHT_PX / 60),
+    _height:    Math.max((end - start) * (HOUR_HEIGHT_PX / 60), 28),
+    _col:       col,
+    _totalCols: clusterMaxCol[clusterOf[i]],
+  }));
+};
 </script>
 
 <template>
@@ -497,53 +714,127 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
       </div>
 
       <!-- Calendar card -->
-      <v-card variant="outlined" rounded="lg" class="navy-card">
+      <v-card variant="outlined" rounded="lg" class="navy-card overflow-hidden">
         <v-progress-linear v-if="loadingShifts" indeterminate color="#12086F" />
 
-        <!-- Scroll hint — only on week view -->
-        <div v-if="viewMode === 'week'" class="scroll-hint d-flex align-center ga-1 pa-2 pl-3">
-          <v-icon size="13" color="#9ca3af">mdi-gesture-swipe-horizontal</v-icon>
-          <span class="text-caption text-grey">Scroll sideways to see all days</span>
-        </div>
+        <!-- ── Google Calendar time grid (week / day) ── -->
+        <div v-if="viewMode !== 'month'" class="gcal-outer">
+          <div class="gcal-inner">
 
-        <!-- ↓ This wrapper enables horizontal scroll ↓ -->
-        <div class="calendar-scroll-wrapper">
-          <div
-            class="calendar-grid"
-            :style="{
-              gridTemplateColumns: viewMode === 'week'
-                ? 'repeat(7, minmax(160px, 1fr))'
-                : viewMode === 'day' ? '1fr' : 'repeat(7, 1fr)',
-              minHeight: viewMode === 'month' ? 'auto' : '600px'
-            }"
-          >
-            <!-- Column headers (week/day only) -->
-            <template v-if="viewMode !== 'month'">
-              <div
-                v-for="day in displayDays"
-                :key="'header-' + day.dateString"
-                class="calendar-header"
-                :class="{ 'today-header': day.isToday }"
-              >
-                <div class="day-name">{{ viewMode === 'day' ? day.dayName : day.dayShort }}</div>
-                <div class="day-date">
-                  <span class="date-number">{{ day.dayOfMonth }}</span>
-                  <span class="date-month">{{ day.month }}</span>
+            <!-- Sticky day-header row -->
+            <div class="gcal-header-row">
+              <div class="gcal-gutter-corner"></div>
+              <div class="gcal-days-header">
+                <div
+                  v-for="day in displayDays"
+                  :key="'gh-' + day.dateString"
+                  class="gcal-day-header"
+                  :class="{ 'gcal-day-header--today': day.isToday }"
+                >
+                  <div class="gcal-day-name">{{ viewMode === 'day' ? day.dayName : day.dayShort }}</div>
+                  <div class="gcal-day-num-wrap">
+                    <span class="gcal-day-num" :class="{ 'gcal-day-num--today': day.isToday }">{{ day.dayOfMonth }}</span>
+                    <span class="gcal-day-month">{{ day.month }}</span>
+                  </div>
                 </div>
               </div>
-            </template>
+            </div>
 
-            <!-- Day cells -->
+            <!-- Body: time gutter + scrollable day columns -->
+            <div class="gcal-body-row">
+              <!-- Hour labels -->
+              <div class="gcal-gutter">
+                <div v-for="hour in timeGridHours" :key="hour.minutes" class="gcal-hour-label">
+                  {{ hour.label }}
+                </div>
+              </div>
+
+              <!-- Day columns -->
+              <div class="gcal-days-area">
+                <div
+                  v-for="day in displayDays"
+                  :key="'gc-' + day.dateString"
+                  :ref="el => { if (el) dayColRefs[day.dateString] = el }"
+                  class="gcal-day-col"
+                  :class="{
+                    'gcal-day-col--today':    day.isToday,
+                    'gcal-day-col--dragging': dragActive && dragDayStr === day.dateString,
+                  }"
+                  @mousedown.prevent="onColMouseDown(day, $event)"
+                >
+                  <!-- Hour rows: grid lines (hover highlight) -->
+                  <div
+                    v-for="hour in timeGridHours"
+                    :key="'hr-' + hour.minutes"
+                    class="gcal-hour-row"
+                  ></div>
+
+                  <!-- Drag ghost preview -->
+                  <div
+                    v-if="dragActive && dragDayStr === day.dateString"
+                    class="gcal-drag-ghost"
+                    :style="dragGhostStyle"
+                  >
+                    <span class="gcal-drag-label">{{ dragTimeLabel }}</span>
+                  </div>
+
+                  <!-- Absolutely-positioned shift blocks -->
+                  <div
+                    v-for="shift in getPositionedShifts(day.shifts)"
+                    :key="shift.shift_id || shift.id"
+                    class="gcal-shift"
+                    :style="{
+                      top:             shift._top + 'px',
+                      height:          shift._height + 'px',
+                      left:            `calc(${shift._col} / ${shift._totalCols} * 100% + 2px)`,
+                      width:           `calc(100% / ${shift._totalCols} - 4px)`,
+                      backgroundColor: getShiftColor(shift),
+                      borderLeftColor: getShiftBorderColor(shift),
+                    }"
+                    @click.stop="openEditShift(shift)"
+                    @mouseenter="showShiftHover($event, shift)"
+                    @mouseleave="hideShiftHover"
+                  >
+                    <div class="gcal-shift-time">
+                      {{ formatTime(shift.start_time ?? shift.startTime) }} – {{ formatTime(shift.end_time ?? shift.endTime) }}
+                    </div>
+                    <div class="gcal-shift-employee" :class="{ 'gcal-shift-unassigned': getEmployeeName(shift) === 'Unassigned' }">
+                      {{ getEmployeeName(shift) }}
+                    </div>
+                    <div class="gcal-shift-role">{{ getJobRoleName(shift) }}</div>
+                    <div v-if="shift.status === 'draft'" class="gcal-shift-draft">Draft</div>
+                    <div class="gcal-shift-actions">
+                      <button class="gcal-action-btn gcal-action-edit" @click.stop="openEditShift(shift)">
+                        <v-icon size="12">mdi-pencil</v-icon>
+                      </button>
+                      <button class="gcal-action-btn gcal-action-delete" @click.stop="openDeleteDialog(shift)">
+                        <v-icon size="12">mdi-delete</v-icon>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Hover "+" to add shift -->
+                  <div class="gcal-add-shift" @click.stop="openCreateShiftForDay(day)">
+                    <v-icon size="16" color="#12086F">mdi-plus</v-icon>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+        <!-- end Google Calendar grid -->
+
+        <!-- ── Month view (compact card grid, unchanged) ── -->
+        <div v-else class="calendar-scroll-wrapper">
+          <div class="calendar-grid" style="grid-template-columns: repeat(7, 1fr);">
             <div
               v-for="day in displayDays"
               :key="'day-' + day.dateString"
-              class="calendar-day"
-              :class="{ 'today-cell': day.isToday, 'calendar-day--month': viewMode === 'month' }"
+              class="calendar-day calendar-day--month"
+              :class="{ 'today-cell': day.isToday }"
             >
-              <div v-if="viewMode === 'month'" class="month-date-num" :class="{ 'today-num': day.isToday }">
-                {{ day.dayOfMonth }}
-              </div>
-
+              <div class="month-date-num" :class="{ 'today-num': day.isToday }">{{ day.dayOfMonth }}</div>
               <div class="shifts-container">
                 <div v-for="(group, gi) in groupShiftsByTime(day.shifts)" :key="'group-' + gi" class="shift-time-group">
                   <div
@@ -560,7 +851,6 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
                     <div class="shift-employee" :class="{ 'shift-unassigned': getEmployeeName(shift) === 'Unassigned' }">
                       {{ getEmployeeName(shift) }}
                     </div>
-                    <div v-if="viewMode !== 'month'" class="shift-role">{{ getJobRoleName(shift) }}</div>
                     <div v-if="shift.status === 'draft'" class="shift-draft-badge">Draft</div>
                     <div class="shift-actions">
                       <v-tooltip text="Edit shift" location="top">
@@ -580,17 +870,14 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
                     </div>
                   </div>
                 </div>
-
                 <div class="add-shift-area" @click="openCreateShiftForDay(day)">
                   <v-icon size="14" color="#12086F">mdi-plus</v-icon>
-                  <span class="add-shift-text">{{ viewMode === 'month' ? '' : 'Add Shift' }}</span>
                 </div>
               </div>
             </div>
-
           </div>
         </div>
-        <!-- end scroll wrapper -->
+
       </v-card>
 
       <!-- Color Legend -->
@@ -843,6 +1130,55 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
     </v-dialog>
 
     <v-snackbar v-model="snackbar" :color="snackbarColor" timeout="3000" location="bottom right">{{ snackbarMessage }}</v-snackbar>
+
+    <!-- ── Shift hover detail card ── -->
+    <teleport to="body">
+      <v-card
+        v-if="hoveredShift"
+        :style="hoverCardStyle"
+        rounded="lg"
+        elevation="10"
+        class="shift-hover-card"
+        @mouseenter="keepShiftHover"
+        @mouseleave="hoveredShift = null"
+      >
+        <div class="shift-hover-accent" :style="{ background: getShiftBorderColor(hoveredShift) }"></div>
+        <v-card-text class="pa-3">
+          <div class="d-flex align-center justify-space-between mb-2">
+            <span class="text-subtitle-2 font-weight-bold navy-text">
+              {{ formatTime(hoveredShift.start_time ?? hoveredShift.startTime) }} – {{ formatTime(hoveredShift.end_time ?? hoveredShift.endTime) }}
+            </span>
+            <span class="text-caption text-grey">({{ getDuration(hoveredShift) }})</span>
+          </div>
+          <div class="d-flex align-center ga-1 mb-1">
+            <v-icon size="14" color="#6b7280">mdi-account</v-icon>
+            <span class="text-body-2">{{ getEmployeeName(hoveredShift) }}</span>
+          </div>
+          <div class="d-flex align-center ga-1 mb-1">
+            <v-icon size="14" color="#6b7280">mdi-briefcase-outline</v-icon>
+            <span class="text-body-2">{{ getJobRoleName(hoveredShift) }}</span>
+          </div>
+          <div v-if="hoveredShift.notes" class="d-flex align-center ga-1 mb-1">
+            <v-icon size="14" color="#6b7280">mdi-note-text-outline</v-icon>
+            <span class="text-caption text-grey">{{ hoveredShift.notes }}</span>
+          </div>
+          <v-chip
+            size="x-small"
+            :color="hoveredShift.status === 'published' ? '#2e7d32' : '#f57c00'"
+            variant="tonal"
+            class="mt-2"
+          >{{ hoveredShift.status }}</v-chip>
+        </v-card-text>
+        <v-divider />
+        <v-card-actions class="pa-2">
+          <v-btn size="x-small" variant="text" color="#4361EE" prepend-icon="mdi-pencil"
+            @click="openEditShift(hoveredShift); hoveredShift = null">Edit</v-btn>
+          <v-spacer />
+          <v-btn size="x-small" variant="text" color="error" prepend-icon="mdi-delete"
+            @click="openDeleteDialog(hoveredShift); hoveredShift = null">Delete</v-btn>
+        </v-card-actions>
+      </v-card>
+    </teleport>
   </EmployerLayout>
 </template>
 
@@ -933,4 +1269,212 @@ const showSnackbar = (message, color = "success") => { snackbarMessage.value = m
 .v-theme--dark .legend-label { color: #e0e0e0; }
 .v-theme--dark .scroll-hint { background: #1e1e2e; border-color: #333; }
 .v-theme--dark .calendar-scroll-wrapper { scrollbar-color: #333 transparent; }
+
+/* ── Google Calendar time-grid ─────────────────────────────────────────────── */
+.gcal-outer {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 720px;
+  scrollbar-width: thin;
+  scrollbar-color: #c7d2fe transparent;
+}
+.gcal-outer::-webkit-scrollbar { width: 6px; height: 6px; }
+.gcal-outer::-webkit-scrollbar-thumb { background: #c7d2fe; border-radius: 3px; }
+
+.gcal-inner {
+  display: flex;
+  flex-direction: column;
+  min-width: 700px;
+}
+
+/* ── Sticky header row ── */
+.gcal-header-row {
+  display: flex;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+}
+.gcal-gutter-corner {
+  width: 56px;
+  min-width: 56px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #12086F 0%, #2B354F 100%);
+}
+.gcal-days-header { display: flex; flex: 1; }
+.gcal-day-header {
+  flex: 1;
+  min-width: 100px;
+  background: linear-gradient(135deg, #12086F 0%, #2B354F 100%);
+  color: white;
+  text-align: center;
+  padding: 8px 4px 10px;
+  border-right: 1px solid rgba(255,255,255,0.08);
+}
+.gcal-day-header:last-child { border-right: none; }
+.gcal-day-header--today { background: linear-gradient(135deg, #4361EE 0%, #5B73F0 100%); }
+.gcal-day-name { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; opacity: 0.85; margin-bottom: 4px; }
+.gcal-day-num-wrap { display: flex; align-items: center; justify-content: center; gap: 4px; }
+.gcal-day-num { font-size: 22px; font-weight: bold; line-height: 1; }
+.gcal-day-num--today {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: white; color: #4361EE; font-size: 17px;
+}
+.gcal-day-month { font-size: 10px; opacity: 0.75; }
+
+/* ── Body row (gutter + day columns) ── */
+.gcal-body-row { display: flex; }
+
+.gcal-gutter {
+  width: 56px;
+  min-width: 56px;
+  flex-shrink: 0;
+  background: #fafafa;
+  border-right: 1px solid #e5e7eb;
+}
+.gcal-hour-label {
+  height: 60px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 3px 8px 0 0;
+  font-size: 10px;
+  color: #9ca3af;
+  font-weight: 500;
+  border-bottom: 1px solid #f3f4f6;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+/* ── Day columns ── */
+.gcal-days-area { display: flex; flex: 1; }
+.gcal-day-col {
+  flex: 1;
+  min-width: 100px;
+  position: relative;
+  border-right: 1px solid #e5e7eb;
+}
+.gcal-day-col:last-child { border-right: none; }
+.gcal-day-col--today { background: #f8f9ff; }
+
+.gcal-hour-row {
+  height: 60px;
+  border-bottom: 1px solid #f0f0f2;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: background 0.1s;
+}
+.gcal-hour-row:hover { background: rgba(18,8,111,0.03); }
+
+/* ── Shift blocks ── */
+.gcal-shift {
+  position: absolute;
+  border-left: 3px solid #4361EE;
+  border-radius: 5px;
+  padding: 3px 6px 3px 5px;
+  overflow: hidden;
+  cursor: pointer;
+  z-index: 3;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.10);
+  transition: box-shadow 0.15s, z-index 0s;
+}
+.gcal-shift:hover {
+  box-shadow: 0 4px 14px rgba(18,8,111,0.22);
+  z-index: 8;
+}
+.gcal-shift-time {
+  font-size: 10px; font-weight: 700; color: #12086F;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4;
+}
+.gcal-shift-employee {
+  font-size: 11px; color: #1f2937;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;
+  font-weight: 500;
+}
+.gcal-shift-unassigned { color: #f57c00; font-style: italic; }
+.gcal-shift-role {
+  font-size: 10px; color: #6b7280;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2;
+}
+.gcal-shift-draft {
+  display: inline-block; font-size: 8px; font-weight: 700;
+  background: rgba(245,124,0,0.14); color: #b45309;
+  border-radius: 2px; padding: 0 3px; text-transform: uppercase; letter-spacing: 0.3px;
+  margin-top: 2px;
+}
+
+/* Edit/Delete buttons — shown on hover */
+.gcal-shift-actions {
+  position: absolute; top: 2px; right: 2px;
+  display: none; gap: 1px;
+  background: rgba(255,255,255,0.82);
+  border-radius: 3px; padding: 1px;
+}
+.gcal-shift:hover .gcal-shift-actions { display: flex; }
+.gcal-action-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border: none; border-radius: 3px;
+  cursor: pointer; background: transparent; transition: background 0.1s;
+}
+.gcal-action-edit  { color: #4361EE; }
+.gcal-action-edit:hover  { background: rgba(67,97,238,0.15); }
+.gcal-action-delete { color: #d32f2f; }
+.gcal-action-delete:hover { background: rgba(211,47,47,0.15); }
+
+/* ── Drag-to-create ── */
+.gcal-day-col { cursor: crosshair; }
+.gcal-day-col--dragging { cursor: ns-resize !important; user-select: none; }
+.gcal-shift { cursor: pointer; }
+.gcal-drag-ghost {
+  pointer-events: none;
+  display: flex;
+  align-items: flex-start;
+  padding: 3px 5px;
+}
+.gcal-drag-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #4361EE;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Hover "+" button per column */
+.gcal-add-shift {
+  position: absolute; bottom: 10px; right: 8px;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(18,8,111,0.09);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; opacity: 0; transition: opacity 0.2s; z-index: 4;
+}
+.gcal-day-col:hover .gcal-add-shift { opacity: 1; }
+
+/* ── Shift hover detail card ── */
+.shift-hover-card {
+  pointer-events: auto;
+  animation: hover-card-in 0.12s ease-out;
+}
+@keyframes hover-card-in {
+  from { opacity: 0; transform: translateX(-6px) scale(0.97); }
+  to   { opacity: 1; transform: translateX(0)   scale(1);    }
+}
+.shift-hover-accent {
+  height: 5px;
+  border-radius: 8px 8px 0 0;
+}
+
+/* Dark mode — gcal */
+.v-theme--dark .gcal-gutter { background: #1e1e2e; border-color: #333; }
+.v-theme--dark .gcal-hour-label { color: #6b7280; border-color: #2a2a3e; }
+.v-theme--dark .gcal-day-col { border-color: #333; }
+.v-theme--dark .gcal-day-col--today { background: #1a1f3a; }
+.v-theme--dark .gcal-hour-row { border-color: #2a2a3e; }
+.v-theme--dark .gcal-shift { box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+.v-theme--dark .gcal-shift-time { color: #a8b4ff; }
+.v-theme--dark .gcal-shift-employee { color: #e0e0e0; }
+.v-theme--dark .gcal-shift-role { color: #9ca3af; }
+.v-theme--dark .gcal-shift-actions { background: rgba(30,30,46,0.85); }
+.v-theme--dark .gcal-outer { scrollbar-color: #333 transparent; }
 </style>
