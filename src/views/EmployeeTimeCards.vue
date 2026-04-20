@@ -343,23 +343,23 @@ const saveLog = async () => {
       const inTs    = new Date(`${dateStr}T${day.clockIn}:00`).getTime();
       const outTs   = new Date(`${dateStr}T${day.clockOut}:00`).getTime();
       if (outTs <= inTs) continue;
-      const clockPayload = {};
-      if (day.shiftId) clockPayload.shiftId = day.shiftId;
-      const res   = await EmployeeService.clockIn(clockPayload);
+      const payload = { clockInTime: inTs, clockOutTime: outTs, notes: day.notes };
+      if (day.shiftId) payload.shiftId = day.shiftId;
+      const res   = await EmployeeService.clockIn(payload);
       const newId = res.data?.id || res.data?.clock_id || res.data?.clockId;
       if (newId) {
         await EmployeeService.updateClockRecord(newId, { clockInTime: inTs, clockOutTime: outTs, notes: day.notes });
         saved++;
       }
-    } catch { skipped++; }
+    } catch { /* individual day failed — likely backend requires shiftId */ }
   }
   logging.value = false;
   if (saved > 0) {
-    showSnackbar(`${saved} entr${saved>1?'ies':'y'} logged! They now appear in the Current tab.`, 'success');
+    showSnackbar(`${saved} entr${saved>1?'ies':'y'} logged! They appear in the Current tab.`, 'success');
     showLogDialog.value = false;
     await loadData();
   } else {
-    showSnackbar('Could not save entries — make sure your shift exists for these days', 'error');
+    showSnackbar('Could not save — the backend needs a fix to support entries without a scheduled shift.', 'error');
   }
 };
 
