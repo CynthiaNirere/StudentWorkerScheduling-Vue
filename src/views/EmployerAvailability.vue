@@ -17,7 +17,6 @@ const showScheduleModal = ref(false);
 const selectedUserId = ref('');
 const selectedUserName = ref('');
 
-const snackbar = ref(false);
 const snackbar        = ref(false);
 const snackbarMessage = ref("");
 const snackbarColor   = ref("success");
@@ -350,7 +349,7 @@ const handleDelete = async () => {
               chips
               closable-chips
             >
-              <template #item="{ item, props }">
+              <template #item="{ props }">
                 <v-list-item v-bind="props">
                   <template #prepend="{ isSelected }">
                     <v-checkbox-btn :model-value="isSelected" color="#12086F" />

@@ -17,6 +17,8 @@ export default {
     return apiClient.put(`/users/${userId}/email-notifications`, {
       emailNotifications: enabled
     });
+  },
+
   updateCertifications(userId, certifications) {
     return apiClient.patch(`/users/${userId}/certifications`, { certifications });
   },
