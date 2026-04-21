@@ -32,20 +32,24 @@ export function useNotifications() {
       const notifs = Array.isArray(notifRes.data) ? notifRes.data : [];
 
       notifs.forEach(n => {
+        const msgText = n.description || n.message || n.title || '';
+        const isTimecard = (n.type || '').toLowerCase() === 'timecard';
+        const isApproved = msgText.toLowerCase().includes('approved');
+        const isDenied   = msgText.toLowerCase().includes('denied') || msgText.toLowerCase().includes('rejected');
         items.push({
           id: `notif-${n.notification_id || n.id}`,
           rawId: n.notification_id || n.id,
-          type: 'notification',
-          category: n.type || 'System',
-          title: n.title,
-          message: n.description || n.title,
-          icon: iconForType(n.type),
-          color: '#4361EE',
+          type: isTimecard ? 'timecard' : 'notification',
+          category: isTimecard ? 'Time Card' : (n.type || 'System'),
+          title: n.title || (isApproved ? 'Timecard Approved' : isDenied ? 'Timecard Denied' : 'Timecard Update'),
+          message: msgText,
+          icon: iconForType(n.type, msgText),
+          color: isTimecard ? (isApproved ? '#2e7d32' : isDenied ? '#d32f2f' : '#1565C0') : '#4361EE',
           timestamp: formatTimestamp(n.createdAt || n.created_at),
           read: !!n.isRead || !!n.is_read,
           urgent: n.type === 'urgent',
-          route: null,
-          action: 'View',
+          route: isTimecard ? 'employeeTimeCards' : null,
+          action: isTimecard ? 'View Timecards' : 'View',
         });
       });
     } catch (err) {
@@ -166,9 +170,14 @@ export function useNotifications() {
     }
   };
 
-  const iconForType = (type) => {
+  const iconForType = (type, msgText = '') => {
     if (!type) return 'mdi-bell';
     const t = type.toLowerCase();
+    if (t === 'timecard' || t.includes('timecard')) {
+      if (msgText.toLowerCase().includes('approved')) return 'mdi-check-circle';
+      if (msgText.toLowerCase().includes('denied') || msgText.toLowerCase().includes('rejected')) return 'mdi-close-circle';
+      return 'mdi-credit-card-clock-outline';
+    }
     if (t.includes('swap')) return 'mdi-swap-horizontal';
     if (t.includes('schedule')) return 'mdi-calendar-check';
     if (t.includes('time') || t.includes('off')) return 'mdi-calendar-remove';
