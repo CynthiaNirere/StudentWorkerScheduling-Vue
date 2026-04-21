@@ -1,237 +1,115 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import EmployerLayout from '../components/EmployerLayout.vue';
-import EmployerService from '../services/employerServices.js';
 
 const router = useRouter();
-const templates = ref([]);
-const loading = ref(false);
 
-const DEMO_USER = {
-  userId: 'demo-employer',
-  user_id: 'demo-employer',
-  email: 'demo@shiftboard.com',
-  fName: 'Demo',
-  lName: 'Manager',
-  role: 'employer',
-  work_location: null,
-  token: 'demo-token'
-};
-
-onMounted(async () => {
-  const isGuest = localStorage.getItem('isGuest');
-  if (!isGuest) {
-    router.push({ name: 'landing' });
-    return;
-  }
-  
-  localStorage.setItem('user', JSON.stringify(DEMO_USER));
-  await loadTemplates();
-});
-
-const loadTemplates = async () => {
-  loading.value = true;
-  try {
-    const res = await EmployerService.getAllTemplates();
-    const allTemplates = Array.isArray(res.data) ? res.data : [];
-    templates.value = allTemplates;
-  } catch (err) {
-    console.error('Error loading templates:', err);
-  } finally {
-    loading.value = false;
-  }
-};
-
-const formatDate = (timestamp) => {
-  if (!timestamp) return '';
-  const date = new Date(Number(timestamp));
-  return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
-};
-
-const goToSchedule = () => {
-  router.push({ name: 'guestSchedule' });
-};
+// ── HARDCODED DEMO TEMPLATES ──────────────────────────────────────────────
+const templates = ref([
+  {
+    id: 1,
+    name: 'Standard Week',
+    description: 'Typical 5-day schedule with opening and closing shifts for a full team.',
+    shiftCount: 14,
+    createdAt: 'Jan 15, 2026',
+  },
+  {
+    id: 2,
+    name: 'Weekend Heavy',
+    description: 'Extra staffing on Friday evening through Sunday for peak hours.',
+    shiftCount: 10,
+    createdAt: 'Feb 3, 2026',
+  },
+  {
+    id: 3,
+    name: 'Minimal Crew',
+    description: 'Skeleton schedule for slow weeks — holidays or low-traffic periods.',
+    shiftCount: 6,
+    createdAt: 'Mar 20, 2026',
+  },
+]);
 </script>
 
 <template>
   <EmployerLayout :isGuest="true">
     <v-container fluid class="pa-6">
-      <!-- Header -->
-      <div class="d-flex align-center justify-space-between mb-6">
+
+      <!-- Guest Banner -->
+      <v-alert type="info" variant="tonal" class="mb-5" density="compact">
+        <v-icon start>mdi-eye-outline</v-icon>
+        <strong>Guest Preview</strong> — Read-only demo. Applying or creating templates is disabled.
+      </v-alert>
+
+      <div class="d-flex align-center justify-space-between mb-5">
         <div>
           <h1 class="text-h4 font-weight-bold navy-text">Schedule Templates</h1>
-          <p class="text-body-2 text-grey">
-            Manage and apply reusable weekly schedule templates
-          </p>
+          <p class="text-body-2 text-grey">Manage and apply reusable weekly schedule templates</p>
         </div>
-        <v-btn
-          color="#12086F"
-          variant="flat"
-          prepend-icon="mdi-arrow-left"
-          @click="goToSchedule"
-        >
+        <v-btn color="#12086F" variant="flat" prepend-icon="mdi-arrow-left"
+          @click="router.push({ name: 'guestSchedule' })">
           Back to Schedule
         </v-btn>
       </div>
 
-      <!-- Loading State -->
-      <div v-if="loading" class="text-center py-12">
-        <v-progress-circular indeterminate color="#12086F" size="48" />
-      </div>
-
-      <!-- Templates Grid (if templates exist) -->
-      <v-row v-else-if="templates.length > 0">
-        <v-col 
-          v-for="template in templates" 
-          :key="template.template_id || template.id"
-          cols="12" 
-          md="6" 
-          lg="4"
-        >
-          <v-card variant="outlined" rounded="lg" class="template-card">
-            <v-card-title class="d-flex align-center justify-space-between pa-4">
-              <div class="text-h6 font-weight-bold navy-text">
-                {{ template.name || template.title }}
-              </div>
-              <v-menu>
-                <template #activator="{ props }">
-                  <v-btn
-                    icon="mdi-dots-vertical"
-                    size="small"
-                    variant="plain"
-                    v-bind="props"
-                    disabled
-                  />
-                </template>
-              </v-menu>
-            </v-card-title>
-
-            <v-divider />
-
-            <v-card-text class="pa-4">
-              <p class="text-body-2 text-grey mb-4">
-                {{ template.description || 'No description provided' }}
-              </p>
-
-              <div class="d-flex align-center ga-2 mb-3">
-                <v-icon size="18" color="#4361EE">mdi-calendar-clock</v-icon>
-                <span class="text-caption font-weight-medium">
-                  {{ template.shift_count || 0 }} shifts
-                </span>
-              </div>
-
-              <div class="d-flex align-center ga-2">
-                <v-icon size="18" color="#9e9e9e">mdi-calendar</v-icon>
-                <span class="text-caption text-grey">
-                  Created {{ formatDate(template.created_at || template.createdAt) }}
-                </span>
-              </div>
-            </v-card-text>
-
-            <v-divider />
-
-            <v-card-actions class="pa-4">
-              <v-btn
-                color="#9c27b0"
-                variant="tonal"
-                block
-                prepend-icon="mdi-calendar-check"
-                disabled
-              >
-                Apply Template
-              </v-btn>
-            </v-card-actions>
-          </v-card>
-        </v-col>
-      </v-row>
-
-      <!-- Empty State (matches design) -->
-      <v-card v-else variant="outlined" rounded="lg" class="empty-state-card">
-        <v-card-text class="pa-12 text-center">
-          <v-icon size="100" color="#BDBDBD" class="mb-6">
-            mdi-file-document-outline
-          </v-icon>
-          
-          <h3 class="text-h6 font-weight-regular text-grey mb-3">
-            No templates yet
-          </h3>
-          
-          <p class="text-body-2 text-grey mb-6">
-            Create a schedule and save it as a template to reuse it later
-          </p>
-
-          <v-btn
-            color="#12086F"
-            variant="outlined"
-            @click="goToSchedule"
-            disabled
-          >
-            Go to Schedule
-          </v-btn>
+      <v-card variant="outlined" rounded="lg" class="navy-card">
+        <v-card-text class="pa-4">
+          <v-row>
+            <v-col v-for="template in templates" :key="template.id" cols="12" md="6" lg="4">
+              <v-card variant="outlined" rounded="lg" class="template-card" hover>
+                <v-card-title class="d-flex align-center justify-space-between pa-4 pb-3">
+                  <div class="text-body-1 font-weight-bold navy-text">{{ template.name }}</div>
+                  <v-btn icon="mdi-dots-vertical" size="small" variant="plain" disabled />
+                </v-card-title>
+                <v-divider />
+                <v-card-text class="pa-4">
+                  <div class="text-body-2 mb-3">{{ template.description }}</div>
+                  <div class="d-flex flex-wrap ga-2 mb-3">
+                    <v-chip size="small" color="#4361EE" variant="tonal">
+                      <v-icon start size="small">mdi-calendar-clock</v-icon>
+                      {{ template.shiftCount }} shifts
+                    </v-chip>
+                    <v-chip size="small" color="#9e9e9e" variant="tonal">
+                      <v-icon start size="small">mdi-clock-outline</v-icon>
+                      {{ template.createdAt }}
+                    </v-chip>
+                  </div>
+                  <v-btn color="#9C27B0" variant="tonal" block prepend-icon="mdi-calendar-check" disabled>
+                    Apply Template
+                  </v-btn>
+                </v-card-text>
+              </v-card>
+            </v-col>
+          </v-row>
         </v-card-text>
       </v-card>
 
-      <!-- How Templates Work Info Box -->
-      <v-card variant="outlined" rounded="lg" class="mt-6 info-card">
-        <v-card-text class="pa-5">
-          <div class="d-flex align-start">
-            <v-icon color="#1976D2" size="28" class="mr-4">mdi-information-outline</v-icon>
+      <!-- How Templates Work -->
+      <v-card variant="outlined" rounded="lg" class="mt-4 navy-card">
+        <v-card-text class="pa-4">
+          <div class="d-flex align-start ga-3">
+            <v-icon color="#4361EE" size="32">mdi-information-outline</v-icon>
             <div>
-              <h3 class="text-body-1 font-weight-bold mb-3" style="color: #1976D2;">
-                How Templates Work
-              </h3>
-              <ul class="text-body-2 text-grey template-list">
+              <div class="text-body-1 font-weight-bold mb-2">How Templates Work</div>
+              <ul class="text-body-2 text-grey pl-4" style="line-height:1.8;">
                 <li>Templates save the structure of your weekly schedule</li>
                 <li>Click "Apply Template" to create shifts for any week</li>
-                <li>Shifts are created as drafts - you can edit before publishing</li>
+                <li>Shifts are created as drafts — you can edit before publishing</li>
+                <li>Edit templates to rename or update their descriptions</li>
                 <li>Great for recurring weekly schedules!</li>
               </ul>
             </div>
           </div>
         </v-card-text>
       </v-card>
+
     </v-container>
   </EmployerLayout>
 </template>
 
 <style scoped>
-.navy-text {
-  color: #12086F !important;
-}
-
-.template-card {
-  border-color: #e0e0e0;
-  box-shadow: 0 2px 8px rgba(18, 8, 111, 0.08);
-  transition: all 0.2s;
-}
-
-.template-card:hover {
-  box-shadow: 0 4px 12px rgba(18, 8, 111, 0.12);
-  transform: translateY(-2px);
-}
-
-.empty-state-card {
-  border-color: #e0e0e0;
-  background: #FAFAFA;
-}
-
-.info-card {
-  border-color: #E3F2FD;
-  background: #FAFAFA;
-}
-
-.template-list {
-  list-style-position: outside;
-  padding-left: 20px;
-  line-height: 1.8;
-}
-
-.template-list li {
-  color: #757575;
-}
-
-.ga-2 {
-  gap: 8px;
-}
+.navy-text { color: #12086F !important; }
+.navy-card { border-color: #e0e0e0; box-shadow: 0 1px 3px rgba(18,8,111,0.05); }
+.template-card { transition: all 0.2s; border-color: #e0e0e0; }
+.template-card:hover { border-color: #9C27B0; box-shadow: 0 4px 12px rgba(156,39,176,0.15); transform: translateY(-2px); }
 </style>

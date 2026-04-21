@@ -1,221 +1,178 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, computed } from 'vue';
 import EmployerLayout from '../components/EmployerLayout.vue';
-import EmployerService from '../services/employerServices.js';
 
-const router = useRouter();
-const loading = ref(true);
-const employees = ref([]);
-const availabilityData = ref([]);
+const selectedEmployee = ref(null);
 
-const DEMO_USER = {
-  userId: 'demo-employer',
-  user_id: 'demo-employer',
-  email: 'demo@shiftboard.com',
-  fName: 'Demo',
-  lName: 'Manager',
-  role: 'employer',
-  work_location: null,
-  token: 'demo-token'
-};
+const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-const daysOfWeek = [
-  { label: 'Sunday', value: 0 },
-  { label: 'Monday', value: 1 },
-  { label: 'Tuesday', value: 2 },
-  { label: 'Wednesday', value: 3 },
-  { label: 'Thursday', value: 4 },
-  { label: 'Friday', value: 5 },
-  { label: 'Saturday', value: 6 }
-];
+// ── HARDCODED DEMO DATA ───────────────────────────────────────────────────
+const employees = ref([
+  { user_id: 'e1', first_name: 'Sarah',   last_name: 'Johnson'   },
+  { user_id: 'e2', first_name: 'Michael', last_name: 'Chen'      },
+  { user_id: 'e3', first_name: 'Emily',   last_name: 'Rodriguez' },
+  { user_id: 'e4', first_name: 'James',   last_name: 'Williams'  },
+  { user_id: 'e5', first_name: 'Ashley',  last_name: 'Brown'     },
+  { user_id: 'e6', first_name: 'David',   last_name: 'Martinez'  },
+]);
 
-onMounted(async () => {
-  const isGuest = localStorage.getItem('isGuest');
-  if (!isGuest) {
-    router.push({ name: 'landing' });
-    return;
-  }
-  
-  localStorage.setItem('user', JSON.stringify(DEMO_USER));
-  await loadData();
-});
+// day_of_week: 0=Sun … 6=Sat, times in minutes from midnight
+const availability = ref([
+  { user_id: 'e1', day_of_week: 1, start_time: 480,  end_time: 960  },
+  { user_id: 'e1', day_of_week: 3, start_time: 480,  end_time: 960  },
+  { user_id: 'e1', day_of_week: 5, start_time: 420,  end_time: 840  },
 
-const loadData = async () => {
-  loading.value = true;
-  try {
-    const [empRes, availRes] = await Promise.all([
-      EmployerService.getAllEmployees(),
-      EmployerService.getAllAvailability()
-    ]);
-    
-    const allEmployees = Array.isArray(empRes.data) ? empRes.data : [];
-    employees.value = allEmployees
-      .filter(emp => (emp.user_id || emp.userId || '').startsWith('demo-emp-'))
-      .slice(0, 5);
-    
-    availabilityData.value = Array.isArray(availRes.data) ? availRes.data : [];
-  } catch (err) {
-    console.error('Error loading data:', err);
-  } finally {
-    loading.value = false;
-  }
-};
+  { user_id: 'e2', day_of_week: 1, start_time: 840,  end_time: 1200 },
+  { user_id: 'e2', day_of_week: 2, start_time: 480,  end_time: 960  },
+  { user_id: 'e2', day_of_week: 4, start_time: 480,  end_time: 960  },
 
-const getAvailabilityForEmployee = (employeeId, dayOfWeek) => {
-  const availability = availabilityData.value.filter(a => 
-    (a.user_id || a.userId) === employeeId && 
-    (a.day_of_week || a.dayOfWeek) === dayOfWeek
-  );
-  
-  if (availability.length === 0) {
-    return { text: 'Unavailable', color: 'transparent', textColor: 'grey' };
-  }
-  
-  return availability.map(a => {
-    const startTime = formatTime(a.start_time || a.startTime);
-    const endTime = formatTime(a.end_time || a.endTime);
+  { user_id: 'e3', day_of_week: 0, start_time: 600,  end_time: 1080 },
+  { user_id: 'e3', day_of_week: 2, start_time: 840,  end_time: 1260 },
+  { user_id: 'e3', day_of_week: 5, start_time: 420,  end_time: 840  },
+
+  { user_id: 'e4', day_of_week: 1, start_time: 420,  end_time: 900  },
+  { user_id: 'e4', day_of_week: 2, start_time: 420,  end_time: 900  },
+  { user_id: 'e4', day_of_week: 6, start_time: 600,  end_time: 1080 },
+
+  { user_id: 'e5', day_of_week: 3, start_time: 900,  end_time: 1260 },
+  { user_id: 'e5', day_of_week: 4, start_time: 480,  end_time: 720  },
+  { user_id: 'e5', day_of_week: 5, start_time: 840,  end_time: 1260 },
+
+  { user_id: 'e6', day_of_week: 0, start_time: 480,  end_time: 960  },
+  { user_id: 'e6', day_of_week: 3, start_time: 420,  end_time: 900  },
+  { user_id: 'e6', day_of_week: 6, start_time: 1080, end_time: 1320 },
+]);
+
+const availabilityGrid = computed(() => {
+  const filtered = selectedEmployee.value
+    ? employees.value.filter(e => e.user_id === selectedEmployee.value)
+    : employees.value;
+
+  return filtered.map(emp => {
+    const empAvail = availability.value.filter(a => a.user_id === emp.user_id);
+    const schedule = {};
+    daysOfWeek.forEach((day, idx) => {
+      schedule[day] = empAvail
+        .filter(a => a.day_of_week === idx)
+        .map(a => ({ start: formatTime(a.start_time), end: formatTime(a.end_time) }));
+    });
     return {
-      text: `${startTime} - ${endTime}`,
-      color: '#e8f5e9',
-      textColor: '#2e7d32'
+      employeeName: `${emp.first_name} ${emp.last_name}`,
+      employeeId: emp.user_id,
+      schedule,
     };
   });
-};
+});
 
 const formatTime = (minutes) => {
-  if (!minutes && minutes !== 0) return '';
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
+  const h    = Math.floor(minutes / 60);
+  const m    = minutes % 60;
   const ampm = h >= 12 ? 'PM' : 'AM';
   const hour = h % 12 || 12;
-  return `${hour}${m > 0 ? ':' + String(m).padStart(2, '0') : ''}${ampm}`;
-};
-
-const exitGuestMode = () => {
-  localStorage.removeItem('isGuest');
-  localStorage.removeItem('user');
-  router.push({ name: 'landing' });
+  return `${hour}${m ? `:${String(m).padStart(2, '0')}` : ''}${ampm}`;
 };
 </script>
 
 <template>
   <EmployerLayout :isGuest="true">
     <v-container fluid class="pa-6">
-      <!-- Guest Mode Banner -->
-      <v-alert type="info" variant="tonal" prominent class="mb-6">
-        <div class="d-flex align-center justify-space-between">
-          <div>
-            <v-icon size="large" class="mr-3">mdi-eye-outline</v-icon>
-            <strong>Guest Mode</strong> - Viewing demo availability data
-          </div>
-          <v-btn color="primary" variant="outlined" @click="exitGuestMode">
-            Exit Guest Mode
-          </v-btn>
-        </div>
+
+      <!-- Guest Banner -->
+      <v-alert type="info" variant="tonal" class="mb-5" density="compact">
+        <v-icon start>mdi-eye-outline</v-icon>
+        <strong>Guest Preview</strong> — Read-only demo. Add/edit/delete actions are disabled.
       </v-alert>
 
       <!-- Header -->
-      <div class="d-flex justify-space-between align-center mb-6">
+      <div class="d-flex align-center justify-space-between mb-5">
         <div>
           <h1 class="text-h4 font-weight-bold navy-text">Employee Availability</h1>
-          <p class="text-subtitle-1 text-medium-emphasis">
-            Manage when employees are available to work
-          </p>
+          <p class="text-body-2 text-grey">View when employees are available to work</p>
         </div>
-        
-        <v-btn color="primary" variant="flat" prepend-icon="mdi-plus" disabled>
-          ADD AVAILABILITY
-        </v-btn>
+        <div class="d-flex align-center ga-3">
+          <v-btn color="#12086F" prepend-icon="mdi-plus" size="small" disabled>Add Availability</v-btn>
+          <v-select
+            v-model="selectedEmployee"
+            :items="employees"
+            :item-title="e => `${e.first_name} ${e.last_name}`"
+            item-value="user_id"
+            label="Filter by employee"
+            variant="outlined"
+            density="compact"
+            style="max-width: 250px"
+            clearable
+            color="#12086F"
+          />
+        </div>
       </div>
 
-      <!-- Loading State -->
-      <div v-if="loading" class="text-center py-12">
-        <v-progress-circular indeterminate color="primary" />
-      </div>
+      <!-- Grid -->
+      <v-card variant="outlined" rounded="lg" class="navy-card">
+        <div class="pa-4 grid-scroll-wrapper">
+          <div class="availability-grid-header">
+            <div class="employee-column">Employee</div>
+            <div v-for="day in daysOfWeek" :key="day" class="day-column">{{ day }}</div>
+          </div>
 
-      <!-- Availability Grid -->
-      <v-card v-else variant="outlined" rounded="lg" class="availability-card">
-        <v-table class="availability-table">
-          <thead>
-            <tr>
-              <th class="employee-column">Employee</th>
-              <th v-for="day in daysOfWeek" :key="day.value" class="text-center">
-                {{ day.label }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="employees.length === 0">
-              <td :colspan="daysOfWeek.length + 1" class="text-center py-8 text-grey">
-                No employees found
-              </td>
-            </tr>
-            <tr v-for="employee in employees" :key="employee.user_id || employee.userId">
-              <td class="employee-column">
-                <span class="font-weight-medium">
-                  {{ employee.first_name || employee.fName }} {{ employee.last_name || employee.lName }}
-                </span>
-              </td>
-              <td v-for="day in daysOfWeek" :key="day.value" class="availability-cell">
-                <template v-if="Array.isArray(getAvailabilityForEmployee(employee.user_id || employee.userId, day.value))">
-                  <v-chip
-                    v-for="(slot, idx) in getAvailabilityForEmployee(employee.user_id || employee.userId, day.value)"
-                    :key="idx"
-                    :color="slot.color"
-                    :text-color="slot.textColor"
-                    size="small"
-                    class="availability-chip"
-                  >
-                    {{ slot.text }}
-                  </v-chip>
-                </template>
-                <span v-else class="text-grey text-caption">
-                  {{ getAvailabilityForEmployee(employee.user_id || employee.userId, day.value).text }}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </v-table>
+          <div v-for="row in availabilityGrid" :key="row.employeeId" class="availability-grid-row">
+            <div class="employee-column">
+              <div class="font-weight-medium">{{ row.employeeName }}</div>
+            </div>
+            <div v-for="day in daysOfWeek" :key="day" class="day-column">
+              <div v-if="row.schedule[day].length === 0" class="in-class">
+                <v-icon size="12" class="mr-1">mdi-school</v-icon>In Class
+              </div>
+              <div v-else v-for="(slot, i) in row.schedule[day]" :key="i" class="available-slot">
+                {{ slot.start }} – {{ slot.end }}
+              </div>
+            </div>
+          </div>
+
+          <div v-if="availabilityGrid.length === 0" class="text-center pa-6">
+            <v-icon size="48" class="mb-2 text-grey">mdi-calendar-clock</v-icon>
+            <div class="text-body-2 text-grey">No availability data</div>
+          </div>
+        </div>
       </v-card>
+
+      <v-alert type="info" variant="tonal" class="mt-4" color="#4361EE">
+        <strong>Tip:</strong> "In Class" means no availability is set for that day.
+      </v-alert>
+
     </v-container>
   </EmployerLayout>
 </template>
 
 <style scoped>
-.navy-text {
-  color: #12086F !important;
+.navy-text { color: #12086F !important; }
+.navy-card { border-color: #e0e0e0; box-shadow: 0 1px 3px rgba(18,8,111,0.05); }
+.availability-grid-header,
+.availability-grid-row {
+  display: grid;
+  grid-template-columns: 200px repeat(7, 1fr);
+  gap: 8px;
+  border-bottom: 1px solid #e8e8e8;
 }
-
-.availability-card {
-  overflow-x: auto;
-}
-
-.availability-table thead tr {
+.availability-grid-header {
   background: linear-gradient(135deg, #12086F 0%, #2B354F 100%);
+  color: white; font-weight: 600; font-size: 13px;
+  padding: 12px 8px; border-bottom: 2px solid #12086F; border-radius: 8px 8px 0 0;
 }
-
-.availability-table thead th {
-  color: white !important;
-  font-weight: 600 !important;
-  padding: 16px 12px !important;
-  border-bottom: 2px solid #e0e0e0 !important;
+.availability-grid-row { padding: 12px 8px; transition: background 0.15s; }
+.availability-grid-row:hover { background: #fafafa; }
+.employee-column, .day-column {
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: center; min-height: 50px;
 }
-
-.employee-column {
-  min-width: 150px;
-  font-weight: 600 !important;
-  color: #12086F !important;
+.employee-column { font-weight: 500; padding-right: 12px; border-right: 1px solid #e8e8e8; }
+.day-column { padding: 0 8px; }
+.grid-scroll-wrapper { overflow-x: auto; min-width: 0; }
+.available-slot {
+  background: #e8f5e9; color: #2e7d32; padding: 3px 6px; border-radius: 4px;
+  font-size: 11px; margin-bottom: 3px; white-space: nowrap; border-left: 3px solid #2e7d32;
 }
-
-.availability-cell {
-  text-align: center;
-  padding: 12px 8px !important;
-  vertical-align: middle;
-}
-
-.availability-chip {
-  font-weight: 500 !important;
-  border: 1px solid #2e7d32;
+.in-class {
+  color: #5c6bc0; font-size: 11px; font-style: italic;
+  display: flex; align-items: center; background: #f3f4fb;
+  padding: 3px 6px; border-radius: 4px; border-left: 3px solid #9fa8da;
 }
 </style>

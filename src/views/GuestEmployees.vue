@@ -1,191 +1,161 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, computed } from 'vue';
 import EmployerLayout from '../components/EmployerLayout.vue';
-import EmployerService from '../services/employerServices.js';
 
-const router = useRouter();
-const loading = ref(true);
-const employees = ref([]);
-const searchQuery = ref('');
+const search = ref('');
+const showDetailsDialog = ref(false);
+const selectedEmployee  = ref(null);
 
-const DEMO_USER = {
-  userId: 'demo-employer',
-  user_id: 'demo-employer',
-  email: 'demo@shiftboard.com',
-  fName: 'Demo',
-  lName: 'Manager',
-  role: 'employer',
-  work_location: null,
-  token: 'demo-token'
-};
+// ── HARDCODED DEMO DATA ───────────────────────────────────────────────────
+const employees = ref([
+  {
+    user_id: 'e1', first_name: 'Sarah',   last_name: 'Johnson',
+    email: 'sarah.j@example.com',   phone_number: '(405) 555-0101',
+    jobRoles: [{ role_title: 'Barista',    is_primary: true  }, { role_title: 'Cashier',    is_primary: false }],
+  },
+  {
+    user_id: 'e2', first_name: 'Michael', last_name: 'Chen',
+    email: 'michael.c@example.com', phone_number: '(405) 555-0102',
+    jobRoles: [{ role_title: 'Cashier',    is_primary: true  }],
+  },
+  {
+    user_id: 'e3', first_name: 'Emily',   last_name: 'Rodriguez',
+    email: 'emily.r@example.com',   phone_number: '(405) 555-0103',
+    jobRoles: [{ role_title: 'Barista',    is_primary: true  }],
+  },
+  {
+    user_id: 'e4', first_name: 'James',   last_name: 'Williams',
+    email: 'james.w@example.com',   phone_number: '(405) 555-0104',
+    jobRoles: [{ role_title: 'Shift Lead', is_primary: true  }, { role_title: 'Barista',    is_primary: false }],
+  },
+  {
+    user_id: 'e5', first_name: 'Ashley',  last_name: 'Brown',
+    email: 'ashley.b@example.com',  phone_number: '(405) 555-0105',
+    jobRoles: [{ role_title: 'Cashier',    is_primary: true  }],
+  },
+  {
+    user_id: 'e6', first_name: 'David',   last_name: 'Martinez',
+    email: 'david.m@example.com',   phone_number: '(405) 555-0106',
+    jobRoles: [{ role_title: 'Barista',    is_primary: true  }],
+  },
+]);
 
-onMounted(async () => {
-  const isGuest = localStorage.getItem('isGuest');
-  if (!isGuest) {
-    router.push({ name: 'landing' });
-    return;
-  }
-  
-  localStorage.setItem('user', JSON.stringify(DEMO_USER));
-  await loadEmployees();
-});
+const headers = [
+  { title: 'Name',      key: 'name',         sortable: true  },
+  { title: 'Email',     key: 'email',         sortable: true  },
+  { title: 'Phone',     key: 'phone_number',  sortable: false },
+  { title: 'Job Roles', key: 'roles',         sortable: false },
+  { title: 'Actions',   key: 'actions',       sortable: false, align: 'end' },
+];
 
-const loadEmployees = async () => {
-  loading.value = true;
-  try {
-    const res = await EmployerService.getAllEmployees();
-    const allEmployees = Array.isArray(res.data) ? res.data : [];
-    
-    // ✅ FILTER: Only show first 5 demo employees
-    employees.value = allEmployees
-      .filter(emp => (emp.user_id || emp.userId || '').startsWith('demo-emp-'))
-      .slice(0, 5);
-  } catch (err) {
-    console.error('Error loading employees:', err);
-  } finally {
-    loading.value = false;
-  }
-};
+const employeesWithName = computed(() =>
+  employees.value.map(e => ({
+    ...e,
+    name: `${e.first_name} ${e.last_name}`,
+  }))
+);
 
-const filteredEmployees = computed(() => {
-  if (!searchQuery.value) return employees.value;
-  
-  const query = searchQuery.value.toLowerCase();
-  return employees.value.filter(emp => {
-    const name = `${emp.first_name || emp.fName} ${emp.last_name || emp.lName}`.toLowerCase();
-    const email = (emp.email || '').toLowerCase();
-    return name.includes(query) || email.includes(query);
-  });
-});
-
-const exitGuestMode = () => {
-  localStorage.removeItem('isGuest');
-  localStorage.removeItem('user');
-  router.push({ name: 'landing' });
+const openDetailsDialog = (emp) => {
+  selectedEmployee.value = emp;
+  showDetailsDialog.value = true;
 };
 </script>
 
 <template>
   <EmployerLayout :isGuest="true">
     <v-container fluid class="pa-6">
-      <!-- Guest Mode Banner -->
-      <v-alert type="info" variant="tonal" prominent class="mb-6">
-        <div class="d-flex align-center justify-space-between">
-          <div>
-            <v-icon size="large" class="mr-3">mdi-eye-outline</v-icon>
-            <strong>Guest Mode</strong> - Viewing demo employee data
-          </div>
-          <v-btn color="primary" variant="outlined" @click="exitGuestMode">
-            Exit Guest Mode
-          </v-btn>
-        </div>
+
+      <!-- Guest Banner -->
+      <v-alert type="info" variant="tonal" class="mb-5" density="compact">
+        <v-icon start>mdi-eye-outline</v-icon>
+        <strong>Guest Preview</strong> — Read-only demo. Add/edit/remove actions are disabled.
       </v-alert>
 
       <!-- Header -->
-      <div class="d-flex justify-space-between align-center mb-6">
+      <div class="d-flex align-center justify-space-between mb-5">
         <div>
           <h1 class="text-h4 font-weight-bold navy-text">Employee Management</h1>
-          <p class="text-subtitle-1 text-medium-emphasis">
-            Manage your team members and their job roles
-          </p>
+          <p class="text-body-2 text-grey">View your team members and their job roles</p>
         </div>
-        
-        <v-btn color="primary" variant="flat" prepend-icon="mdi-plus" disabled>
-          ADD EMPLOYEE
+        <v-btn color="#12086F" variant="flat" prepend-icon="mdi-plus" size="large" disabled>
+          Add Employee
         </v-btn>
       </div>
 
-      <!-- Search Bar -->
-      <v-text-field
-        v-model="searchQuery"
-        prepend-inner-icon="mdi-magnify"
-        label="Search employees"
-        variant="outlined"
-        density="comfortable"
-        class="mb-6"
-        clearable
-        hide-details
-      />
+      <!-- Table -->
+      <v-card variant="outlined" rounded="lg" class="navy-card">
+        <v-card-text class="pa-0">
+          <v-data-table :headers="headers" :items="employeesWithName" :search="search" items-per-page="10">
+            <template #top>
+              <div class="pa-4 pb-0">
+                <v-text-field v-model="search" prepend-inner-icon="mdi-magnify" label="Search employees"
+                  variant="outlined" density="compact" hide-details clearable color="#12086F" />
+              </div>
+            </template>
 
-      <!-- Loading State -->
-      <div v-if="loading" class="text-center py-12">
-        <v-progress-circular indeterminate color="primary" />
-      </div>
-
-      <!-- Employee Table -->
-      <v-card v-else variant="outlined" rounded="lg">
-        <v-table>
-          <thead>
-            <tr>
-              <th class="text-left">Name</th>
-              <th class="text-left">Email</th>
-              <th class="text-left">Phone</th>
-              <th class="text-left">Job Role</th>
-              <th class="text-center">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="filteredEmployees.length === 0">
-              <td colspan="5" class="text-center py-8 text-grey">
-                No employees found
-              </td>
-            </tr>
-            <tr v-for="employee in filteredEmployees" :key="employee.user_id || employee.userId">
-              <td>
-                <div class="d-flex align-center">
-                  <v-avatar size="32" color="primary" class="mr-3">
-                    <span class="text-white text-caption font-weight-bold">
-                      {{ (employee.first_name || employee.fName || '').charAt(0) }}{{ (employee.last_name || employee.lName || '').charAt(0) }}
-                    </span>
-                  </v-avatar>
-                  <span class="font-weight-medium">
-                    {{ employee.first_name || employee.fName }} {{ employee.last_name || employee.lName }}
-                  </span>
-                </div>
-              </td>
-              <td>{{ employee.email }}</td>
-              <td>{{ employee.phone_number || '-' }}</td>
-              <td>
-                <v-chip size="small" variant="tonal" color="grey">
-                  Not assigned
+            <template #[`item.roles`]="{ item }">
+              <div class="d-flex flex-wrap ga-1">
+                <v-chip v-for="(role, i) in (item.jobRoles || []).slice(0, 2)" :key="i"
+                  size="x-small" :color="role.is_primary ? '#12086F' : '#4361EE'" variant="tonal">
+                  {{ role.role_title }}
+                  <v-icon v-if="role.is_primary" size="x-small" class="ml-1">mdi-star</v-icon>
                 </v-chip>
-              </td>
-              <td>
-                <div class="d-flex justify-center gap-2">
-                  <v-btn icon size="small" variant="text" color="primary" disabled>
-                    <v-icon>mdi-eye</v-icon>
-                  </v-btn>
-                  <v-btn icon size="small" variant="text" color="primary" disabled>
-                    <v-icon>mdi-pencil</v-icon>
-                  </v-btn>
-                  <v-btn icon size="small" variant="text" color="primary" disabled>
-                    <v-icon>mdi-calendar-clock</v-icon>
-                  </v-btn>
-                  <v-btn icon size="small" variant="text" color="error" disabled>
-                    <v-icon>mdi-delete</v-icon>
-                  </v-btn>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </v-table>
+              </div>
+            </template>
+
+            <template #[`item.actions`]="{ item }">
+              <v-btn icon="mdi-eye" size="small" variant="text" color="#4361EE"
+                @click="openDetailsDialog(item)" />
+              <v-btn icon="mdi-pencil"  size="small" variant="text" color="#4361EE" disabled />
+              <v-btn icon="mdi-delete"  size="small" variant="text" color="error"   disabled />
+            </template>
+          </v-data-table>
+        </v-card-text>
       </v-card>
+
     </v-container>
+
+    <!-- Details Dialog -->
+    <v-dialog v-model="showDetailsDialog" max-width="500">
+      <v-card rounded="lg" v-if="selectedEmployee">
+        <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4 navy-text">Employee Details</v-card-title>
+        <v-divider />
+        <v-card-text class="pa-5">
+          <div class="mb-3">
+            <div class="text-caption text-grey">Name</div>
+            <div class="text-body-1 font-weight-medium">{{ selectedEmployee.first_name }} {{ selectedEmployee.last_name }}</div>
+          </div>
+          <div class="mb-3">
+            <div class="text-caption text-grey">Email</div>
+            <div class="text-body-1">{{ selectedEmployee.email }}</div>
+          </div>
+          <div class="mb-3">
+            <div class="text-caption text-grey">Phone</div>
+            <div class="text-body-1">{{ selectedEmployee.phone_number }}</div>
+          </div>
+          <div class="mb-3">
+            <div class="text-caption text-grey">Job Roles</div>
+            <div class="d-flex flex-wrap ga-1 mt-1">
+              <v-chip v-for="(role, i) in selectedEmployee.jobRoles" :key="i"
+                size="small" :color="role.is_primary ? '#12086F' : '#4361EE'" variant="tonal">
+                {{ role.role_title }}
+                <v-icon v-if="role.is_primary" size="small" class="ml-1">mdi-star</v-icon>
+              </v-chip>
+            </div>
+          </div>
+        </v-card-text>
+        <v-divider />
+        <v-card-actions class="pa-4">
+          <v-spacer />
+          <v-btn variant="text" @click="showDetailsDialog = false">Close</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
   </EmployerLayout>
 </template>
 
 <style scoped>
-.navy-text {
-  color: #12086F !important;
-}
-
-.gap-2 {
-  gap: 8px;
-}
-
-th {
-  font-weight: 600 !important;
-  color: #12086F !important;
-}
+.navy-text { color: #12086F !important; }
+.navy-card { border-color: #e0e0e0; box-shadow: 0 1px 3px rgba(18,8,111,0.05); }
 </style>
