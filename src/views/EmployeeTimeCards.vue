@@ -44,10 +44,15 @@ function periodLabel(start) {
 }
 
 // ── RECORDS ───────────────────────────────────────────────────────────────
+// Local edits for draft entries — not sent to backend until Submit is clicked
+const localEdits = ref({});
+
 const recordsWithDetails = computed(() =>
   clockRecords.value.map(r => {
-    const clockIn  = r.clockInTime  || r.clock_in_time;
-    const clockOut = r.clockOutTime || r.clock_out_time;
+    const rid    = r.id || r.clock_id;
+    const edit   = localEdits.value[rid];
+    const clockIn  = edit?.clockInTime  ?? r.clockInTime  ?? r.clock_in_time;
+    const clockOut = edit?.clockOutTime ?? r.clockOutTime ?? r.clock_out_time;
     const inDate   = clockIn  ? new Date(Number(clockIn))  : null;
     const outDate  = clockOut ? new Date(Number(clockOut)) : null;
     let totalHours = null;
@@ -57,7 +62,14 @@ const recordsWithDetails = computed(() =>
       totalHours = parseFloat(r.totalHoursWorked || r.total_hours_worked).toFixed(2);
     }
     const rejectionComment = r.rejectionReason || r.rejection_reason || r.rejectReason || r.reason || null;
-    return { ...r, inDate, outDate, totalHours, status: r.status || 'pending', rejectionComment };
+    return {
+      ...r,
+      ...(edit ? { clockInTime: edit.clockInTime, clockOutTime: edit.clockOutTime, notes: edit.notes } : {}),
+      inDate, outDate, totalHours,
+      status: r.status || 'pending',
+      rejectionComment,
+      _pendingEdit: !!edit,
+    };
   })
 );
 
@@ -211,6 +223,12 @@ const submitTimecard = async () => {
       return;
     }
 
+    // Flush any locally-edited drafts to the backend first
+    for (const [id, edit] of Object.entries(localEdits.value)) {
+      await EmployeeService.updateClockRecord(id, edit).catch(() => {});
+    }
+    localEdits.value = {};
+
     // Use the submitTimecard service call if available, otherwise update each record
     try {
       const userId = user.value?.user_id || user.value?.userId;
@@ -255,20 +273,13 @@ const openEdit = (record) => {
   showEditDialog.value = true;
 };
 
-const saveEdit = async () => {
-  saving.value = true;
-  try {
-    const inTs  = editForm.value.clockInTime  ? new Date(editForm.value.clockInTime).getTime()  : null;
-    const outTs = editForm.value.clockOutTime ? new Date(editForm.value.clockOutTime).getTime() : null;
-    await EmployeeService.updateClockRecord(editForm.value.id, {
-      clockInTime: inTs, clockOutTime: outTs, notes: editForm.value.notes
-    });
-    showSnackbar('Time entry updated', 'success');
-    showEditDialog.value = false;
-    await loadData();
-  } catch (err) {
-    showSnackbar(err.response?.data?.message || 'Error updating', 'error');
-  } finally { saving.value = false; }
+const saveEdit = () => {
+  const inTs  = editForm.value.clockInTime  ? new Date(editForm.value.clockInTime).getTime()  : null;
+  const outTs = editForm.value.clockOutTime ? new Date(editForm.value.clockOutTime).getTime() : null;
+  // Store locally — backend is only updated on Submit to avoid auto-approval
+  localEdits.value[editForm.value.id] = { clockInTime: inTs, clockOutTime: outTs, notes: editForm.value.notes };
+  showSnackbar('Entry updated — submit your timecard to save permanently.', 'success');
+  showEditDialog.value = false;
 };
 
 // ── LOG HOURS ──────────────────────────────────────────────────────────────
@@ -525,6 +536,7 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
                       <div class="d-flex align-center ga-2 mb-1">
                         <span class="entry-badge">Clock Entry</span>
                         <span v-if="isToday(day.date)" class="today-pill">Today</span>
+                        <span v-if="r._pendingEdit" class="status-pill status-pill--edited">Edited</span>
                         <span v-if="r.status === 'submitted'" class="status-pill status-pill--submitted">Needs Review</span>
                         <span v-if="r.status === 'approved'"  class="status-pill status-pill--approved">Approved</span>
                         <span v-if="r.status === 'rejected'"  class="status-pill status-pill--rejected">Rejected</span>
@@ -578,6 +590,7 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
                       <div class="d-flex align-center ga-2 mb-1">
                         <span class="entry-badge">Clock Entry</span>
                         <span v-if="isToday(day.date)" class="today-pill">Today</span>
+                        <span v-if="r._pendingEdit" class="status-pill status-pill--edited">Edited</span>
                         <span v-if="r.status === 'submitted'" class="status-pill status-pill--submitted">Needs Review</span>
                         <span v-if="r.status === 'approved'"  class="status-pill status-pill--approved">Approved</span>
                         <span v-if="r.status === 'rejected'"  class="status-pill status-pill--rejected">Rejected</span>
@@ -989,6 +1002,7 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
 .entry-badge { background: #ede9ff; color: #12086F; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
 .today-pill  { background: #12086F; color: white; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; }
 .status-pill { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; letter-spacing: .02em; }
+.status-pill--edited { background: #fff3e0; color: #e65100; }
 .status-pill--submitted { background: #1565C0; color: white; }
 .status-pill--approved  { background: #2e7d32; color: white; }
 .status-pill--rejected  { background: #d32f2f; color: white; }
