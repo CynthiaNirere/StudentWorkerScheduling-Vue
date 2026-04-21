@@ -1,10 +1,4 @@
 import apiClient from "./services.js";
-import Utils from "../config/utils.js";
-
-const getAuthHeader = () => {
-  const user = Utils.getStore('user');
-  return user ? {} : {};
-};
 
 export default {
 
@@ -16,6 +10,13 @@ export default {
   updateProfile(userId, data) {
     // Employee can only update phone_number
     return apiClient.put(`/users/${userId}`, { phone_number: data.phone_number });
+  },
+
+  // ─── EMAIL NOTIFICATIONS ────────────────────────────────────────────────
+  updateEmailNotifications(userId, enabled) {
+    return apiClient.put(`/users/${userId}/email-notifications`, {
+      emailNotifications: enabled
+    });
   },
 
   // ─── SHIFTS ─────────────────────────────────────────────────────────────

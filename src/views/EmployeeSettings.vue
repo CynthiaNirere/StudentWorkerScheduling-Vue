@@ -3,6 +3,7 @@ import { ref, onMounted, watch } from 'vue';
 import { useTheme } from 'vuetify';
 import Utils from '../config/utils.js';
 import EmployeeLayout from '../components/EmployeeLayout.vue';
+import EmployeeService from '../services/employeeServices.js';
 
 const theme = useTheme();
 const user  = ref(null);
@@ -12,6 +13,7 @@ const urgentPref   = ref('email');
 const urgentSaving = ref(false);
 
 const notificationPreferences = ref({
+  emailNotifications: false,
   shiftReminders: true,
   swapRequests: true,
   timeOffRequests: true,
@@ -49,10 +51,24 @@ const saveUrgentPref = async () => {
   showSnackbar('Communication preference saved!');
 };
 
-const saveNotificationPreferences = () => {
-  localStorage.setItem('notificationPreferences', JSON.stringify(notificationPreferences.value));
-  window.dispatchEvent(new CustomEvent('notif-prefs-updated'));
-  showSnackbar('Notification preferences saved!');
+const saveNotificationPreferences = async () => {
+  try {
+    // Save email notification preference to backend
+    if (notificationPreferences.value.emailNotifications !== undefined) {
+      await EmployeeService.updateEmailNotifications(
+        user.value.id,
+        notificationPreferences.value.emailNotifications
+      );
+    }
+    
+    // Save other preferences to localStorage
+    localStorage.setItem('notificationPreferences', JSON.stringify(notificationPreferences.value));
+    window.dispatchEvent(new CustomEvent('notif-prefs-updated'));
+    showSnackbar('Notification preferences saved!', 'success');
+  } catch (error) {
+    console.error('Error saving notification preferences:', error);
+    showSnackbar('Error saving preferences', 'error');
+  }
 };
 
 const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackColor.value = color; snackbar.value = true; };
@@ -121,13 +137,28 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
       <!-- Notification Types -->
       <v-card variant="outlined" rounded="lg" class="navy-card mb-4">
         <v-card-title class="text-body-1 font-weight-bold pa-4 navy-text">
-          <v-icon start size="18">mdi-bell-outline</v-icon>Notification Types
+          <v-icon start size="18">mdi-bell-outline</v-icon>Notification Preferences
         </v-card-title>
         <v-divider />
         <v-card-text class="pa-5">
           <v-alert type="info" variant="tonal" density="compact" class="mb-4" color="#4361EE">
-            Choose which notification types appear in your bell icon.
+            Choose which notification types appear in your bell icon and whether to receive email alerts.
           </v-alert>
+          
+          <div class="text-subtitle-2 font-weight-bold mb-3">Email Notifications</div>
+          <v-checkbox 
+            v-model="notificationPreferences.emailNotifications" 
+            label="Email notifications" 
+            hint="Receive emails for shift assignments, approvals, and schedule changes"
+            persistent-hint
+            color="#12086F" 
+            density="compact" 
+            class="mb-3" 
+          />
+          
+          <v-divider class="my-4" />
+          
+          <div class="text-subtitle-2 font-weight-bold mb-3">In-App Notification Types</div>
           <v-checkbox v-model="notificationPreferences.shiftReminders" label="Shift reminders" color="#12086F" density="compact" class="mb-1" hide-details />
           <v-checkbox v-model="notificationPreferences.swapRequests" label="Shift swap requests" color="#12086F" density="compact" class="mb-1" hide-details />
           <v-checkbox v-model="notificationPreferences.timeOffRequests" label="Time off requests" color="#12086F" density="compact" class="mb-1" hide-details />

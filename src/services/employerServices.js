@@ -1,335 +1,330 @@
 import apiClient from "./services.js";
-import Utils from "../config/utils.js";
-
-// services.js interceptor handles auth headers for logged-in users.
-// addDemoHeader only needed for guest mode (no logged-in user).
-const addDemoHeader = (config = {}) => {
-  const isGuest = localStorage.getItem('isGuest') === 'true';
-  const user    = Utils.getStore('user');
-  if (isGuest && !user) {
-    return { ...config, headers: { ...config.headers, 'x-demo-mode': 'true' } };
-  }
-  return config;
-};
 
 export default {
 
+  // ── EMAIL NOTIFICATIONS ──────────────────────────────────────────────────
+  updateEmailNotifications(userId, enabled) {
+    return apiClient.put(`/users/${userId}/email-notifications`, {
+      emailNotifications: enabled
+    });
+  },
+
   // ── SHIFTS ──────────────────────────────────────────────────────────────
   getAllShifts() {
-    return apiClient.get("/shifts", addDemoHeader());
+    return apiClient.get("/shifts");
   },
   getShiftsByWeek(startDate, endDate) {
-    return apiClient.get(`/shifts?startDate=${startDate}&endDate=${endDate}`, addDemoHeader());
+    return apiClient.get(`/shifts?startDate=${startDate}&endDate=${endDate}`);
   },
   getShiftsByLocation(locationId) {
-    return apiClient.get(`/shifts?locationId=${locationId}`, addDemoHeader());
+    return apiClient.get(`/shifts?locationId=${locationId}`);
   },
   getShiftById(id) {
-    return apiClient.get(`/shifts/${id}`, addDemoHeader());
+    return apiClient.get(`/shifts/${id}`);
   },
   createShift(shift) {
-    return apiClient.post("/shifts", shift, addDemoHeader());
+    return apiClient.post("/shifts", shift);
   },
   updateShift(id, shift) {
-    return apiClient.put(`/shifts/${id}`, shift, addDemoHeader());
+    return apiClient.put(`/shifts/${id}`, shift);
   },
   deleteShift(id) {
-    return apiClient.delete(`/shifts/${id}`, addDemoHeader());
+    return apiClient.delete(`/shifts/${id}`);
   },
   assignUserToShift(id, userId) {
-    return apiClient.put(`/shifts/${id}/assign`, { userId }, addDemoHeader());
+    return apiClient.put(`/shifts/${id}/assign`, { userId });
   },
   publishShift(id) {
-    return apiClient.put(`/shifts/${id}/publish`, {}, addDemoHeader());
+    return apiClient.put(`/shifts/${id}/publish`, {});
   },
 
   // ── SCHEDULE TEMPLATES ───────────────────────────────────────────────────
   getAllTemplates() {
-    return apiClient.get("/schedule-templates", addDemoHeader());
+    return apiClient.get("/schedule-templates");
   },
   getTemplateById(id) {
-    return apiClient.get(`/schedule-templates/${id}`, addDemoHeader());
+    return apiClient.get(`/schedule-templates/${id}`);
   },
   createTemplate(template) {
-    return apiClient.post("/schedule-templates", template, addDemoHeader());
+    return apiClient.post("/schedule-templates", template);
   },
   updateTemplate(id, template) {
-    return apiClient.put(`/schedule-templates/${id}`, template, addDemoHeader());
+    return apiClient.put(`/schedule-templates/${id}`, template);
   },
   deleteTemplate(id) {
-    return apiClient.delete(`/schedule-templates/${id}`, addDemoHeader());
+    return apiClient.delete(`/schedule-templates/${id}`);
   },
   applyTemplate(id, startDate) {
-    return apiClient.post(`/schedule-templates/${id}/apply`, { startDate }, addDemoHeader());
+    return apiClient.post(`/schedule-templates/${id}/apply`, { startDate });
   },
 
   // ── NOTIFICATIONS ────────────────────────────────────────────────────────
   getAllNotifications() {
-    return apiClient.get("/notifications", addDemoHeader());
+    return apiClient.get("/notifications");
   },
   createNotification(notification) {
-    return apiClient.post("/notifications", notification, addDemoHeader());
+    return apiClient.post("/notifications", notification);
   },
   markNotificationRead(id) {
-    return apiClient.put(`/notifications/${id}/read`, {}, addDemoHeader());
+    return apiClient.put(`/notifications/${id}/read`, {});
   },
   deleteNotification(id) {
-    return apiClient.delete(`/notifications/${id}`, addDemoHeader());
+    return apiClient.delete(`/notifications/${id}`);
   },
 
   // ── SHIFT SWAP REQUESTS ──────────────────────────────────────────────────
   getAllShiftSwapRequests() {
-    return apiClient.get("/shift-swap-requests", addDemoHeader());
+    return apiClient.get("/shift-swap-requests");
   },
   getAllSwapRequests() {
-    return apiClient.get("/shift-swap-requests", addDemoHeader());
+    return apiClient.get("/shift-swap-requests");
   },
   getPendingSwapRequests() {
-    return apiClient.get("/shift-swap-requests?status=pending", addDemoHeader());
+    return apiClient.get("/shift-swap-requests?status=pending");
   },
   getSwapRequestById(id) {
-    return apiClient.get(`/shift-swap-requests/${id}`, addDemoHeader());
+    return apiClient.get(`/shift-swap-requests/${id}`);
   },
   approveSwapRequest(id) {
-    return apiClient.put(`/shift-swap-requests/${id}/approve`, {}, addDemoHeader());
+    return apiClient.put(`/shift-swap-requests/${id}/approve`, {});
   },
   rejectSwapRequest(id) {
-    return apiClient.put(`/shift-swap-requests/${id}/reject`, {}, addDemoHeader());
+    return apiClient.put(`/shift-swap-requests/${id}/reject`, {});
   },
 
   // ── TIME OFF REQUESTS ────────────────────────────────────────────────────
   getAllTimeOffRequests() {
-    return apiClient.get("/time-off-requests", addDemoHeader());
+    return apiClient.get("/time-off-requests");
   },
   getPendingTimeOffRequests() {
-    return apiClient.get("/time-off-requests?status=pending", addDemoHeader());
+    return apiClient.get("/time-off-requests?status=pending");
   },
   getTimeOffRequestById(id) {
-    return apiClient.get(`/time-off-requests/${id}`, addDemoHeader());
+    return apiClient.get(`/time-off-requests/${id}`);
   },
   approveTimeOffRequest(id) {
-    return apiClient.put(`/time-off-requests/${id}/approve`, {}, addDemoHeader());
+    return apiClient.put(`/time-off-requests/${id}/approve`, {});
   },
   denyTimeOffRequest(id) {
-    return apiClient.put(`/time-off-requests/${id}/deny`, {}, addDemoHeader());
+    return apiClient.put(`/time-off-requests/${id}/deny`, {});
   },
   deleteTimeOffRequest(id) {
-    return apiClient.delete(`/time-off-requests/${id}`, addDemoHeader());
+    return apiClient.delete(`/time-off-requests/${id}`);
   },
 
   // ── USERS / EMPLOYEES ────────────────────────────────────────────────────
   getAllEmployees() {
-    return apiClient.get("/users", addDemoHeader());
+    return apiClient.get("/users");
   },
   getEmployeeById(id) {
-    return apiClient.get(`/users/${id}`, addDemoHeader());
+    return apiClient.get(`/users/${id}`);
   },
   createEmployee(employee) {
-    return apiClient.post("/users", employee, addDemoHeader());
+    return apiClient.post("/users", employee);
   },
   updateEmployee(id, employee) {
-    return apiClient.put(`/users/${id}`, employee, addDemoHeader());
+    return apiClient.put(`/users/${id}`, employee);
   },
   deleteEmployee(id) {
-    return apiClient.delete(`/users/${id}`, addDemoHeader());
+    return apiClient.delete(`/users/${id}`);
   },
 
   // Search existing users by name (for the assign-to-workplace flow)
   searchEmployeesByName(q) {
-    return apiClient.get(`/users/search?q=${encodeURIComponent(q)}`, addDemoHeader());
+    return apiClient.get(`/users/search?q=${encodeURIComponent(q)}`);
   },
 
   // Assign an existing user to the employer's workplace — no duplicate record created
   assignEmployeeToWorkplace(userId) {
-    return apiClient.post(`/users/${userId}/assign`, {}, addDemoHeader());
+    return apiClient.post(`/users/${userId}/assign`, {});
   },
 
   // ── USER JOB ROLES ───────────────────────────────────────────────────────
   addRoleToUser(userId, roleData) {
-    return apiClient.post(`/user-job-roles/user/${userId}/roles`, roleData, addDemoHeader());
+    return apiClient.post(`/user-job-roles/user/${userId}/roles`, roleData);
   },
   getUserRoles(userId) {
-    return apiClient.get(`/user-job-roles/user/${userId}/roles`, addDemoHeader());
+    return apiClient.get(`/user-job-roles/user/${userId}/roles`);
   },
   removeRoleFromUser(userId, roleId) {
-    return apiClient.delete(`/user-job-roles/user/${userId}/roles/${roleId}`, addDemoHeader());
+    return apiClient.delete(`/user-job-roles/user/${userId}/roles/${roleId}`);
   },
   setPrimaryRole(userId, roleId) {
-    return apiClient.put(`/user-job-roles/user/${userId}/roles/${roleId}/primary`, {}, addDemoHeader());
+    return apiClient.put(`/user-job-roles/user/${userId}/roles/${roleId}/primary`, {});
   },
   getUsersByRole(roleId) {
-    return apiClient.get(`/user-job-roles/role/${roleId}/users`, addDemoHeader());
+    return apiClient.get(`/user-job-roles/role/${roleId}/users`);
   },
 
   // ── AVAILABILITY ─────────────────────────────────────────────────────────
   getAllAvailability() {
-    return apiClient.get("/availability", addDemoHeader());
+    return apiClient.get("/availability");
   },
   getAvailabilityByUser(userId) {
-    return apiClient.get(`/availability?userId=${userId}`, addDemoHeader());
+    return apiClient.get(`/availability?userId=${userId}`);
   },
   createAvailability(availability) {
-    return apiClient.post("/availability", availability, addDemoHeader());
+    return apiClient.post("/availability", availability);
   },
   updateAvailability(id, availability) {
-    return apiClient.put(`/availability/${id}`, availability, addDemoHeader());
+    return apiClient.put(`/availability/${id}`, availability);
   },
   deleteAvailability(id) {
-    return apiClient.delete(`/availability/${id}`, addDemoHeader());
+    return apiClient.delete(`/availability/${id}`);
   },
 
   // ── TASK LISTS ───────────────────────────────────────────────────────────
   getAllTaskLists() {
-    return apiClient.get("/task-lists", addDemoHeader());
+    return apiClient.get("/task-lists");
   },
   getTaskListById(id) {
-    return apiClient.get(`/task-lists/${id}`, addDemoHeader());
+    return apiClient.get(`/task-lists/${id}`);
   },
   createTaskList(taskList) {
-    return apiClient.post("/task-lists", taskList, addDemoHeader());
+    return apiClient.post("/task-lists", taskList);
   },
   updateTaskList(id, taskList) {
-    return apiClient.put(`/task-lists/${id}`, taskList, addDemoHeader());
+    return apiClient.put(`/task-lists/${id}`, taskList);
   },
   deleteTaskList(id) {
-    return apiClient.delete(`/task-lists/${id}`, addDemoHeader());
+    return apiClient.delete(`/task-lists/${id}`);
   },
   completeTaskList(id) {
-    return apiClient.put(`/task-lists/${id}/complete`, {}, addDemoHeader());
+    return apiClient.put(`/task-lists/${id}/complete`, {});
   },
   archiveTaskList(id) {
-    return apiClient.put(`/task-lists/${id}/archive`, {}, addDemoHeader());
+    return apiClient.put(`/task-lists/${id}/archive`, {});
   },
 
   // ── TASK LIST ITEMS ──────────────────────────────────────────────────────
   getAllTaskItems() {
-    return apiClient.get("/task-list-items", addDemoHeader());
+    return apiClient.get("/task-list-items");
   },
   getTaskItemsByList(tasklistId) {
-    return apiClient.get(`/task-list-items?tasklistId=${tasklistId}`, addDemoHeader());
+    return apiClient.get(`/task-list-items?tasklistId=${tasklistId}`);
   },
   createTaskItem(item) {
-    return apiClient.post("/task-list-items", item, addDemoHeader());
+    return apiClient.post("/task-list-items", item);
   },
   updateTaskItem(id, item) {
-    return apiClient.put(`/task-list-items/${id}`, item, addDemoHeader());
+    return apiClient.put(`/task-list-items/${id}`, item);
   },
   deleteTaskItem(id) {
-    return apiClient.delete(`/task-list-items/${id}`, addDemoHeader());
+    return apiClient.delete(`/task-list-items/${id}`);
   },
   completeTaskItem(id) {
-    return apiClient.put(`/task-list-items/${id}/complete`, {}, addDemoHeader());
+    return apiClient.put(`/task-list-items/${id}/complete`, {});
   },
   reorderTaskItems(items) {
-    return apiClient.put("/task-list-items/reorder", { items }, addDemoHeader());
+    return apiClient.put("/task-list-items/reorder", { items });
   },
 
   // ── SHIFT TASKS ──────────────────────────────────────────────────────────
   assignTaskToShift(shiftId, tasklistId) {
-    return apiClient.post("/shift-tasks", { shiftId, tasklistId }, addDemoHeader());
+    return apiClient.post("/shift-tasks", { shiftId, tasklistId });
   },
   bulkAssignTasksToShift(shiftId, tasklistIds) {
-    return apiClient.post("/shift-tasks/bulk", { shiftId, tasklistIds }, addDemoHeader());
+    return apiClient.post("/shift-tasks/bulk", { shiftId, tasklistIds });
   },
   getShiftTasks(shiftId) {
-    return apiClient.get(`/shift-tasks/shift/${shiftId}`, addDemoHeader());
+    return apiClient.get(`/shift-tasks/shift/${shiftId}`);
   },
   getTaskShifts(tasklistId) {
-    return apiClient.get(`/shift-tasks/task/${tasklistId}`, addDemoHeader());
+    return apiClient.get(`/shift-tasks/task/${tasklistId}`);
   },
   removeTaskFromShift(shiftId, tasklistId) {
-    return apiClient.delete(`/shift-tasks/shift/${shiftId}/task/${tasklistId}`, addDemoHeader());
+    return apiClient.delete(`/shift-tasks/shift/${shiftId}/task/${tasklistId}`);
   },
 
   // ── MESSAGES ─────────────────────────────────────────────────────────────
   sendMessage(messageData) {
-    return apiClient.post("/messages", messageData, addDemoHeader());
+    return apiClient.post("/messages", messageData);
   },
   broadcastMessage(messageData) {
-    return apiClient.post("/messages/broadcast", messageData, addDemoHeader());
+    return apiClient.post("/messages/broadcast", messageData);
   },
   getInbox() {
-    return apiClient.get("/messages/inbox", addDemoHeader());
+    return apiClient.get("/messages/inbox");
   },
   getSentMessages() {
-    return apiClient.get("/messages/sent", addDemoHeader());
+    return apiClient.get("/messages/sent");
   },
   getUnreadMessageCount() {
-    return apiClient.get("/messages/unread-count", addDemoHeader());
+    return apiClient.get("/messages/unread-count");
   },
   markMessageAsRead(id) {
-    return apiClient.put(`/messages/${id}/read`, {}, addDemoHeader());
+    return apiClient.put(`/messages/${id}/read`, {});
   },
   deleteMessage(id) {
-    return apiClient.delete(`/messages/${id}`, addDemoHeader());
+    return apiClient.delete(`/messages/${id}`);
   },
 
   // ── CLOCK RECORDS (time cards) ───────────────────────────────────────────
   getAllClockRecords() {
-    return apiClient.get("/clock-records", addDemoHeader());
+    return apiClient.get("/clock-records");
   },
   approveClockRecord(id) {
-    return apiClient.put(`/clock-records/${id}/approve`, {}, addDemoHeader());
+    return apiClient.put(`/clock-records/${id}/approve`, {});
   },
   rejectClockRecord(id, reason = '') {
-    return apiClient.put(`/clock-records/${id}/reject`, { reason }, addDemoHeader());
+    return apiClient.put(`/clock-records/${id}/reject`, { reason });
   },
   modifyClockRecord(id, data) {
-    return apiClient.put(`/clock-records/${id}/modify`, data, addDemoHeader());
+    return apiClient.put(`/clock-records/${id}/modify`, data);
   },
   clockIn(shiftId) {
-    return apiClient.post("/clock-records/clock-in", { shiftId }, addDemoHeader());
+    return apiClient.post("/clock-records/clock-in", { shiftId });
   },
   clockOut(id) {
-    return apiClient.put(`/clock-records/clock-out/${id}`, {}, addDemoHeader());
+    return apiClient.put(`/clock-records/clock-out/${id}`, {});
   },
   kioskClockIn({ userId, shiftId }) {
-    return apiClient.post("/clock-records/clock-in", { userId, shiftId }, addDemoHeader());
+    return apiClient.post("/clock-records/clock-in", { userId, shiftId });
   },
   kioskClockOut({ userId }) {
-    return apiClient.put("/clock-records/clock-out/0", { userId }, addDemoHeader());
+    return apiClient.put("/clock-records/clock-out/0", { userId });
   },
 
   // ── BUSINESS AREAS / LOCATIONS ───────────────────────────────────────────
   getAllLocations() {
-    return apiClient.get("/business-areas", addDemoHeader());
+    return apiClient.get("/business-areas");
   },
   getBusinessAreas() {
-    return apiClient.get("/business-areas", addDemoHeader());
+    return apiClient.get("/business-areas");
   },
   getLocationById(id) {
-    return apiClient.get(`/business-areas/${id}`, addDemoHeader());
+    return apiClient.get(`/business-areas/${id}`);
   },
   createLocation(location) {
-    return apiClient.post("/business-areas", location, addDemoHeader());
+    return apiClient.post("/business-areas", location);
   },
   updateLocation(id, location) {
-    return apiClient.put(`/business-areas/${id}`, location, addDemoHeader());
+    return apiClient.put(`/business-areas/${id}`, location);
   },
   deleteLocation(id) {
-    return apiClient.delete(`/business-areas/${id}`, addDemoHeader());
+    return apiClient.delete(`/business-areas/${id}`);
   },
 
   // ── JOB ROLES ────────────────────────────────────────────────────────────
   getAllJobRoles() {
-    return apiClient.get("/job-roles", addDemoHeader());
+    return apiClient.get("/job-roles");
   },
   getJobRoleById(id) {
-    return apiClient.get(`/job-roles/${id}`, addDemoHeader());
+    return apiClient.get(`/job-roles/${id}`);
   },
   createJobRole(jobRole) {
-    return apiClient.post("/job-roles", jobRole, addDemoHeader());
+    return apiClient.post("/job-roles", jobRole);
   },
   updateJobRole(id, jobRole) {
-    return apiClient.put(`/job-roles/${id}`, jobRole, addDemoHeader());
+    return apiClient.put(`/job-roles/${id}`, jobRole);
   },
   deleteJobRole(id) {
-    return apiClient.delete(`/job-roles/${id}`, addDemoHeader());
+    return apiClient.delete(`/job-roles/${id}`);
   },
 
   // ── TASK COMPLETION HISTORY ──────────────────────────────────────────────
   getTaskCompletionHistory() {
-    return apiClient.get("/tasklists/history/all", addDemoHeader());
+    return apiClient.get("/tasklists/history/all");
   },
 
 };

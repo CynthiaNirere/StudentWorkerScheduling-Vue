@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from "vue";
 import Utils from "../config/utils";
 import EmployerService from "../services/employerServices.js";
 import EmployerLayout from '../components/EmployerLayout.vue';
+import ClassScheduleModal from '../components/classSchedulemodal.vue';
 
 const user = ref(null);
 
@@ -10,6 +11,11 @@ const availability = ref([]);
 const employees = ref([]);
 const loading = ref(false);
 const selectedEmployee = ref(null);
+
+// Class Schedule Modal
+const showScheduleModal = ref(false);
+const selectedUserId = ref('');
+const selectedUserName = ref('');
 
 const snackbar = ref(false);
 const snackbarMessage = ref("");
@@ -126,6 +132,13 @@ const showSnackbar = (message, color = "success") => {
   snackbar.value = true;
 };
 
+// Open Class Schedule Modal
+const viewClassSchedule = (employee) => {
+  selectedUserId.value = employee.employeeId;
+  selectedUserName.value = employee.employeeName;
+  showScheduleModal.value = true;
+};
+
 const openAddDialog = () => {
   addForm.value = { ...defaultForm };
   showAddDialog.value = true;
@@ -200,6 +213,13 @@ const handleDelete = async () => {
 
 <template>
   <EmployerLayout>
+    <!-- Class Schedule Modal -->
+    <ClassScheduleModal 
+      v-model="showScheduleModal" 
+      :userId="selectedUserId"
+      :userName="selectedUserName"
+    />
+
     <v-container fluid class="pa-6">
       <div class="d-flex align-center justify-space-between mb-5">
         <div>
@@ -236,7 +256,20 @@ const handleDelete = async () => {
 
           <div v-for="row in availabilityGrid" :key="row.employeeId" class="availability-grid-row">
             <div class="employee-column">
-              <div class="font-weight-medium">{{ row.employeeName }}</div>
+              <div class="d-flex align-center justify-space-between w-100">
+                <div class="font-weight-medium">{{ row.employeeName }}</div>
+                <!-- 📚 Class Schedule Button -->
+                <v-btn 
+                  size="x-small" 
+                  color="primary" 
+                  variant="outlined"
+                  prepend-icon="mdi-school"
+                  @click="viewClassSchedule(row)"
+                  class="ml-2"
+                >
+                  Class Schedule
+                </v-btn>
+              </div>
             </div>
             <div v-for="day in daysOfWeek" :key="day" class="day-column">
               <!-- ✅ CHANGED: "Unavailable" → "In Class" -->
@@ -271,7 +304,7 @@ const handleDelete = async () => {
       </v-card>
 
       <v-alert type="info" variant="tonal" class="mt-4" color="#4361EE">
-        <strong>Tip:</strong> "In Class" means no availability is set for that day. Click "Add Availability" to set hours.
+        <strong>Tip:</strong> Click "Class Schedule" next to any employee to view their course schedule and plan shifts accordingly.
       </v-alert>
 
       <!-- Add Dialog -->
@@ -335,7 +368,7 @@ const handleDelete = async () => {
 .availability-grid-header,
 .availability-grid-row {
   display: grid;
-  grid-template-columns: 200px repeat(7, 1fr);
+  grid-template-columns: 250px repeat(7, 1fr);
   gap: 8px;
   border-bottom: 1px solid #e8e8e8;
 }

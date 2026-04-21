@@ -4,6 +4,7 @@ import { useTheme } from 'vuetify';
 import { useRouter } from 'vue-router';
 import Utils from "../config/utils";
 import EmployerLayout from '../components/EmployerLayout.vue';
+import EmployerService from '../services/employerServices.js';
 
 const router = useRouter();
 
@@ -58,10 +59,24 @@ watch(darkMode, (val) => {
   localStorage.setItem('theme', val ? 'dark' : 'light');
 });
 
-const saveNotificationPreferences = () => {
-  localStorage.setItem('notificationPreferences', JSON.stringify(notificationPreferences.value));
-  window.dispatchEvent(new CustomEvent('notif-prefs-updated'));
-  showSnackbar("Notification preferences saved!", "success");
+const saveNotificationPreferences = async () => {
+  try {
+    // Save email notification preference to backend
+    if (notificationPreferences.value.emailNotifications !== undefined) {
+      await EmployerService.updateEmailNotifications(
+        user.value.id,
+        notificationPreferences.value.emailNotifications
+      );
+    }
+    
+    // Save other preferences to localStorage
+    localStorage.setItem('notificationPreferences', JSON.stringify(notificationPreferences.value));
+    window.dispatchEvent(new CustomEvent('notif-prefs-updated'));
+    showSnackbar("Notification preferences saved!", "success");
+  } catch (error) {
+    console.error('Error saving notification preferences:', error);
+    showSnackbar("Error saving preferences", "error");
+  }
 };
 
 const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true; };

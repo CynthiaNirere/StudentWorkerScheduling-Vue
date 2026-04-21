@@ -3,8 +3,12 @@ import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
 import Utils from '../config/utils.js';
 import EmployeeService from '../services/employeeServices.js';
 import EmployeeLayout from '../components/EmployeeLayout.vue';
+import ClassScheduleModal from '../components/classSchedulemodal.vue';
 
 const user = ref(null);
+
+// Class Schedule Modal
+const showScheduleModal = ref(false);
 
 // ── LOCATION ──────────────────────────────────────────────────────────────
 const locations        = ref([]);
@@ -284,6 +288,11 @@ const submitAvailability = async () => {
   }
 };
 
+// Open Class Schedule Modal
+const viewMyClassSchedule = () => {
+  showScheduleModal.value = true;
+};
+
 // ── LIFECYCLE ─────────────────────────────────────────────────────────────
 onMounted(async () => {
   user.value = Utils.getStore('user');
@@ -300,6 +309,13 @@ onUnmounted(() => {
 
 <template>
   <EmployeeLayout>
+    <!-- Class Schedule Modal -->
+    <ClassScheduleModal 
+      v-model="showScheduleModal" 
+      :userId="user?.user_id || user?.userId"
+      :userName="`${user?.fName || ''} ${user?.lName || ''}`"
+    />
+
     <v-container fluid class="pa-6">
 
       <!-- Header -->
@@ -381,6 +397,21 @@ onUnmounted(() => {
                 Save & Notify Employer
               </v-btn>
             </v-card-actions>
+          </v-card>
+
+          <!-- 📚 View My Class Schedule Button -->
+          <v-card variant="outlined" rounded="lg" class="navy-card mb-4">
+            <v-card-text class="pa-3">
+              <v-btn
+                block
+                color="primary"
+                variant="outlined"
+                prepend-icon="mdi-school"
+                @click="viewMyClassSchedule"
+              >
+                View My Class Schedule
+              </v-btn>
+            </v-card-text>
           </v-card>
 
           <v-card variant="outlined" rounded="lg" class="navy-card">
