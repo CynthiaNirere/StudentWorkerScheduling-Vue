@@ -155,7 +155,29 @@ const pendingWeeksOpen = ref({ w1: true, w2: false });
 onMounted(async () => {
   user.value = Utils.getStore('user');
   await loadData();
+  checkTimecardNotifications();
 });
+
+const checkTimecardNotifications = async () => {
+  const userId = user.value?.user_id || user.value?.userId;
+  if (!userId) return;
+  try {
+    const res = await EmployeeService.getMyNotifications(userId);
+    const notifs = Array.isArray(res.data) ? res.data : [];
+    const unread = notifs.filter(n =>
+      (n.type === 'timecard') && !n.isRead && !n.is_read
+    );
+    if (unread.length === 0) return;
+    const latest = unread[0];
+    const msg = latest.description || latest.message || latest.title || 'Your timecard status was updated';
+    const approved = msg.toLowerCase().includes('approved');
+    showSnackbar(msg, approved ? 'success' : 'error');
+    for (const n of unread) {
+      await EmployeeService.markNotificationRead(n.notification_id || n.id).catch(() => {});
+    }
+    window.dispatchEvent(new CustomEvent('notifications-updated'));
+  } catch { /* silent */ }
+};
 
 const loadData = async () => {
   loading.value = true;
@@ -347,11 +369,8 @@ const saveLog = async () => {
       if (day.shiftId) payload.shiftId = day.shiftId;
       const res   = await EmployeeService.clockIn(payload);
       const newId = res.data?.id || res.data?.clock_id || res.data?.clockId;
-      if (newId) {
-        await EmployeeService.updateClockRecord(newId, { clockInTime: inTs, clockOutTime: outTs, notes: day.notes });
-        saved++;
-      }
-    } catch { /* individual day failed — likely backend requires shiftId */ }
+      if (newId) saved++;
+    } catch { /* individual day failed — backend requires shiftId */ }
   }
   logging.value = false;
   if (saved > 0) {
@@ -371,7 +390,18 @@ const toInputDateTime = (d) => {
 const formatTime  = (d) => d ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—';
 const dayShort    = (d) => d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
 const isToday     = (d) => { const t = new Date(); return d.getDate()===t.getDate()&&d.getMonth()===t.getMonth()&&d.getFullYear()===t.getFullYear(); };
-const weekHours   = (days) => days.reduce((s,d)=>s+d.records.reduce((ss,r)=>ss+(parseFloat(r.totalHours)||0),0),0).toFixed(2);
+const weekHours      = (days) => days.reduce((s,d)=>s+d.records.reduce((ss,r)=>ss+(parseFloat(r.totalHours)||0),0),0).toFixed(2);
+const weekEntryCount = (days) => days.reduce((s,d)=>s+d.records.length,0);
+
+const getWeekLabel = (days, fallback) => {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const start = new Date(days[0].date); start.setHours(0,0,0,0);
+  const end   = new Date(days[6].date); end.setHours(23,59,59,999);
+  if (today >= start && today <= end) return 'This Week';
+  if (end < today) return 'Last Week';
+  if (start > today) return 'Next Week';
+  return fallback;
+};
 
 const showSnackbar = (msg, color='success') => { snackMsg.value=msg; snackColor.value=color; snackbar.value=true; };
 
@@ -471,16 +501,17 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
           </div>
 
           <!-- Week 1 -->
-          <v-card variant="outlined" rounded="lg" class="navy-card overflow-hidden mb-3">
+          <v-card variant="outlined" rounded="lg" class="navy-card overflow-hidden mb-3" :class="weekEntryCount(pendingWeek1) > 0 ? 'week-card--active' : ''">
             <div class="week-toggle d-flex align-center px-5 py-4 cursor-pointer" @click="pendingWeeksOpen.w1 = !pendingWeeksOpen.w1">
               <v-icon size="18" class="mr-3" color="#12086F" style="transition:transform .2s" :style="pendingWeeksOpen.w1 ? 'transform:rotate(90deg)' : ''">mdi-chevron-right</v-icon>
-              <span class="text-body-2 font-weight-bold navy-text mr-2">Week 1</span>
+              <span class="text-body-2 font-weight-bold navy-text mr-2">{{ getWeekLabel(pendingWeek1, 'Week 1') }}</span>
+              <v-chip v-if="weekEntryCount(pendingWeek1) > 0" size="x-small" color="#12086F" variant="tonal" class="mr-2">{{ weekEntryCount(pendingWeek1) }} entr{{ weekEntryCount(pendingWeek1) === 1 ? 'y' : 'ies' }}</v-chip>
               <span class="text-caption text-grey">
                 {{ pendingWeek1[0].date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }} –
                 {{ pendingWeek1[6].date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }}
               </span>
               <v-spacer />
-              <span class="text-body-2 font-weight-bold navy-text">{{ weekHours(pendingWeek1) }} hrs</span>
+              <span class="text-body-2 font-weight-bold" :style="weekEntryCount(pendingWeek1) > 0 ? 'color:#12086F' : ''">{{ weekHours(pendingWeek1) }} hrs</span>
             </div>
             <template v-if="pendingWeeksOpen.w1">
               <v-divider />
@@ -523,16 +554,17 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
           </v-card>
 
           <!-- Week 2 -->
-          <v-card variant="outlined" rounded="lg" class="navy-card overflow-hidden mb-4">
+          <v-card variant="outlined" rounded="lg" class="navy-card overflow-hidden mb-4" :class="weekEntryCount(pendingWeek2) > 0 ? 'week-card--active' : ''">
             <div class="week-toggle d-flex align-center px-5 py-4 cursor-pointer" @click="pendingWeeksOpen.w2 = !pendingWeeksOpen.w2">
               <v-icon size="18" class="mr-3" color="#12086F" style="transition:transform .2s" :style="pendingWeeksOpen.w2 ? 'transform:rotate(90deg)' : ''">mdi-chevron-right</v-icon>
-              <span class="text-body-2 font-weight-bold navy-text mr-2">Week 2</span>
+              <span class="text-body-2 font-weight-bold navy-text mr-2">{{ getWeekLabel(pendingWeek2, 'Week 2') }}</span>
+              <v-chip v-if="weekEntryCount(pendingWeek2) > 0" size="x-small" color="#12086F" variant="tonal" class="mr-2">{{ weekEntryCount(pendingWeek2) }} entr{{ weekEntryCount(pendingWeek2) === 1 ? 'y' : 'ies' }}</v-chip>
               <span class="text-caption text-grey">
                 {{ pendingWeek2[0].date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }} –
                 {{ pendingWeek2[6].date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }}
               </span>
               <v-spacer />
-              <span class="text-body-2 font-weight-bold navy-text">{{ weekHours(pendingWeek2) }} hrs</span>
+              <span class="text-body-2 font-weight-bold" :style="weekEntryCount(pendingWeek2) > 0 ? 'color:#12086F' : ''">{{ weekHours(pendingWeek2) }} hrs</span>
             </div>
             <template v-if="pendingWeeksOpen.w2">
               <v-divider />
@@ -600,7 +632,7 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
           <v-card v-if="submittedWeek1.some(d => d.records.length > 0)" variant="outlined" rounded="lg" class="navy-card overflow-hidden mb-3">
             <div class="week-toggle d-flex align-center px-5 py-4 cursor-pointer" @click="pendingWeeksOpen.w1 = !pendingWeeksOpen.w1">
               <v-icon size="18" class="mr-3" color="#12086F" style="transition:transform .2s" :style="pendingWeeksOpen.w1 ? 'transform:rotate(90deg)' : ''">mdi-chevron-right</v-icon>
-              <span class="text-body-2 font-weight-bold navy-text mr-2">Week 1</span>
+              <span class="text-body-2 font-weight-bold navy-text mr-2">{{ getWeekLabel(submittedWeek1, 'Week 1') }}</span>
               <span class="text-caption text-grey">
                 {{ submittedWeek1[0].date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }} –
                 {{ submittedWeek1[6].date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }}
@@ -649,7 +681,7 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
           <v-card v-if="submittedWeek2.some(d => d.records.length > 0)" variant="outlined" rounded="lg" class="navy-card overflow-hidden mb-3">
             <div class="week-toggle d-flex align-center px-5 py-4 cursor-pointer" @click="pendingWeeksOpen.w2 = !pendingWeeksOpen.w2">
               <v-icon size="18" class="mr-3" color="#12086F" style="transition:transform .2s" :style="pendingWeeksOpen.w2 ? 'transform:rotate(90deg)' : ''">mdi-chevron-right</v-icon>
-              <span class="text-body-2 font-weight-bold navy-text mr-2">Week 2</span>
+              <span class="text-body-2 font-weight-bold navy-text mr-2">{{ getWeekLabel(submittedWeek2, 'Week 2') }}</span>
               <span class="text-caption text-grey">
                 {{ submittedWeek2[0].date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }} –
                 {{ submittedWeek2[6].date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }}
@@ -932,6 +964,7 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
 <style scoped>
 .navy-text  { color: #12086F !important; }
 .navy-card  { border-color: #e0e0e0; }
+.week-card--active { border-color: #12086F !important; border-left-width: 3px !important; }
 .cursor-pointer { cursor: pointer; }
 .period-row, .week-toggle { transition: background .15s; }
 .period-row:hover, .week-toggle:hover { background: #fafbff; }
@@ -979,6 +1012,7 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
 /* ── Dark mode ─────────────────────────────────────────────────────────── */
 .v-theme--dark .navy-text  { color: #C5CAE9 !important; }
 .v-theme--dark .navy-card  { border-color: #37474F; }
+.v-theme--dark .week-card--active { border-color: #7B68EE !important; }
 .v-theme--dark .period-row:hover, .v-theme--dark .week-toggle:hover { background: #263238; }
 .v-theme--dark .shift-card { background: #1E1E2E; border-color: #37474F; }
 .v-theme--dark .shift-card:hover { background: #263238; }
