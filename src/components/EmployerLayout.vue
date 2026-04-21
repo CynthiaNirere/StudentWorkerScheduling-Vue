@@ -242,21 +242,70 @@ const logout = () => {
       <v-divider class="border-white-20" />
 
       <v-list nav class="px-2">
-        <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard"   :to="isGuest ? { name: 'guestDashboard' }   : { name: 'employerDashboard' }"   color="white" class="nav-item" rounded="lg" />
-        <v-list-item prepend-icon="mdi-calendar"       title="Schedule"    :to="isGuest ? { name: 'guestSchedule' }    : { name: 'employerSchedule' }"    color="white" class="nav-item" rounded="lg" />
-        <v-list-item prepend-icon="mdi-calendar-text"  title="Templates"   :to="isGuest ? { name: 'guestTemplates' }   : { name: 'employerTemplates' }"   color="white" class="nav-item" rounded="lg" />
-        <v-list-item prepend-icon="mdi-account-group"  title="Employees"   :to="isGuest ? { name: 'guestEmployees' }   : { name: 'employerEmployees' }"   color="white" class="nav-item" rounded="lg" />
-        <v-list-item prepend-icon="mdi-clock-outline"  title="Availability" :to="isGuest ? { name: 'guestAvailability' } : { name: 'employerAvailability' }" color="white" class="nav-item" rounded="lg" />
-        <v-list-item prepend-icon="mdi-calendar-remove" title="Time Off"   :to="isGuest ? { name: 'guestTimeOff' }     : { name: 'employerTimeOff' }"     color="white" class="nav-item" rounded="lg" />
-        <v-list-item prepend-icon="mdi-swap-horizontal" title="Swaps"      :to="isGuest ? { name: 'guestSwaps' }       : { name: 'employerSwaps' }"       color="white" class="nav-item" rounded="lg" />
-        <v-list-item prepend-icon="mdi-message-text"   title="Messages"    :to="isGuest ? { name: 'guestMessages' }    : { name: 'employerMessages' }"    color="white" class="nav-item" rounded="lg">
+        <v-list-item
+          prepend-icon="mdi-view-dashboard"
+          title="Dashboard"
+          :to="isGuest ? { name: 'guestDashboard' } : { name: 'employerDashboard' }"
+          color="white" class="nav-item" rounded="lg" />
+        <v-list-item
+          prepend-icon="mdi-calendar"
+          title="Schedule"
+          :to="isGuest ? { name: 'guestSchedule' } : { name: 'employerSchedule' }"
+          color="white" class="nav-item" rounded="lg" />
+        <v-list-item
+          prepend-icon="mdi-calendar-text"
+          title="Templates"
+          :to="isGuest ? { name: 'guestTemplates' } : { name: 'employerTemplates' }"
+          color="white" class="nav-item" rounded="lg" />
+        <v-list-item
+          prepend-icon="mdi-account-group"
+          title="Employees"
+          :to="isGuest ? { name: 'guestEmployees' } : { name: 'employerEmployees' }"
+          color="white" class="nav-item" rounded="lg" />
+        <v-list-item
+          prepend-icon="mdi-clock-outline"
+          title="Availability"
+          :to="isGuest ? { name: 'guestAvailability' } : { name: 'employerAvailability' }"
+          color="white" class="nav-item" rounded="lg" />
+        <v-list-item
+          prepend-icon="mdi-calendar-remove"
+          title="Time Off"
+          :to="isGuest ? { name: 'guestTimeOff' } : { name: 'employerTimeOff' }"
+          color="white" class="nav-item" rounded="lg" />
+        <v-list-item
+          prepend-icon="mdi-swap-horizontal"
+          title="Swaps"
+          :to="isGuest ? { name: 'guestSwaps' } : { name: 'employerSwaps' }"
+          color="white" class="nav-item" rounded="lg" />
+        <v-list-item
+          prepend-icon="mdi-message-text"
+          title="Messages"
+          :to="isGuest ? { name: 'guestMessages' } : { name: 'employerMessages' }"
+          color="white" class="nav-item" rounded="lg">
           <template #append v-if="unreadMsgCount > 0">
             <v-badge :content="unreadMsgCount" color="#f57c00" inline />
           </template>
         </v-list-item>
-        <v-list-item prepend-icon="mdi-checkbox-marked-circle-outline" title="Tasks"      :to="isGuest ? { name: 'guestTasks' }      : { name: 'employerTasks' }"      color="white" class="nav-item" rounded="lg" />
-        <v-list-item prepend-icon="mdi-credit-card-clock-outline"      title="Time Cards" :to="isGuest ? { name: 'guestDashboard' }  : { name: 'employerTimeCards' }"  color="white" class="nav-item" rounded="lg" />
-        <v-list-item prepend-icon="mdi-cog-outline"                    title="Settings"   :to="isGuest ? { name: 'guestDashboard' }  : { name: 'employerSettings' }"   color="white" class="nav-item" rounded="lg" />
+        <v-list-item
+          prepend-icon="mdi-checkbox-marked-circle-outline"
+          title="Tasks"
+          :to="isGuest ? { name: 'guestTasks' } : { name: 'employerTasks' }"
+          color="white" class="nav-item" rounded="lg" />
+        <v-list-item
+          prepend-icon="mdi-bell-outline"
+          title="Alerts"
+          :to="isGuest ? { name: 'guestAlerts' } : { name: 'employerAlerts' }"
+          color="white" class="nav-item" rounded="lg" />
+        <v-list-item
+          prepend-icon="mdi-credit-card-clock-outline"
+          title="Time Cards"
+          :to="isGuest ? { name: 'guestTimeCards' } : { name: 'employerTimeCards' }"
+          color="white" class="nav-item" rounded="lg" />
+        <v-list-item
+          prepend-icon="mdi-cog-outline"
+          title="Settings"
+          :to="isGuest ? { name: 'guestSettings' } : { name: 'employerSettings' }"
+          color="white" class="nav-item" rounded="lg" />
 
         <v-divider v-if="isImpersonating" class="border-white-20 my-2" />
         <v-list-item v-if="isImpersonating"
@@ -282,7 +331,9 @@ const logout = () => {
             <v-card-title class="text-h6 font-weight-bold pa-4 d-flex align-center justify-space-between">
               <span>Notifications</span>
               <v-btn v-if="notifications.length > 0" size="x-small" variant="tonal" color="#12086F"
-                @click="router.push({ name: 'employerAlerts' }); showNotifications = false">View All</v-btn>
+                @click="router.push({ name: isGuest ? 'guestAlerts' : 'employerAlerts' }); showNotifications = false">
+                View All
+              </v-btn>
             </v-card-title>
             <v-divider />
             <div v-if="notifications.length === 0" class="text-center pa-6">
@@ -340,9 +391,13 @@ const logout = () => {
                   class="text-warning font-weight-bold" @click="exitImpersonation" />
                 <v-list-item v-if="!isGuest && !isImpersonating"
                   prepend-icon="mdi-account" title="Profile" :to="{ name: 'employerProfile' }" />
-                <v-list-item prepend-icon="mdi-logout"
+                <v-list-item v-if="isGuest"
+                  prepend-icon="mdi-account" title="Profile" :to="{ name: 'guestProfile' }" />
+                <v-list-item
+                  prepend-icon="mdi-logout"
                   :title="isGuest ? 'Exit Guest Mode' : 'Sign Out'"
-                  @click="logout" :class="isGuest ? 'text-info' : 'text-error'" />
+                  @click="logout"
+                  :class="isGuest ? 'text-info' : 'text-error'" />
               </v-list>
             </v-card-text>
           </v-card>
