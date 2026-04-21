@@ -12,6 +12,9 @@ import GuestTasks from './views/GuestTasks.vue';
 import GuestTemplate from './views/GuestTemplate.vue';
 import GuestAlerts from './views/GuestAlerts.vue';
 import GuestMessages from './views/GuestMessages.vue';
+import GuestTimeCards from './views/GuestTimeCards.vue';
+import GuestProfile from './views/GuestProfile.vue';
+import GuestSettings from './views/GuestSettings.vue';
 import Login from "./views/Login.vue";
 import SignUp from "./views/SignUp.vue";
 import RoleSelect from "./views/RoleSelect.vue";
@@ -47,75 +50,13 @@ import Profile from "./views/Profile.vue";
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    // ─── LANDING & GUEST ROUTES ────────────────────────────────────────
+    // ─── LANDING & AUTH ────────────────────────────────────────────────
     {
       path: "/",
       name: "landing",
       component: Landing,
       meta: { requiresAuth: false },
     },
-    {
-      path: "/guest",
-      name: "guestDashboard",
-      component: GuestDashboard,
-      meta: { requiresAuth: false },
-    },
-    {
-      path: "/guest/schedule",
-      name: "guestSchedule",
-      component: GuestSchedule,
-      meta: { requiresAuth: false },
-    },
-    {
-      path: "/guest/employees",
-      name: "guestEmployees",
-      component: GuestEmployees,
-      meta: { requiresAuth: false },
-    },
-    {
-      path: "/guest/availability",
-      name: "guestAvailability",
-      component: GuestAvailability,
-      meta: { requiresAuth: false },
-    },
-    {
-      path: "/guest/time-off",
-      name: "guestTimeOff",
-      component: GuestTimeOff,
-      meta: { requiresAuth: false },
-    },
-    {
-      path: "/guest/swaps",
-      name: "guestSwaps",
-      component: GuestSwaps,
-      meta: { requiresAuth: false },
-    },
-    {
-      path: "/guest/tasks",
-      name: "guestTasks",
-      component: GuestTasks,
-      meta: { requiresAuth: false },
-    },
-    {
-      path: "/guest/alerts",
-      name: "guestAlerts",
-      component: GuestAlerts,
-      meta: { requiresAuth: false },
-    },
-    {
-      path: "/guest/messages",
-      name: "guestMessages",
-      component: GuestMessages,
-      meta: { requiresAuth: false },
-    },
-    {
-      path: "/guest/templates",
-      name: "guestTemplates",
-      component: GuestTemplate,
-      meta: { requiresAuth: false },
-    },
-    
-    // ─── AUTH ROUTES ───────────────────────────────────────────────────
     {
       path: "/signup",
       name: "signup",
@@ -134,15 +75,95 @@ const router = createRouter({
       component: RoleSelect,
       meta: { requiresAuth: true },
     },
-    
-    // ─── SHARED ROUTES (All Authenticated Users) ───────────────────────
+
+    // ─── GUEST ROUTES (all public, no auth required) ───────────────────
     {
-      path: "/profile",  
+      path: "/guest",
+      name: "guestDashboard",
+      component: GuestDashboard,
+      meta: { requiresAuth: false, isGuestRoute: true },
+    },
+    {
+      path: "/guest/schedule",
+      name: "guestSchedule",
+      component: GuestSchedule,
+      meta: { requiresAuth: false, isGuestRoute: true },
+    },
+    {
+      path: "/guest/employees",
+      name: "guestEmployees",
+      component: GuestEmployees,
+      meta: { requiresAuth: false, isGuestRoute: true },
+    },
+    {
+      path: "/guest/availability",
+      name: "guestAvailability",
+      component: GuestAvailability,
+      meta: { requiresAuth: false, isGuestRoute: true },
+    },
+    {
+      path: "/guest/time-off",
+      name: "guestTimeOff",
+      component: GuestTimeOff,
+      meta: { requiresAuth: false, isGuestRoute: true },
+    },
+    {
+      path: "/guest/swaps",
+      name: "guestSwaps",
+      component: GuestSwaps,
+      meta: { requiresAuth: false, isGuestRoute: true },
+    },
+    {
+      path: "/guest/tasks",
+      name: "guestTasks",
+      component: GuestTasks,
+      meta: { requiresAuth: false, isGuestRoute: true },
+    },
+    {
+      path: "/guest/alerts",
+      name: "guestAlerts",
+      component: GuestAlerts,
+      meta: { requiresAuth: false, isGuestRoute: true },
+    },
+    {
+      path: "/guest/messages",
+      name: "guestMessages",
+      component: GuestMessages,
+      meta: { requiresAuth: false, isGuestRoute: true },
+    },
+    {
+      path: "/guest/templates",
+      name: "guestTemplates",
+      component: GuestTemplate,
+      meta: { requiresAuth: false, isGuestRoute: true },
+    },
+    {
+      path: "/guest/time-cards",
+      name: "guestTimeCards",
+      component: GuestTimeCards,
+      meta: { requiresAuth: false, isGuestRoute: true },
+    },
+    {
+      path: "/guest/profile",
+      name: "guestProfile",
+      component: GuestProfile,
+      meta: { requiresAuth: false, isGuestRoute: true },
+    },
+    {
+      path: "/guest/settings",
+      name: "guestSettings",
+      component: GuestSettings,
+      meta: { requiresAuth: false, isGuestRoute: true },
+    },
+
+    // ─── SHARED ROUTES ─────────────────────────────────────────────────
+    {
+      path: "/profile",
       name: "profile",
       component: Profile,
       meta: { requiresAuth: true },
     },
-    
+
     // ─── ADMIN ROUTES ──────────────────────────────────────────────────
     {
       path: "/admin",
@@ -154,7 +175,7 @@ const router = createRouter({
       component: Workplace,
       meta: { requiresAuth: true, requiresAdmin: true },
     },
-    
+
     // ─── EMPLOYEE ROUTES ────────────────────────────────────────────────
     {
       path: "/employee",
@@ -226,7 +247,7 @@ const router = createRouter({
       component: EmployeeSwaps,
       meta: { requiresAuth: true, role: 'employee' },
     },
-    
+
     // ─── EMPLOYER ROUTES ────────────────────────────────────────────────
     {
       path: "/business-area-select",
@@ -322,7 +343,7 @@ const router = createRouter({
       component: ClockKiosk,
       meta: { requiresAuth: true, role: 'employer' },
     },
-    
+
     // ─── CATCH ALL ──────────────────────────────────────────────────────
     {
       path: "/:pathMatch(.*)*",
@@ -331,71 +352,72 @@ const router = createRouter({
   ],
 });
 
-//  ENHANCED ROUTE GUARD - Handles page refresh and prevents jumping
+// ── ROUTE GUARD ────────────────────────────────────────────────────────────
 router.beforeEach((to, from, next) => {
   console.log('🔍 Navigation:', { from: from.name, to: to.name });
-  
-  const user = Utils.getStore("user");
-  const isGuest = localStorage.getItem("isGuest") === "true";
+
+  const user         = Utils.getStore("user");
+  const isGuest      = user?.role === 'guest' || user?.isGuest === true || localStorage.getItem("isGuest") === "true";
   const requiresAuth = to.meta.requiresAuth;
   const requiresAdmin = to.meta.requiresAdmin;
-  const requiredRole = to.meta.role;
+  const requiredRole  = to.meta.role;
+  const isGuestRoute  = to.meta.isGuestRoute;
 
   console.log('👤 User:', user);
   console.log('🔐 Requires auth:', requiresAuth);
   console.log('👁️ Is guest:', isGuest);
 
-  // PUBLIC ROUTES - Always allow
-  if (!requiresAuth) {
-    console.log(' Public route - allowing access');
-    next();
-    return;
-  }
-
-  //  GUEST USERS - Redirect to guest dashboard
-  if (isGuest && requiresAuth) {
-    console.log(' Guest trying to access protected route');
+  // ── Guest users: allow all guest routes, redirect protected routes to guest dashboard
+  if (isGuest) {
+    if (isGuestRoute || !requiresAuth) {
+      console.log('✅ Guest on public/guest route - allowing');
+      next();
+      return;
+    }
+    console.log('🚫 Guest trying to access protected route → guestDashboard');
     next({ name: 'guestDashboard' });
     return;
   }
 
-  //  NOT LOGGED IN - Redirect to login
-  if (!user && requiresAuth) {
-    console.log(' No user - redirecting to login');
-    next({ name: "login" });
+  // ── Public routes: always allow
+  if (!requiresAuth) {
+    console.log('✅ Public route - allowing access');
+    next();
     return;
   }
 
-  //  ADMIN ROLE CHECK
+  // ── Not logged in
+  if (!user) {
+    console.log('🚫 No user - redirecting to login');
+    next({ name: 'login' });
+    return;
+  }
+
+  // ── Admin check
   if (requiresAdmin && user?.role !== 'admin') {
-    console.log(' Not admin - redirecting based on role');
-    if (user?.role === 'employer') {
-      next({ name: 'employerDashboard' });
-    } else if (user?.role === 'employee') {
-      next({ name: 'employeeDashboard' });
-    } else {
-      next({ name: 'landing' });
-    }
+    console.log('🚫 Not admin - redirecting based on role');
+    if (user?.role === 'employer') next({ name: 'employerDashboard' });
+    else if (user?.role === 'employee') next({ name: 'employeeDashboard' });
+    else next({ name: 'landing' });
     return;
   }
 
+  // ── Role check
   if (requiredRole && user?.role !== requiredRole) {
-    console.log(` Wrong role: user is ${user?.role}, route requires ${requiredRole}`);
-    
-    // Redirect to appropriate dashboard based on actual role
-    if (user?.role === 'admin') {
-      next({ name: 'workplace' });
-    } else if (user?.role === 'employer') {
-      next({ name: 'employerDashboard' });
-    } else if (user?.role === 'employee') {
-      next({ name: 'employeeDashboard' });
-    } else {
-      next({ name: 'landing' });
+    // Allow admin to access employer routes (for impersonation)
+    if (user?.role === 'admin' && requiredRole === 'employer') {
+      next();
+      return;
     }
+    console.log(`🚫 Wrong role: user is ${user?.role}, route requires ${requiredRole}`);
+    if (user?.role === 'admin') next({ name: 'workplace' });
+    else if (user?.role === 'employer') next({ name: 'employerDashboard' });
+    else if (user?.role === 'employee') next({ name: 'employeeDashboard' });
+    else next({ name: 'landing' });
     return;
   }
 
-  console.log(' Navigation allowed');
+  console.log('✅ Navigation allowed');
   next();
 });
 
