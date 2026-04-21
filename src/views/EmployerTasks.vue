@@ -39,9 +39,7 @@ const newTask = ref({
 const newItem = ref({ title: '', description: '' });
 const selectedTaskList = ref(null);
 
-// ── COMPUTED ──────────────────────────────────────────────────────────────
-// Removed "Daily Tasks" tab — daily tasks just appear in All with the Daily chip.
-// Only two tabs: All Lists and Templates.
+
 const templateTasks = computed(() =>
   taskLists.value.filter(t => t.isTemplate || t.is_template)
 );
