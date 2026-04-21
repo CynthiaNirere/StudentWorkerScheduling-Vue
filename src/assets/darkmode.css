@@ -1,0 +1,83 @@
+/* ── Global dark mode overrides ────────────────────────────────────────── */
+
+/* Headings & navy text */
+.v-theme--dark .navy-text { color: #C5CAE9 !important; }
+.v-theme--dark h1, .v-theme--dark h2, .v-theme--dark h3, .v-theme--dark h4,
+.v-theme--dark .text-h4, .v-theme--dark .text-h5, .v-theme--dark .text-h6 { color: #E8EAF6 !important; }
+.v-theme--dark .text-grey { color: #90A4AE !important; }
+.v-theme--dark .text-body-1, .v-theme--dark .text-body-2 { color: #CFD8DC; }
+.v-theme--dark .text-caption { color: #90A4AE; }
+
+/* Cards */
+.v-theme--dark .navy-card { border-color: #37474F !important; background-color: #1E1E2E !important; }
+.v-theme--dark .v-card { background-color: #1E1E2E !important; }
+.v-theme--dark .v-card-title, .v-theme--dark .v-card-subtitle { color: #E8EAF6 !important; }
+
+/* Tonal buttons — dark navy tint on dark bg is unreadable; force light */
+.v-theme--dark .v-btn--variant-tonal {
+  color: #C5CAE9 !important;
+  background-color: rgba(197, 202, 233, 0.12) !important;
+}
+.v-theme--dark .v-btn--variant-tonal:hover {
+  background-color: rgba(197, 202, 233, 0.2) !important;
+}
+
+/* Outlined buttons */
+.v-theme--dark .v-btn--variant-outlined {
+  color: #C5CAE9 !important;
+  border-color: #7B68EE !important;
+}
+
+/* Text buttons */
+.v-theme--dark .v-btn--variant-text { color: #C5CAE9 !important; }
+
+/* Btn-toggle */
+.v-theme--dark .v-btn-toggle { border-color: #37474F !important; }
+.v-theme--dark .v-btn-toggle .v-btn { color: #C5CAE9 !important; border-color: #37474F !important; }
+.v-theme--dark .v-btn-toggle .v-btn--active {
+  background-color: rgba(123, 104, 238, 0.25) !important;
+  color: #E8EAF6 !important;
+}
+
+/* Checkboxes & radio — navy icon invisible on dark bg */
+.v-theme--dark .v-checkbox .v-icon,
+.v-theme--dark .v-radio .v-icon,
+.v-theme--dark .v-selection-control .v-icon { color: #7B68EE !important; }
+.v-theme--dark .v-label { color: #CFD8DC !important; }
+
+/* Chips */
+.v-theme--dark .v-chip--variant-tonal { color: #C5CAE9 !important; }
+
+/* Alerts */
+.v-theme--dark .v-alert { background-color: #1a1a3e !important; color: #C5CAE9 !important; }
+.v-theme--dark .v-alert .v-alert__content { color: #C5CAE9 !important; }
+
+/* Inputs */
+.v-theme--dark .v-field__input { color: #E8EAF6 !important; }
+.v-theme--dark .v-label.v-field-label { color: #90A4AE !important; }
+.v-theme--dark .v-field--variant-outlined .v-field__outline { color: #37474F !important; }
+
+/* Shift/schedule cards */
+.v-theme--dark .shift-card { background: #1E1E2E !important; border-color: #37474F !important; }
+.v-theme--dark .entry-badge { background: #1a237e; color: #C5CAE9; }
+
+/* Dividers */
+.v-theme--dark .v-divider { border-color: #37474F !important; }
+
+/* Notifications panel */
+.v-theme--dark .notif-row { border-bottom: 1px solid #37474F !important; background: #1E1E2E !important; color: #E8EAF6 !important; }
+.v-theme--dark .notif-row:hover { background: #263238 !important; }
+.v-theme--dark .notif-unread { border-left: 3px solid #f57c00 !important; background: #1a1500 !important; }
+.v-theme--dark .notif-row .text-body-2 { color: #E8EAF6 !important; }
+.v-theme--dark .notif-row .text-grey { color: #90A4AE !important; }
+.v-theme--dark .notif-row .text-caption { color: #90A4AE !important; }
+
+/* Time Requests page */
+.v-theme--dark .request-item { background: #1E1E2E !important; border-color: #37474F !important; color: #E8EAF6 !important; }
+.v-theme--dark .request-item:hover { border-color: #7B68EE !important; }
+.v-theme--dark .request-pending { border-left: 4px solid #f57c00 !important; background: #1a1200 !important; }
+.v-theme--dark .request-item .navy-text { color: #C5CAE9 !important; }
+
+/* EmployeeSchedule legend badges */
+.v-theme--dark .legend-item--shift { border-color: #64B5F6 !important; background: rgba(25,118,210,0.25) !important; color: #E8EAF6 !important; }
+.v-theme--dark .legend-item--open  { border-color: #66BB6A !important; background: rgba(46,125,50,0.25) !important; color: #E8EAF6 !important; }

@@ -12,7 +12,16 @@ const clockRecords = ref([]);
 const loading = ref(true);
 const currentTime = ref('');
 const currentDate = ref('');
-const actionLoading = ref(null); // userId currently loading
+const actionLoading = ref(null);
+
+// ── PIN EXIT PROTECTION ───────────────────────────────────────────────────
+const showExitDialog = ref(false);
+const exitPin = ref('');
+const pinError = ref('');
+const pinLoading = ref(false);
+// PIN is the last 4 digits of the employer's user_id, or a hardcoded fallback.
+// In a real app this would be a stored PIN — for now we use a simple approach.
+const KIOSK_EXIT_PIN = '1234'; // fallback default PIN
 
 const snackbar = ref(false);
 const snackMsg = ref('');
@@ -27,10 +36,8 @@ const updateTime = () => {
   currentDate.value = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 };
 
-// Get today's date string
 const todayStr = () => new Date().toISOString().split('T')[0];
 
-// Employees who have a shift today
 const todayEmployees = computed(() => {
   const today = todayStr();
   const todayShifts = shifts.value.filter(s => {
@@ -123,8 +130,38 @@ const handleClockAction = async (emp) => {
   }
 };
 
-const exitKiosk = () => {
-  router.push({ name: 'employerSettings' });
+// ── EXIT KIOSK (PIN protected) ────────────────────────────────────────────
+const promptExitKiosk = () => {
+  exitPin.value = '';
+  pinError.value = '';
+  showExitDialog.value = true;
+};
+
+const confirmExitKiosk = () => {
+  pinLoading.value = true;
+  pinError.value = '';
+
+  // Get the stored PIN — use last 4 digits of employer user_id as default,
+  // or the stored kiosk PIN from localStorage if set
+  const storedPin = localStorage.getItem('kioskExitPin') || KIOSK_EXIT_PIN;
+
+  setTimeout(() => {
+    if (exitPin.value === storedPin) {
+      showExitDialog.value = false;
+      exitPin.value = '';
+      router.push({ name: 'employerSettings' });
+    } else {
+      pinError.value = 'Incorrect PIN. Please try again.';
+      exitPin.value = '';
+    }
+    pinLoading.value = false;
+  }, 400); // small delay for UX feel
+};
+
+const cancelExit = () => {
+  showExitDialog.value = false;
+  exitPin.value = '';
+  pinError.value = '';
 };
 
 onMounted(async () => {
@@ -161,7 +198,8 @@ onUnmounted(() => {
         <div class="text-h3 font-weight-bold text-white kiosk-time">{{ currentTime }}</div>
         <div class="text-body-2 text-white" style="opacity:0.8;">{{ currentDate }}</div>
       </div>
-      <v-btn variant="tonal" color="white" prepend-icon="mdi-exit-to-app" @click="exitKiosk">
+      <!-- Exit button now requires PIN — employees can't tap out of kiosk -->
+      <v-btn variant="tonal" color="white" prepend-icon="mdi-lock" @click="promptExitKiosk">
         Exit Kiosk
       </v-btn>
     </div>
@@ -238,6 +276,41 @@ onUnmounted(() => {
         </v-row>
       </div>
     </div>
+
+    <!-- PIN Exit Dialog -->
+    <v-dialog v-model="showExitDialog" max-width="380" persistent>
+      <v-card rounded="xl">
+        <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4 d-flex align-center ga-2" style="color:#12086F;">
+          <v-icon color="#12086F">mdi-lock</v-icon>
+          Manager Exit Required
+        </v-card-title>
+        <v-divider />
+        <v-card-text class="pa-5">
+          <p class="text-body-2 text-grey mb-4">Enter the manager PIN to exit kiosk mode.</p>
+          <v-otp-input
+            v-model="exitPin"
+            length="4"
+            type="password"
+            color="#12086F"
+            variant="outlined"
+            :error="!!pinError"
+            @finish="confirmExitKiosk"
+          />
+          <p v-if="pinError" class="text-caption text-error mt-2">
+            <v-icon size="small">mdi-alert-circle</v-icon> {{ pinError }}
+          </p>
+          <p class="text-caption text-grey mt-3">
+            Default PIN: <strong>1234</strong>. Change it in Settings → Work Device.
+          </p>
+        </v-card-text>
+        <v-divider />
+        <v-card-actions class="pa-4">
+          <v-spacer />
+          <v-btn variant="text" @click="cancelExit">Cancel</v-btn>
+          <v-btn color="#12086F" variant="flat" :loading="pinLoading" @click="confirmExitKiosk">Exit Kiosk</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <v-snackbar v-model="snackbar" :color="snackColor" timeout="3000" location="top center">
       <div class="text-center text-body-1 font-weight-bold">{{ snackMsg }}</div>

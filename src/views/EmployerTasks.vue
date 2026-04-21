@@ -23,6 +23,9 @@ const snackbar        = ref(false);
 const snackbarMessage = ref('');
 const snackbarColor   = ref('success');
 
+// ── NEW TASK FORM ─────────────────────────────────────────────────────────
+// Tasks are assigned to a SHIFT (not individual employees).
+// Anyone working that shift can complete the tasks.
 const newTask = ref({
   title: '',
   description: '',
@@ -30,20 +33,21 @@ const newTask = ref({
   recursDaily: false,
   isTemplate: false,
   priority: 'medium',
-  assignedTo: null,   // ✅ employee assignment
-  shiftId: null,      // ✅ connected to a specific shift
+  shiftId: null,
 });
 
 const newItem = ref({ title: '', description: '' });
 const selectedTaskList = ref(null);
 
 // ── COMPUTED ──────────────────────────────────────────────────────────────
-const todayTasks = computed(() =>
-  taskLists.value.filter(t => !(t.isTemplate || t.is_template) && (t.recursDaily || t.recurs_daily))
-);
-
+// Removed "Daily Tasks" tab — daily tasks just appear in All with the Daily chip.
+// Only two tabs: All Lists and Templates.
 const templateTasks = computed(() =>
   taskLists.value.filter(t => t.isTemplate || t.is_template)
+);
+
+const allNonTemplateTasks = computed(() =>
+  taskLists.value.filter(t => !(t.isTemplate || t.is_template))
 );
 
 const priorityConfig = {
@@ -58,21 +62,13 @@ const getPriorityIcon  = p => priorityConfig[p]?.icon  || 'mdi-circle';
 const getTaskId = (task) => task?.tasklist_id ?? task?.tasklistId ?? task?.id ?? null;
 const getItemId = (item) => item?.item_id ?? item?.itemId ?? item?.id ?? null;
 
-// Employee display helper
-const getEmployeeName = (userId) => {
-  if (!userId) return null;
-  const emp = employees.value.find(e => (e.user_id || e.userId) === userId);
-  if (!emp) return null;
-  return `${emp.fName || emp.first_name || ''} ${emp.lName || emp.last_name || ''}`.trim();
-};
-
 // Shift display helper
 const getShiftLabel = (shiftId) => {
   if (!shiftId) return null;
   const s = shifts.value.find(sh => (sh.shift_id || sh.id) === shiftId);
   if (!s) return null;
   const d = new Date(Number(s.shiftTime || s.shift_time));
-  return `${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${formatMinutes(s.startTime || s.start_time)}`;
+  return `${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${formatMinutes(s.startTime || s.start_time)} – ${formatMinutes(s.endTime || s.end_time)}`;
 };
 
 const formatMinutes = (min) => {
@@ -81,18 +77,26 @@ const formatMinutes = (min) => {
   return `${h % 12 || 12}:${String(m).padStart(2,'0')}${h >= 12 ? 'PM' : 'AM'}`;
 };
 
-const employeeOptions = computed(() =>
-  employees.value.map(e => ({
-    title: `${e.fName || e.first_name || ''} ${e.lName || e.last_name || ''}`.trim(),
-    value: e.user_id || e.userId,
-  }))
-);
+// Get the name of who completed an item
+const getCompleterName = (item) => {
+  const completedBy = item.completedBy || item.completed_by;
+  if (!completedBy) return null;
+  const emp = employees.value.find(e => (e.user_id || e.userId) === completedBy);
+  if (emp) return `${emp.fName || emp.first_name || ''} ${emp.lName || emp.last_name || ''}`.trim();
+  // Could be the employer themselves
+  const myId = user.value?.user_id || user.value?.userId;
+  if (String(completedBy) === String(myId)) {
+    const u = user.value;
+    return `${u.fName || u.first_name || ''} ${u.lName || u.last_name || ''}`.trim() || 'You';
+  }
+  return `User #${completedBy}`;
+};
 
 const shiftOptions = computed(() =>
   shifts.value.map(s => {
     const d = new Date(Number(s.shiftTime || s.shift_time));
     return {
-      title: `${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${formatMinutes(s.startTime || s.start_time)}`,
+      title: `${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${formatMinutes(s.startTime || s.start_time)} – ${formatMinutes(s.endTime || s.end_time)}`,
       value: s.shift_id || s.id,
     };
   })
@@ -154,8 +158,7 @@ const createTaskList = async () => {
       recursDaily: newTask.value.recursDaily,
       isTemplate:  newTask.value.isTemplate,
       priority:    newTask.value.priority,
-      assignedTo:  newTask.value.assignedTo || null,   // ✅ employee
-      shiftId:     newTask.value.shiftId    || null,   // ✅ shift connection
+      shiftId:     newTask.value.shiftId || null,  // assigned to shift, not a person
       locationId:  user.value?.work_location || null,
       createdBy:   userId,
       createdAt:   Date.now(),
@@ -184,7 +187,7 @@ const addTaskItem = async () => {
       tasklistId:  taskId,
       title:       newItem.value.title.trim(),
       description: newItem.value.description || null,
-      status:      'active',  // ✅ only active or completed — no started/in-progress
+      status:      'active',
     });
     showSnackbar('Task item added!', 'success');
     showAddItemDialog.value = false;
@@ -194,14 +197,16 @@ const addTaskItem = async () => {
   finally { savingItem.value = false; }
 };
 
-// ✅ Only two states: active → completed, completed → active (no started/in-progress)
+// Toggle: active ↔ completed, recording who did it
 const toggleItemCompletion = async (item) => {
   const itemId = getItemId(item);
   if (!itemId) return;
   try {
     const newStatus = item.status === 'completed' ? 'active' : 'completed';
+    const myId = user.value?.user_id || user.value?.userId;
     await EmployerService.updateTaskItem(itemId, {
       status:      newStatus,
+      completedBy: newStatus === 'completed' ? myId : null,
       completedAt: newStatus === 'completed' ? Date.now() : null,
     });
     await loadTaskListItems(selectedTaskList.value);
@@ -234,7 +239,7 @@ const deleteTaskList = async () => {
 };
 
 const resetNewTask = () => {
-  newTask.value = { title: '', description: '', shiftType: 'all_day', recursDaily: false, isTemplate: false, priority: 'medium', assignedTo: null, shiftId: null };
+  newTask.value = { title: '', description: '', shiftType: 'all_day', recursDaily: false, isTemplate: false, priority: 'medium', shiftId: null };
 };
 const resetNewItem = () => { newItem.value = { title: '', description: '' }; };
 const completedCount = (task) => (task.items || []).filter(i => i.status === 'completed').length;
@@ -247,19 +252,16 @@ const completedCount = (task) => (task.items || []).filter(i => i.status === 'co
       <div class="d-flex justify-space-between align-center mb-6">
         <div>
           <h1 class="text-h4 font-weight-bold navy-text">Task Management</h1>
-          <p class="text-body-2 text-grey">Create and assign task lists to employees and shifts</p>
+          <p class="text-body-2 text-grey">Create task lists and assign them to shifts — anyone on that shift can complete them</p>
         </div>
         <v-btn color="#12086F" prepend-icon="mdi-plus" size="large" @click="showCreateDialog = true">New Task List</v-btn>
       </div>
 
+      <!-- Only two tabs: All Lists and Templates (removed Daily) -->
       <v-tabs v-model="tab" color="#12086F" class="mb-5" density="comfortable">
         <v-tab value="all">
           <v-icon start size="small">mdi-format-list-checkbox</v-icon>All Lists
-          <v-chip size="x-small" class="ml-2" color="#12086F" variant="tonal">{{ taskLists.length }}</v-chip>
-        </v-tab>
-        <v-tab value="today">
-          <v-icon start size="small">mdi-calendar-today</v-icon>Daily
-          <v-chip v-if="todayTasks.length" size="x-small" class="ml-2" color="success" variant="tonal">{{ todayTasks.length }}</v-chip>
+          <v-chip size="x-small" class="ml-2" color="#12086F" variant="tonal">{{ allNonTemplateTasks.length }}</v-chip>
         </v-tab>
         <v-tab value="templates">
           <v-icon start size="small">mdi-content-save</v-icon>Templates
@@ -274,10 +276,10 @@ const completedCount = (task) => (task.items || []).filter(i => i.status === 'co
       <template v-else>
         <v-window v-model="tab">
 
-          <!-- ALL -->
+          <!-- ALL LISTS -->
           <v-window-item value="all">
-            <v-row v-if="taskLists.length > 0">
-              <v-col v-for="task in taskLists" :key="getTaskId(task)" cols="12" sm="6" lg="4">
+            <v-row v-if="allNonTemplateTasks.length > 0">
+              <v-col v-for="task in allNonTemplateTasks" :key="getTaskId(task)" cols="12" sm="6" lg="4">
                 <v-card variant="outlined" rounded="lg" class="task-card" hover @click="openItemsDialog(task)">
                   <div class="task-card-accent" :class="`bg-${getPriorityColor(task.priority)}`" />
                   <v-card-text class="pa-4">
@@ -289,14 +291,14 @@ const completedCount = (task) => (task.items || []).filter(i => i.status === 'co
                       <v-btn icon="mdi-delete" size="x-small" variant="text" color="error" @click.stop="confirmDeleteTaskList(task)" />
                     </div>
 
-                    <!-- ✅ Show assigned employee and shift if linked -->
-                    <div v-if="task.assignedTo || task.assigned_to" class="d-flex align-center ga-1 mb-1">
-                      <v-icon size="12" color="#4361EE">mdi-account</v-icon>
-                      <span class="text-caption text-grey">{{ getEmployeeName(task.assignedTo || task.assigned_to) || 'Assigned' }}</span>
-                    </div>
+                    <!-- Shift link -->
                     <div v-if="task.shiftId || task.shift_id" class="d-flex align-center ga-1 mb-2">
                       <v-icon size="12" color="#9C27B0">mdi-calendar-clock</v-icon>
                       <span class="text-caption text-grey">{{ getShiftLabel(task.shiftId || task.shift_id) || 'Linked to shift' }}</span>
+                    </div>
+                    <div v-else class="d-flex align-center ga-1 mb-2">
+                      <v-icon size="12" color="#6b7280">mdi-calendar-blank</v-icon>
+                      <span class="text-caption text-grey">Not linked to a shift</span>
                     </div>
 
                     <div class="d-flex flex-wrap ga-1 mt-2">
@@ -304,8 +306,9 @@ const completedCount = (task) => (task.items || []).filter(i => i.status === 'co
                         <v-icon start size="x-small">{{ getPriorityIcon(task.priority) }}</v-icon>
                         {{ task.priority || 'medium' }}
                       </v-chip>
-                      <v-chip v-if="task.isTemplate || task.is_template" size="x-small" color="#9C27B0" variant="tonal">Template</v-chip>
-                      <v-chip v-if="task.recursDaily || task.recurs_daily" size="x-small" color="teal" variant="tonal">Daily</v-chip>
+                      <v-chip v-if="task.recursDaily || task.recurs_daily" size="x-small" color="teal" variant="tonal">
+                        <v-icon start size="x-small">mdi-repeat</v-icon>Daily
+                      </v-chip>
                       <v-chip size="x-small" color="grey" variant="tonal">{{ (task.shiftType || task.shift_type || 'all day').replace('_', ' ') }}</v-chip>
                     </div>
                   </v-card-text>
@@ -316,26 +319,6 @@ const completedCount = (task) => (task.items || []).filter(i => i.status === 'co
               <v-icon size="72" color="grey-lighten-2" class="mb-4">mdi-clipboard-text-outline</v-icon>
               <div class="text-h6 text-grey mb-2">No task lists yet</div>
               <v-btn color="#12086F" prepend-icon="mdi-plus" @click="showCreateDialog = true">Create Task List</v-btn>
-            </div>
-          </v-window-item>
-
-          <!-- DAILY -->
-          <v-window-item value="today">
-            <v-row v-if="todayTasks.length > 0">
-              <v-col v-for="task in todayTasks" :key="getTaskId(task)" cols="12" sm="6" lg="4">
-                <v-card variant="outlined" rounded="lg" class="task-card" hover @click="openItemsDialog(task)">
-                  <div class="task-card-accent bg-teal" />
-                  <v-card-text class="pa-4">
-                    <div class="text-body-1 font-weight-bold navy-text mb-1">{{ task.title }}</div>
-                    <p v-if="task.description" class="text-caption text-grey">{{ task.description }}</p>
-                    <v-chip size="x-small" color="teal" variant="tonal" class="mt-2">Recurs Daily</v-chip>
-                  </v-card-text>
-                </v-card>
-              </v-col>
-            </v-row>
-            <div v-else class="text-center py-16">
-              <v-icon size="72" color="grey-lighten-2" class="mb-4">mdi-calendar-check-outline</v-icon>
-              <div class="text-h6 text-grey">No daily recurring tasks</div>
             </div>
           </v-window-item>
 
@@ -351,7 +334,9 @@ const completedCount = (task) => (task.items || []).filter(i => i.status === 'co
                       <v-btn icon="mdi-delete" size="x-small" variant="text" color="error" @click.stop="confirmDeleteTaskList(task)" />
                     </div>
                     <p v-if="task.description" class="text-caption text-grey">{{ task.description }}</p>
-                    <v-chip size="x-small" color="#9C27B0" variant="tonal" class="mt-2">Reusable Template</v-chip>
+                    <v-chip size="x-small" color="#9C27B0" variant="tonal" class="mt-2">
+                      <v-icon start size="x-small">mdi-content-save</v-icon>Reusable Template
+                    </v-chip>
                   </v-card-text>
                 </v-card>
               </v-col>
@@ -373,6 +358,13 @@ const completedCount = (task) => (task.items || []).filter(i => i.status === 'co
         </v-card-title>
         <v-divider />
         <v-card-text class="pa-5">
+          <v-alert type="info" variant="tonal" density="compact" color="#12086F" class="mb-4">
+            <div class="text-caption">
+              <v-icon size="small" class="mr-1">mdi-information</v-icon>
+              Tasks are assigned to a <strong>shift</strong>, not a specific person. Anyone working that shift can complete them.
+            </div>
+          </v-alert>
+
           <v-text-field v-model="newTask.title" label="Title *" variant="outlined" density="compact" class="mb-3" color="#12086F" autofocus />
           <v-textarea v-model="newTask.description" label="Description" variant="outlined" density="compact" rows="2" class="mb-3" color="#12086F" />
           <v-row dense class="mb-3">
@@ -384,22 +376,7 @@ const completedCount = (task) => (task.items || []).filter(i => i.status === 'co
             </v-col>
           </v-row>
 
-          <!-- ✅ Employee assignment -->
-          <v-select
-            v-model="newTask.assignedTo"
-            :items="employeeOptions"
-            label="Assign to Employee (optional)"
-            variant="outlined"
-            density="compact"
-            class="mb-3"
-            color="#12086F"
-            clearable
-            prepend-inner-icon="mdi-account"
-            hint="Employee will see this task in their Tasks page"
-            persistent-hint
-          />
-
-          <!-- ✅ Shift connection -->
+          <!-- Shift connection (replaces employee assignment) -->
           <v-select
             v-model="newTask.shiftId"
             :items="shiftOptions"
@@ -433,15 +410,13 @@ const completedCount = (task) => (task.items || []).filter(i => i.status === 'co
           <div>
             <div class="text-body-1 font-weight-bold navy-text">{{ selectedTaskList.title }}</div>
             <div class="text-caption text-grey mt-1">{{ selectedTaskList.description }}</div>
-            <!-- ✅ Show assignment + shift context in dialog header -->
             <div class="d-flex ga-2 mt-1 flex-wrap">
-              <v-chip v-if="selectedTaskList.assignedTo || selectedTaskList.assigned_to" size="x-small" color="#4361EE" variant="tonal">
-                <v-icon start size="x-small">mdi-account</v-icon>
-                {{ getEmployeeName(selectedTaskList.assignedTo || selectedTaskList.assigned_to) }}
-              </v-chip>
               <v-chip v-if="selectedTaskList.shiftId || selectedTaskList.shift_id" size="x-small" color="#9C27B0" variant="tonal">
                 <v-icon start size="x-small">mdi-calendar-clock</v-icon>
                 {{ getShiftLabel(selectedTaskList.shiftId || selectedTaskList.shift_id) }}
+              </v-chip>
+              <v-chip v-if="selectedTaskList.recursDaily || selectedTaskList.recurs_daily" size="x-small" color="teal" variant="tonal">
+                <v-icon start size="x-small">mdi-repeat</v-icon>Daily
               </v-chip>
             </div>
           </div>
@@ -454,7 +429,7 @@ const completedCount = (task) => (task.items || []).filter(i => i.status === 'co
         </v-card-title>
         <v-divider />
 
-        <v-card-text class="pa-0" style="max-height: 420px; overflow-y: auto;">
+        <v-card-text class="pa-0" style="max-height: 460px; overflow-y: auto;">
           <div v-if="selectedTaskList.items?.length > 0">
             <div
               v-for="item in selectedTaskList.items"
@@ -463,26 +438,56 @@ const completedCount = (task) => (task.items || []).filter(i => i.status === 'co
               :class="{ 'task-item-done': item.status === 'completed' }"
             >
               <div class="d-flex align-center ga-3">
-                <!-- ✅ Only two states: checked = completed, unchecked = active -->
-                <v-checkbox
-                  :model-value="item.status === 'completed'"
-                  @update:model-value="toggleItemCompletion(item)"
-                  hide-details density="compact" color="#12086F"
-                />
                 <div class="flex-grow-1">
-                  <div class="text-body-2 font-weight-medium" :class="item.status === 'completed' ? 'text-decoration-line-through text-grey' : 'navy-text'">
+                  <div
+                    class="text-body-2 font-weight-medium mb-1"
+                    :class="item.status === 'completed' ? 'text-decoration-line-through text-grey' : 'navy-text'"
+                  >
                     {{ item.title }}
                   </div>
-                  <div v-if="item.description" class="text-caption text-grey">{{ item.description }}</div>
+                  <div v-if="item.description" class="text-caption text-grey mb-1">{{ item.description }}</div>
+
+                  <!-- Who completed it -->
+                  <div v-if="item.status === 'completed'" class="d-flex align-center ga-1">
+                    <v-icon size="12" color="success">mdi-account-check</v-icon>
+                    <span class="text-caption" style="color:#2e7d32;">
+                      Completed by <strong>{{ getCompleterName(item) || 'Unknown' }}</strong>
+                    </span>
+                  </div>
                 </div>
-                <v-chip v-if="item.status === 'completed'" size="x-small" color="success" variant="tonal">Done</v-chip>
-                <v-btn icon="mdi-delete" size="x-small" variant="text" color="error" @click="deleteTaskItem(item)" />
+
+                <!-- Better check-off button -->
+                <div class="d-flex align-center ga-2">
+                  <v-btn
+                    v-if="item.status !== 'completed'"
+                    size="small"
+                    color="#12086F"
+                    variant="tonal"
+                    prepend-icon="mdi-check"
+                    @click="toggleItemCompletion(item)"
+                    class="text-none"
+                  >
+                    Mark Done
+                  </v-btn>
+                  <v-btn
+                    v-else
+                    size="small"
+                    color="success"
+                    variant="flat"
+                    prepend-icon="mdi-check-circle"
+                    @click="toggleItemCompletion(item)"
+                    class="text-none"
+                  >
+                    Done
+                  </v-btn>
+                  <v-btn icon="mdi-delete" size="x-small" variant="text" color="error" @click="deleteTaskItem(item)" />
+                </div>
               </div>
             </div>
           </div>
           <div v-else class="text-center pa-10">
             <v-icon size="56" color="grey-lighten-2" class="mb-3">mdi-clipboard-outline</v-icon>
-            <div class="text-body-2 text-grey">No items yet.</div>
+            <div class="text-body-2 text-grey">No items yet. Add some tasks below.</div>
           </div>
         </v-card-text>
 
@@ -540,5 +545,10 @@ const completedCount = (task) => (task.items || []).filter(i => i.status === 'co
 .task-item-row { border-bottom: 1px solid #f0f0f0; transition: background 0.15s; }
 .task-item-row:hover { background: #fafafa; }
 .task-item-row:last-child { border-bottom: none; }
-.task-item-done { background: #f9f9f9; }
+.task-item-done { background: #f0fdf4; }
+
+/* Dark mode */
+.v-theme--dark .task-item-done { background: #1a2e1a; }
+.v-theme--dark .task-item-row:hover { background: #2a2a3e; }
+.v-theme--dark .navy-text { color: #a8b4ff !important; }
 </style>

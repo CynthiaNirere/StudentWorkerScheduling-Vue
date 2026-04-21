@@ -128,10 +128,24 @@ export default {
   deleteEmployee(id) {
     return apiClient.delete(`/users/${id}`);
   },
+  removeFromWorkplace(userId) {
+    return apiClient.delete(`/users/${userId}/workplace`, addDemoHeader());
+  },
+  searchEmployees(query) {
+    return apiClient.get(`/users/search?q=${encodeURIComponent(query)}`, addDemoHeader());
+  },
+  assignToWorkplace(userId) {
+    return apiClient.post(`/users/${userId}/assign`, {}, addDemoHeader());
+  },
 
   // Search existing users by name (for the assign-to-workplace flow)
   searchEmployeesByName(q) {
     return apiClient.get(`/users/search?q=${encodeURIComponent(q)}`);
+  },
+
+  // Look up a single user by exact email — returns 404 if not found
+  findByEmail(email) {
+    return apiClient.get(`/users/email/${encodeURIComponent(email)}`, addDemoHeader());
   },
 
   // Assign an existing user to the employer's workplace — no duplicate record created
@@ -145,6 +159,9 @@ export default {
   },
   getUserRoles(userId) {
     return apiClient.get(`/user-job-roles/user/${userId}/roles`);
+  getUserRoles(userId, locationId) {
+    const params = locationId ? `?locationId=${locationId}` : '';
+    return apiClient.get(`/user-job-roles/user/${userId}/roles${params}`, addDemoHeader());
   },
   removeRoleFromUser(userId, roleId) {
     return apiClient.delete(`/user-job-roles/user/${userId}/roles/${roleId}`);

@@ -8,7 +8,7 @@ const user = ref(null);
 const clockRecords = ref([]);
 const loading = ref(false);
 const processing = ref(false);
-const selectedTab = ref("pending");
+const selectedTab = ref("needs-review");
 
 const showDetailsDialog = ref(false);
 const showEditDialog = ref(false);
@@ -52,22 +52,25 @@ const recordsWithDetails = computed(() =>
       status: r.status || 'pending',
       _clockInTime: clockIn,
       _clockOutTime: clockOut,
+      rejectionReason: r.rejectionReason || r.rejection_reason || r.reason || r.denial_reason || null,
     };
   })
 );
 
 const filteredRecords = computed(() => {
   if (selectedTab.value === 'all') return recordsWithDetails.value;
+  if (selectedTab.value === 'needs-review') return recordsWithDetails.value.filter(r => isPending(r));
   return recordsWithDetails.value.filter(r => r.status === selectedTab.value);
 });
 
-const pendingCount  = computed(() => recordsWithDetails.value.filter(r => r.status === 'pending' || r.status === 'clocked_out').length);
+const pendingCount  = computed(() => recordsWithDetails.value.filter(r => isPending(r)).length);
+const rejectedCount = computed(() => recordsWithDetails.value.filter(r => r.status === 'rejected').length);
 
-const statusColor = (s) => ({ pending: '#f57c00', approved: '#2e7d32', rejected: '#d32f2f', clocked_in: '#9C27B0', clocked_out: '#f57c00' }[s] || '#9e9e9e');
-const statusLabel = (s) => ({ pending: 'Pending Review', approved: 'Approved', rejected: 'Rejected', clocked_in: 'Clocked In', clocked_out: 'Awaiting Review' }[s] || s);
+const statusColor = (s) => ({ pending: '#f57c00', submitted: '#1565C0', approved: '#2e7d32', rejected: '#d32f2f', clocked_in: '#9C27B0', clocked_out: '#f57c00' }[s] || '#9e9e9e');
+const statusLabel = (s) => ({ pending: 'Pending', submitted: 'Needs Review', approved: 'Approved', rejected: 'Denied', clocked_in: 'Clocked In', clocked_out: 'Not Clocked Out' }[s] || s);
 const getRecordId = (r) => r?.id ?? r?.clock_id ?? r?.clockId ?? null;
 const tsToLocal = (ts) => ts ? new Date(Number(ts)).toISOString().slice(0, 16) : '';
-const isPending = (r) => r.status === 'pending' || r.status === 'clocked_out';
+const isPending = (r) => r.status === 'pending' || r.status === 'clocked_out' || r.status === 'submitted';
 
 onMounted(async () => {
   user.value = Utils.getStore("user");
@@ -150,12 +153,15 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
       <!-- Tabs -->
       <v-card variant="outlined" rounded="lg" class="mb-4 navy-card">
         <v-tabs v-model="selectedTab" color="#12086F">
-          <v-tab value="pending">
-            Pending
-            <v-chip v-if="pendingCount > 0" size="x-small" color="#f57c00" variant="tonal" class="ml-2">{{ pendingCount }}</v-chip>
+          <v-tab value="needs-review">
+            Needs Review
+            <v-chip v-if="pendingCount > 0" size="x-small" color="#1565C0" variant="tonal" class="ml-2">{{ pendingCount }}</v-chip>
           </v-tab>
           <v-tab value="approved">Approved</v-tab>
-          <v-tab value="rejected">Rejected</v-tab>
+          <v-tab value="rejected">
+            Denied
+            <v-chip v-if="rejectedCount > 0" size="x-small" color="#d32f2f" variant="tonal" class="ml-2">{{ rejectedCount }}</v-chip>
+          </v-tab>
           <v-tab value="all">All</v-tab>
         </v-tabs>
       </v-card>
@@ -204,7 +210,11 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
           </v-row>
           <div class="mb-3"><div class="text-caption text-grey">Total Hours</div><div class="text-h6 font-weight-bold navy-text">{{ selectedRecord.totalHours }}</div></div>
           <div v-if="selectedRecord.notes" class="mb-3"><div class="text-caption text-grey">Notes</div><div class="text-body-2">{{ selectedRecord.notes }}</div></div>
-          <div><div class="text-caption text-grey">Status</div><v-chip :color="statusColor(selectedRecord.status)" size="small" variant="tonal" class="mt-1">{{ statusLabel(selectedRecord.status) }}</v-chip></div>
+          <div class="mb-3"><div class="text-caption text-grey">Status</div><v-chip :color="statusColor(selectedRecord.status)" size="small" variant="tonal" class="mt-1">{{ statusLabel(selectedRecord.status) }}</v-chip></div>
+          <div v-if="selectedRecord.status === 'rejected' && selectedRecord.rejectionReason" class="pa-3 rejection-box">
+            <div class="text-caption font-weight-bold mb-1" style="color:#b71c1c">Manager's Note:</div>
+            <div class="text-body-2" style="color:#b71c1c">{{ selectedRecord.rejectionReason }}</div>
+          </div>
         </v-card-text>
         <v-divider />
         <v-card-actions class="pa-4">
@@ -263,4 +273,12 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
 <style scoped>
 .navy-text { color: #12086F !important; }
 .navy-card { border-color: #e0e0e0; box-shadow: 0 1px 3px rgba(18, 8, 111, 0.05); }
+.rejection-box { background: #fff5f5; border-left: 3px solid #d32f2f; border-radius: 0 6px 6px 0; }
+
+/* Dark mode */
+.v-theme--dark .navy-text { color: #C5CAE9 !important; }
+.v-theme--dark .navy-card { border-color: #37474F !important; }
+.v-theme--dark .rejection-box { background: #1a0505; border-left-color: #ef5350; }
+.v-theme--dark .rejection-box .text-body-2,
+.v-theme--dark .rejection-box .text-caption { color: #EF9A9A !important; }
 </style>

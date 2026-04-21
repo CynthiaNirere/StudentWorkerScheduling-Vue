@@ -73,6 +73,18 @@ const savePhone = async () => {
   }
 };
 
+const saveCertsToBackend = async (list) => {
+  try {
+    const userId = user.value.user_id || user.value.userId;
+    await EmployeeService.updateCertifications(userId, list);
+    const updated = { ...user.value, certifications: list };
+    Utils.setStore('user', updated);
+    user.value = updated;
+  } catch (err) {
+    console.warn('Could not persist certifications:', err.message);
+  }
+};
+
 const onCertFileChange = (e) => {
   certError.value = '';
   const file = e.target.files?.[0];
@@ -83,18 +95,17 @@ const onCertFileChange = (e) => {
     return;
   }
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     certifications.value.push({ name: file.name, date: new Date().toLocaleDateString(), dataUrl: reader.result, mimeType: file.type });
-    const updated = { ...user.value, certifications: [...certifications.value] };
-    Utils.setStore('user', updated);
+    await saveCertsToBackend([...certifications.value]);
   };
   reader.readAsDataURL(file);
   e.target.value = '';
 };
 
-const removeCert = (idx) => {
+const removeCert = async (idx) => {
   certifications.value.splice(idx, 1);
-  Utils.setStore('user', { ...user.value, certifications: [...certifications.value] });
+  await saveCertsToBackend([...certifications.value]);
 };
 
 const openCertViewer = (cert) => {
