@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import Utils from '../config/utils.js';
 import EmployeeService from '../services/employeeServices.js';
 import EmployeeLayout from '../components/EmployeeLayout.vue';
@@ -82,10 +82,15 @@ const currentPeriodRecords = computed(() => {
   return recordsWithDetails.value.filter(r => r.inDate && r.inDate >= start && r.inDate <= end);
 });
 
-// Current period — unsubmitted (actionable)
+// Active clock-in (currently on the clock)
+const activeClockIn = computed(() =>
+  recordsWithDetails.value.find(r => r.status === 'clocked_in')
+);
+
+// Current period — unsubmitted (actionable), includes active clock-ins
 const pendingRecords = computed(() =>
   currentPeriodRecords.value.filter(r =>
-    r.status === 'pending' || r.status === 'clocked_out' || r.status === 'rejected'
+    r.status === 'pending' || r.status === 'clocked_out' || r.status === 'clocked_in' || r.status === 'rejected'
   )
 );
 
@@ -130,7 +135,7 @@ function buildWeekDays(periodStart, offset, filterFn = null) {
   return days;
 }
 
-const isUnsubmitted      = (r) => r.status === 'pending' || r.status === 'clocked_out';
+const isUnsubmitted      = (r) => r.status === 'pending' || r.status === 'clocked_out' || r.status === 'clocked_in';
 const isSubmittedOrDone  = (r) => r.status === 'submitted' || r.status === 'approved' || r.status === 'rejected';
 
 const pendingWeek1   = computed(() => buildWeekDays(currentPeriodStart.value, 0, isUnsubmitted));
@@ -174,12 +179,19 @@ const orderedPendingWeeks = computed(() => {
     : [{ days: pendingWeek1.value, key: 'w1' }, { days: pendingWeek2.value, key: 'w2' }];
 });
 
+
 // ── LIFECYCLE ──────────────────────────────────────────────────────────────
+let pollInterval = null;
+
 onMounted(async () => {
   user.value = Utils.getStore('user');
   await loadData();
   checkTimecardNotifications();
+  // Poll every 30s so employer clock-outs reflect automatically
+  pollInterval = setInterval(loadData, 30000);
 });
+
+onUnmounted(() => { if (pollInterval) clearInterval(pollInterval); });
 
 const checkTimecardNotifications = async () => {
   const userId = user.value?.user_id || user.value?.userId;
@@ -324,6 +336,32 @@ const saveEdit = () => {
   localEdits.value[editForm.value.id] = { clockInTime: inTs, clockOutTime: outTs, notes: editForm.value.notes };
   showSnackbar('Entry updated — submit your timecard to save permanently.', 'success');
   showEditDialog.value = false;
+};
+
+const deleting          = ref(false);
+const showDeleteDialog  = ref(false);
+const deleteComment     = ref('');
+const recordToDelete    = ref(null);
+
+const openDeleteDialog = (record) => {
+  recordToDelete.value = record;
+  deleteComment.value  = '';
+  showDeleteDialog.value = true;
+};
+
+const confirmDelete = async () => {
+  if (!deleteComment.value.trim()) return;
+  const id = recordToDelete.value.id || recordToDelete.value.clock_id;
+  deleting.value = true;
+  try {
+    await EmployeeService.deleteClockRecord(id);
+    delete localEdits.value[id];
+    showSnackbar('Entry deleted.', 'success');
+    showDeleteDialog.value = false;
+    await loadData();
+  } catch {
+    showSnackbar('Could not delete entry.', 'error');
+  } finally { deleting.value = false; }
 };
 
 // ── LOG HOURS ──────────────────────────────────────────────────────────────
@@ -476,9 +514,17 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
           <h1 class="text-h5 font-weight-bold navy-text">My Time Card</h1>
           <p class="text-body-2 text-grey mt-1">Track your hours and submit your timecard at the end of the week</p>
         </div>
-        <v-btn v-if="activeTab === 'current'" color="#12086F" variant="tonal" size="small" @click="openLogDialog">
-          <v-icon start size="16">mdi-plus</v-icon>Log Hours
-        </v-btn>
+        <div class="d-flex align-center ga-2 flex-wrap">
+          <!-- Live indicator (read-only — clock in/out is managed by employer) -->
+          <div v-if="activeClockIn" class="live-badge d-flex align-center ga-2 px-3 py-1">
+            <span class="live-dot"></span>
+            <span class="text-caption font-weight-bold" style="color:#2e7d32">Clocked in {{ formatTime(activeClockIn.inDate) }}</span>
+          </div>
+          <!-- Log Hours -->
+          <v-btn v-if="activeTab === 'current'" color="#12086F" variant="tonal" size="small" @click="openLogDialog">
+            <v-icon start size="16">mdi-plus</v-icon>Log Hours
+          </v-btn>
+        </div>
       </div>
 
       <!-- Tabs -->
@@ -537,19 +583,21 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
                       <div class="d-flex align-center ga-2 mb-1">
                         <span class="entry-badge">Clock Entry</span>
                         <span v-if="isToday(day.date)" class="today-pill">Today</span>
+                        <span v-if="r.status === 'clocked_in'" class="live-pill">● Live</span>
                         <span v-if="r._pendingEdit" class="status-pill status-pill--edited">Edited</span>
                       </div>
                       <div class="text-body-2 font-weight-bold navy-text mb-1">{{ day.date.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'}) }}</div>
                       <div class="text-caption text-grey">
-                        In: <strong>{{ formatTime(r.inDate) }}</strong> → Out: <strong>{{ r.outDate ? formatTime(r.outDate) : 'Not clocked out' }}</strong>
+                        In: <strong>{{ formatTime(r.inDate) }}</strong> → Out: <strong>{{ r.status === 'clocked_in' ? 'Currently working…' : r.outDate ? formatTime(r.outDate) : 'Not clocked out' }}</strong>
                         <span v-if="r.totalHours"> · <span class="navy-text font-weight-bold">{{ r.totalHours }} hrs</span></span>
                       </div>
                       <div v-if="r.notes" class="text-caption text-grey mt-1">
                         <v-icon size="11" class="mr-1">mdi-comment-text-outline</v-icon>{{ r.notes }}
                       </div>
                     </div>
-                    <div class="d-flex flex-column align-end ga-2">
+                    <div v-if="r.status !== 'clocked_in'" class="d-flex align-end ga-1">
                       <v-btn size="x-small" variant="tonal" color="#12086F" @click="openEdit(r)">Edit</v-btn>
+                      <v-btn size="x-small" variant="tonal" color="error" @click="openDeleteDialog(r)">Delete</v-btn>
                     </div>
                   </div>
                 </template>
@@ -816,6 +864,32 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
       </v-card>
     </v-dialog>
 
+    <!-- Delete Entry dialog -->
+    <v-dialog v-model="showDeleteDialog" max-width="400" persistent>
+      <v-card rounded="lg">
+        <v-card-title class="pa-5 pb-3 font-weight-bold text-body-1" style="color:#d32f2f">Delete Time Entry</v-card-title>
+        <v-divider />
+        <v-card-text class="pa-5">
+          <p class="text-body-2 text-grey mb-4">Please provide a reason for deleting this entry.</p>
+          <v-textarea
+            v-model="deleteComment"
+            label="Reason (required)"
+            variant="outlined"
+            density="compact"
+            color="error"
+            rows="3"
+            :rules="[v => !!v.trim() || 'Reason is required']"
+            hide-details="auto"
+          />
+        </v-card-text>
+        <v-divider />
+        <v-card-actions class="pa-4 d-flex justify-end ga-2">
+          <v-btn variant="text" @click="showDeleteDialog = false" :disabled="deleting">Cancel</v-btn>
+          <v-btn color="error" variant="flat" :loading="deleting" :disabled="!deleteComment.trim()" @click="confirmDelete">Delete</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- Log Hours dialog — Workday-style -->
     <v-dialog v-model="showLogDialog" max-width="600" persistent scrollable>
       <v-card rounded="lg">
@@ -959,6 +1033,10 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
 .today-pill  { background: #12086F; color: white; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; }
 .status-pill { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; letter-spacing: .02em; }
 .status-pill--edited { background: #fff3e0; color: #e65100; }
+.live-pill { background: #e8f5e9; color: #2e7d32; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; animation: live-pulse 1.5s ease-in-out infinite; }
+.live-badge { background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 20px; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: #2e7d32; display: inline-block; animation: live-pulse 1.5s ease-in-out infinite; flex-shrink: 0; }
+@keyframes live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 .status-pill--submitted { background: #1565C0; color: white; }
 .status-pill--approved  { background: #2e7d32; color: white; }
 .status-pill--rejected  { background: #d32f2f; color: white; }

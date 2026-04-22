@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import Utils from "../config/utils";
 import EmployerService from "../services/employerServices.js";
 import EmployerLayout from '../components/EmployerLayout.vue';
@@ -97,10 +97,15 @@ const tsToLocal    = (ts) => ts ? new Date(Number(ts)).toISOString().slice(0, 16
 const isPending    = (r) => r.status === 'pending' || r.status === 'clocked_out' || r.status === 'submitted';
 const initials     = (name) => name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
+let pollInterval = null;
+
 onMounted(async () => {
   user.value = Utils.getStore("user");
   await loadClockRecords();
+  pollInterval = setInterval(loadClockRecords, 30000);
 });
+
+onUnmounted(() => { if (pollInterval) clearInterval(pollInterval); });
 
 const loadClockRecords = async () => {
   loading.value = true;
