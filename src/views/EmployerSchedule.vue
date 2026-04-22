@@ -573,13 +573,13 @@ const dragTimeLabel = computed(() => {
 
 // ── HOVER DETAIL CARD ────────────────────────────────────────────────────
 const hoveredShift = ref(null);
-const hoverPos     = ref({ x: 0, y: 0 });
+const hoverPos     = ref({ rect: null });
 let   hoverTimer   = null;
 
 const showShiftHover = (e, shift) => {
   clearTimeout(hoverTimer);
   hoveredShift.value = shift;
-  hoverPos.value     = { x: e.clientX, y: e.clientY };
+  hoverPos.value     = { rect: e.currentTarget.getBoundingClientRect(), mouseX: e.clientX };
 };
 const hideShiftHover = () => {
   hoverTimer = setTimeout(() => { hoveredShift.value = null; }, 150);
@@ -594,23 +594,29 @@ const getDuration = (shift) => {
 };
 
 const hoverCardStyle = computed(() => {
-  if (!hoveredShift.value) return {};
-  const { x, y } = hoverPos.value;
+  if (!hoveredShift.value || !hoverPos.value.rect) return {};
+  const { rect, mouseX } = hoverPos.value;
   const vW    = window.innerWidth;
   const vH    = window.innerHeight;
   const cardW = 270;
-  const cardH = 290;
-  const offset = 14;
+  const cardH = 300;
+  const gap   = 10;
 
-  // Prefer right of cursor, flip left when not enough room
-  const rawLeft = x + offset + cardW <= vW ? x + offset : x - cardW - offset;
-  // Prefer below cursor, flip up when not enough room
-  const rawTop  = y + offset + cardH <= vH ? y + offset : y - cardH - offset;
+  // Anchor horizontally to the cursor position (which is on the shift);
+  // flip left when there isn't enough room on the right.
+  let left = mouseX + gap + cardW <= vW
+    ? mouseX + gap
+    : mouseX - gap - cardW;
+  left = Math.max(8, Math.min(left, vW - cardW - 8));
+
+  // Align card top with shift top; push up if it would overflow bottom
+  let top = rect.top;
+  top = Math.max(8, Math.min(top, vH - cardH - 8));
 
   return {
     position: 'fixed',
-    top:  Math.max(8, Math.min(rawTop,  vH - cardH - 8)) + 'px',
-    left: Math.max(8, Math.min(rawLeft, vW - cardW - 8)) + 'px',
+    top:  top  + 'px',
+    left: left + 'px',
     zIndex: 3000,
     width: cardW + 'px',
   };
