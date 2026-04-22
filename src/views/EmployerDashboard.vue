@@ -9,14 +9,13 @@ const router  = useRouter();
 const user    = ref(null);
 const loading = ref(true);
 
-const weeklySchedule   = ref([]);
+const weeklySchedule    = ref([]);
 const schedulePublished = ref(false);
-const pendingSwaps     = ref([]);
-const pendingTimeOff   = ref([]);
-const employees        = ref([]);
-const clockedInCount   = ref(0);
+const pendingSwaps      = ref([]);
+const pendingTimeOff    = ref([]);
+const employees         = ref([]);
+const clockedInCount    = ref(0);
 
-// ── WEEK DAYS ─────────────────────────────────────────────────────────────
 const weekDays = computed(() => {
   const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const full  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -41,43 +40,6 @@ const weekDays = computed(() => {
   });
 });
 
-// ── STAT CARDS ────────────────────────────────────────────────────────────
-const statCards = computed(() => [
-  {
-    label:    'Employees',
-    value:    employees.value.length,
-    icon:     'mdi-account-group',
-    color:    '#12086F',
-    bg:       '#eef2ff',
-    route:    'employerEmployees',
-  },
-  {
-    label:    'Shifts This Week',
-    value:    weeklySchedule.value.length,
-    icon:     'mdi-calendar-check',
-    color:    '#4361EE',
-    bg:       '#e8eeff',
-    route:    'employerSchedule',
-  },
-  {
-    label:    'Pending Time Off',
-    value:    pendingTimeOff.value.length,
-    icon:     'mdi-calendar-remove',
-    color:    pendingTimeOff.value.length > 0 ? '#f57c00' : '#2e7d32',
-    bg:       pendingTimeOff.value.length > 0 ? '#fff3e0' : '#e8f5e9',
-    route:    'employerTimeOff',
-  },
-  {
-    label:    'Swap Requests',
-    value:    pendingSwaps.value.length,
-    icon:     'mdi-swap-horizontal',
-    color:    pendingSwaps.value.length > 0 ? '#9C27B0' : '#2e7d32',
-    bg:       pendingSwaps.value.length > 0 ? '#f3e5f5' : '#e8f5e9',
-    route:    'employerSwaps',
-  },
-]);
-
-// ── LIFECYCLE ─────────────────────────────────────────────────────────────
 onMounted(async () => {
   user.value = Utils.getStore('user');
   await loadAll();
@@ -94,12 +56,11 @@ const loadAll = async () => {
 
 const loadSchedule = async () => {
   try {
-    const res = await EmployerService.getAllShifts();
+    const res       = await EmployerService.getAllShifts();
     const allShifts = Array.isArray(res.data) ? res.data : [];
-    // Only this week's shifts
-    const sunday   = getSunday(new Date()).getTime();
-    const saturday = sunday + 7 * 24 * 60 * 60 * 1000;
-    weeklySchedule.value   = allShifts.filter(s => {
+    const sunday    = getSunday(new Date()).getTime();
+    const saturday  = sunday + 7 * 24 * 60 * 60 * 1000;
+    weeklySchedule.value    = allShifts.filter(s => {
       const t = Number(s.shift_time || s.shiftTime);
       return t >= sunday && t < saturday;
     });
@@ -120,20 +81,28 @@ const loadRequests = async () => {
 
 const loadEmployees = async () => {
   try {
-    const res = await EmployerService.getAllEmployees();
+    const res       = await EmployerService.getAllEmployees();
     employees.value = (Array.isArray(res.data) ? res.data : []).filter(u => u.role === 'employee');
   } catch (err) { console.error('Employees error:', err); }
 };
 
 const loadClockedIn = async () => {
   try {
-    const res = await EmployerService.getAllClockRecords();
+    const res     = await EmployerService.getAllClockRecords();
     const records = Array.isArray(res.data) ? res.data : [];
-    clockedInCount.value = records.filter(r => r.status === 'clocked_in').length;
-  } catch { clockedInCount.value = 0; }
+    clockedInCount.value = records.filter(r => {
+      const status = (r.status || '').toLowerCase();
+      if (['clocked_in', 'active', 'open', 'in'].includes(status)) return true;
+      if (['clocked_out', 'completed', 'done', 'closed', 'out', 'pending', 'approved', 'rejected'].includes(status)) return false;
+      const hasIn  = !!(r.clockInTime  || r.clockIn  || r.clock_in_time  || r.clock_in);
+      const hasOut = !!(r.clockOutTime || r.clockOut || r.clock_out_time || r.clock_out);
+      return hasIn && !hasOut;
+    }).length;
+  } catch {
+    clockedInCount.value = 0;
+  }
 };
 
-// ── HELPERS ───────────────────────────────────────────────────────────────
 const getSunday = (date) => {
   const d = new Date(date);
   d.setDate(d.getDate() - d.getDay());
@@ -149,6 +118,14 @@ const formatTime = (minutes) => {
   const hour = h % 12 || 12;
   return `${hour}:${String(m).padStart(2, '0')}${ampm}`;
 };
+
+const goToKiosk = () => {
+  if (localStorage.getItem('isWorkDevice') === 'true') {
+    router.push({ name: 'clockKiosk' });
+  } else {
+    router.push({ name: 'employerSettings' });
+  }
+};
 </script>
 
 <template>
@@ -159,18 +136,23 @@ const formatTime = (minutes) => {
       <div class="d-flex align-center justify-space-between mb-6">
         <div>
           <h1 class="text-h4 font-weight-bold navy-text">Dashboard</h1>
-          <p class="text-body-2 text-grey">
-            Welcome back, {{ user?.fName || user?.first_name }}!
-            <v-chip v-if="clockedInCount > 0" size="x-small" color="#2e7d32" variant="tonal" class="ml-2">
-              <v-icon start size="14">mdi-circle</v-icon>
-              {{ clockedInCount }} clocked in now
-            </v-chip>
-          </p>
+          <p class="text-body-2 text-grey">Welcome back, {{ user?.fName || user?.first_name }}!</p>
         </div>
-        <v-chip :color="schedulePublished ? '#2e7d32' : '#f57c00'" variant="tonal" size="small">
-          <v-icon start size="18">{{ schedulePublished ? 'mdi-check-circle' : 'mdi-alert-circle' }}</v-icon>
-          Schedule {{ schedulePublished ? 'Published' : 'Draft' }}
-        </v-chip>
+        <div class="d-flex align-center ga-3">
+          <v-chip
+            v-if="clockedInCount > 0"
+            color="#2e7d32" variant="tonal" size="small"
+            style="cursor:pointer;" @click="goToKiosk"
+          >
+            <v-icon start size="14">mdi-circle</v-icon>
+            {{ clockedInCount }} clocked in now
+            <v-icon end size="14">mdi-arrow-right</v-icon>
+          </v-chip>
+          <v-chip :color="schedulePublished ? '#2e7d32' : '#f57c00'" variant="tonal" size="small">
+            <v-icon start size="18">{{ schedulePublished ? 'mdi-check-circle' : 'mdi-alert-circle' }}</v-icon>
+            Schedule {{ schedulePublished ? 'Published' : 'Draft' }}
+          </v-chip>
+        </div>
       </div>
 
       <div v-if="loading" class="text-center py-12">
@@ -179,53 +161,49 @@ const formatTime = (minutes) => {
 
       <template v-else>
 
-        <!-- ── Quick Actions ─────────────────────────────────────────────── -->
+        <!-- Quick Actions -->
         <v-row class="mb-6">
-          <v-col cols="12" sm="4">
-            <v-btn block color="#12086F" variant="flat" size="large"
-              @click="router.push({ name: 'employerSchedule' })">
+          <v-col cols="12" sm="3">
+            <v-btn block color="#12086F" variant="flat" size="large" @click="router.push({ name: 'employerSchedule' })">
               <v-icon start>mdi-calendar-edit</v-icon>Manage Schedule
             </v-btn>
           </v-col>
-          <v-col cols="12" sm="4">
-            <v-btn block color="#4361EE" variant="outlined" size="large"
-              @click="router.push({ name: 'employerEmployees' })">
+          <v-col cols="12" sm="3">
+            <v-btn block color="#4361EE" variant="outlined" size="large" @click="router.push({ name: 'employerEmployees' })">
               <v-icon start>mdi-account-plus</v-icon>Manage Employees
             </v-btn>
           </v-col>
-          <v-col cols="12" sm="4">
-            <v-btn block color="#9C27B0" variant="outlined" size="large"
-              @click="router.push({ name: 'employerTimeCards' })">
+          <v-col cols="12" sm="3">
+            <v-btn block color="#9C27B0" variant="outlined" size="large" @click="router.push({ name: 'employerTimeCards' })">
               <v-icon start>mdi-credit-card-clock-outline</v-icon>Review Time Cards
+            </v-btn>
+          </v-col>
+          <v-col cols="12" sm="3">
+            <v-btn block color="#2e7d32" variant="outlined" size="large" @click="goToKiosk">
+              <v-icon start>mdi-clock-check-outline</v-icon>Clock Kiosk
             </v-btn>
           </v-col>
         </v-row>
 
-        <!-- ── This Week's Schedule ──────────────────────────────────────── -->
+        <!-- This Week's Schedule -->
         <v-card variant="outlined" rounded="lg" class="navy-card">
           <v-card-title class="d-flex align-center justify-space-between pa-4">
             <span class="text-body-1 font-weight-bold navy-text">
               <v-icon start size="22">mdi-calendar-week</v-icon>This Week's Schedule
             </span>
-            <v-btn size="small" color="#12086F" variant="tonal"
-              @click="router.push({ name: 'employerSchedule' })">
+            <v-btn size="small" color="#12086F" variant="tonal" @click="router.push({ name: 'employerSchedule' })">
               Open Full Schedule
             </v-btn>
           </v-card-title>
           <v-divider />
           <v-card-text class="pa-4">
             <div class="week-grid">
-              <div v-for="day in weekDays" :key="day.short"
-                class="week-col" :class="{ 'week-col--today': day.isToday }">
-
-                <!-- Day header -->
+              <div v-for="day in weekDays" :key="day.short" class="week-col" :class="{ 'week-col--today': day.isToday }">
                 <div class="week-header">
                   <div class="text-overline font-weight-bold text-white" style="font-size:13px;">{{ day.short }}</div>
                   <div class="text-h6 font-weight-black text-white">{{ day.dateNum }}</div>
-                  <div class="text-caption text-white" style="opacity:0.7; font-size:12px;">{{ day.monthShort }}</div>
+                  <div class="text-caption text-white" style="opacity:0.7;font-size:12px;">{{ day.monthShort }}</div>
                 </div>
-
-                <!-- Shifts in this day -->
                 <div class="week-body">
                   <div v-if="day.shifts.length === 0" class="empty-day">
                     <v-icon size="26" color="grey-lighten-2">mdi-calendar-blank-outline</v-icon>
@@ -236,8 +214,8 @@ const formatTime = (minutes) => {
                     <div class="mini-shift-name text-truncate">
                       {{ shift.employee_name || shift.employeeName || 'Unassigned' }}
                     </div>
-                    <v-chip v-if="shift.status === 'draft'" size="x-small" color="#f57c00" variant="tonal"
-                      style="font-size:11px; height:20px;">Draft</v-chip>
+                    <v-chip v-if="shift.status === 'open'" size="x-small" color="#2e7d32" variant="tonal" style="font-size:11px;height:20px;">Open</v-chip>
+                    <v-chip v-else-if="shift.status === 'draft'" size="x-small" color="#f57c00" variant="tonal" style="font-size:11px;height:20px;">Draft</v-chip>
                   </div>
                 </div>
               </div>
@@ -253,37 +231,15 @@ const formatTime = (minutes) => {
 <style scoped>
 .navy-text { color: #12086F !important; }
 .navy-card { border-color: #e0e0e0; box-shadow: 0 1px 3px rgba(18,8,111,0.05); }
-
-/* Stat cards */
-.stat-card { transition: all 0.2s; }
-.stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(18,8,111,0.12) !important; }
-.stat-icon-wrap { width: 52px; height: 52px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
-
-/* Week grid */
 .week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; background: #f5f5f5; padding: 8px; border-radius: 12px; }
 .week-col { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: box-shadow 0.2s; }
 .week-col:hover { box-shadow: 0 3px 8px rgba(18,8,111,0.12); }
 .week-col--today { outline: 2px solid #4361EE; }
-
-.week-header {
-  background: linear-gradient(135deg, #12086F, #2B354F);
-  padding: 14px 8px;
-  text-align: center;
-  display: flex; flex-direction: column; align-items: center;
-}
+.week-header { background: linear-gradient(135deg, #12086F, #2B354F); padding: 14px 8px; text-align: center; display: flex; flex-direction: column; align-items: center; }
 .week-col--today .week-header { background: linear-gradient(135deg, #4361EE, #5B73F0); }
-
 .week-body { padding: 8px; min-height: 140px; max-height: 280px; overflow-y: auto; }
-
 .empty-day { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 16px 4px; }
-
-.mini-shift {
-  background: #f0f4ff;
-  border-left: 3px solid #4361EE;
-  border-radius: 4px;
-  padding: 4px 6px;
-  margin-bottom: 4px;
-}
+.mini-shift { background: #f0f4ff; border-left: 3px solid #4361EE; border-radius: 4px; padding: 4px 6px; margin-bottom: 4px; }
 .mini-shift-time { font-size: 13px; font-weight: 700; color: #12086F; }
 .mini-shift-name { font-size: 13px; color: #444; max-width: 100%; }
 </style>

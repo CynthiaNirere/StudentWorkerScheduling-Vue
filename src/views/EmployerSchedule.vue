@@ -8,6 +8,13 @@ import EmployerLayout from '../components/EmployerLayout.vue';
 const router = useRouter();
 const user = ref(null);
 
+const toLocalDateStr = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 const shifts = ref([]);
 const employees = ref([]);
 const availability = ref([]);
@@ -64,7 +71,7 @@ const weekDays = computed(() => {
   return Array.from({ length: 7 }, (_, i) => {
     const day = new Date(sunday);
     day.setDate(sunday.getDate() + i);
-    const dayDateString = day.toISOString().split('T')[0];
+    const dayDateString = toLocalDateStr(day);
 
     const dayShifts = shifts.value.filter(shift => {
       const raw = shift.shift_time ?? shift.shiftTime;
@@ -83,7 +90,7 @@ const weekDays = computed(() => {
       dayShort: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][i],
       dayOfMonth: day.getDate(),
       month: day.toLocaleDateString('en-US', { month: 'short' }),
-      isToday: dayDateString === new Date().toISOString().split('T')[0],
+      isToday: dayDateString === toLocalDateStr(new Date()),
       shifts: dayShifts
     };
   });
@@ -98,19 +105,19 @@ const monthDays = computed(() => {
   const days = [];
   for (let d = 1; d <= lastDay.getDate(); d++) {
     const date = new Date(year, month, d);
-    const ds = date.toISOString().split('T')[0];
+    const ds = toLocalDateStr(date);
     const dayShifts = shifts.value.filter(shift => {
       const raw = shift.shift_time ?? shift.shiftTime;
       if (!raw) return false;
       const sd = new Date(Number(raw));
       if (isNaN(sd.getTime())) return false;
-      return sd.toISOString().split('T')[0] === ds;
+      return toLocalDateStr(sd) === ds;
     }).sort((a, b) => (a.start_time ?? a.startTime ?? 0) - (b.start_time ?? b.startTime ?? 0));
     days.push({
       date, dateString: ds, dayOfMonth: d,
       dayShort: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][date.getDay()],
       month: date.toLocaleDateString('en-US', { month: 'short' }),
-      isToday: ds === new Date().toISOString().split('T')[0],
+      isToday: ds === toLocalDateStr(new Date()),
       shifts: dayShifts
     });
   }
@@ -118,7 +125,7 @@ const monthDays = computed(() => {
 });
 
 const todayDay = computed(() => {
-  const today = new Date().toISOString().split('T')[0];
+  const today = toLocalDateStr(new Date());
   return weekDays.value.find(d => d.dateString === today) || weekDays.value[0];
 });
 
@@ -326,7 +333,7 @@ const checkForOverlaps = (shiftData) => {
     if (!raw) return false;
     const d = new Date(Number(raw));
     const newD = new Date(Number(shiftData.shiftTime));
-    return !isNaN(d.getTime()) && d.toISOString().split('T')[0] === newD.toISOString().split('T')[0];
+    return !isNaN(d.getTime()) && toLocalDateStr(d) === toLocalDateStr(newD);
   });
   for (const existing of sameDayShifts) {
     const existStart = existing.start_time ?? existing.startTime ?? 0;
@@ -393,7 +400,7 @@ const openEditShift = async (shift) => {
   let assignedTasks = [];
   try { const r = await EmployerService.getShiftTasks(shift.shift_id || shift.id); if (Array.isArray(r.data)) assignedTasks = r.data.map(st => st.tasklist_id || st.tasklistId); } catch {}
   shiftForm.value = {
-    date: shiftDate.toISOString().split('T')[0],
+    date: toLocalDateStr(shiftDate),
     startHour: startTime.hour, startMinute: startTime.minute, startAmPm: startTime.ampm,
     endHour: endTime.hour, endMinute: endTime.minute, endAmPm: endTime.ampm,
     userId: shift.user_id || shift.userId || "", jobRole: shift.job_role_id || shift.jobRoleId || "",
@@ -413,14 +420,14 @@ const confirmDelete = async () => {
 
 const publishSchedule = async () => {
   try {
-    const weekShifts = shifts.value.filter(s => { const raw = s.shift_time ?? s.shiftTime; if (!raw) return false; const d = new Date(Number(raw)); return weekDays.value.some(day => day.dateString === d.toISOString().split('T')[0]); });
+    const weekShifts = shifts.value.filter(s => { const raw = s.shift_time ?? s.shiftTime; if (!raw) return false; const d = new Date(Number(raw)); return weekDays.value.some(day => day.dateString === toLocalDateStr(d)); });
     for (const s of weekShifts) { if (s.status === 'draft') await EmployerService.updateShift(s.shift_id || s.id, { status: 'published' }); }
     showSnackbar("Schedule published!", "success"); await loadShifts();
   } catch { showSnackbar("Error publishing schedule", "error"); }
 };
 
 const openSaveTemplateDialog = () => {
-  const weekShifts = shifts.value.filter(s => { const raw = s.shift_time ?? s.shiftTime; if (!raw) return false; const d = new Date(Number(raw)); return weekDays.value.some(day => day.dateString === d.toISOString().split('T')[0]); });
+  const weekShifts = shifts.value.filter(s => { const raw = s.shift_time ?? s.shiftTime; if (!raw) return false; const d = new Date(Number(raw)); return weekDays.value.some(day => day.dateString === toLocalDateStr(d)); });
   if (!weekShifts.length) { showSnackbar("No shifts to save as template", "error"); return; }
   showSaveTemplateDialog.value = true;
 };
@@ -429,7 +436,7 @@ const handleSaveTemplate = async () => {
   if (!templateName.value) { showSnackbar("Template name is required", "error"); return; }
   savingTemplate.value = true;
   try {
-    const weekShifts = shifts.value.filter(s => { const raw = s.shift_time ?? s.shiftTime; if (!raw) return false; const d = new Date(Number(raw)); return weekDays.value.some(day => day.dateString === d.toISOString().split('T')[0]); });
+    const weekShifts = shifts.value.filter(s => { const raw = s.shift_time ?? s.shiftTime; if (!raw) return false; const d = new Date(Number(raw)); return weekDays.value.some(day => day.dateString === toLocalDateStr(d)); });
     const templateData = weekShifts.map(s => { const d = new Date(Number(s.shift_time ?? s.shiftTime)); return { dayOfWeek: d.getDay(), startTime: s.start_time ?? s.startTime, endTime: s.end_time ?? s.endTime, jobRoleId: s.job_role_id || s.jobRoleId, notes: s.notes || "" }; });
     await EmployerService.createTemplate({ name: templateName.value, description: templateDescription.value || "", locationId: user.value?.work_location || 1, createdBy: user.value?.user_id || user.value?.userId, templateData: JSON.stringify(templateData), isActive: true });
     showSnackbar("Template saved!", "success"); showSaveTemplateDialog.value = false; templateName.value = ""; templateDescription.value = ""; await loadTemplates();
@@ -566,13 +573,13 @@ const dragTimeLabel = computed(() => {
 
 // ── HOVER DETAIL CARD ────────────────────────────────────────────────────
 const hoveredShift = ref(null);
-const hoverRect    = ref(null);
+const hoverPos     = ref({ rect: null });
 let   hoverTimer   = null;
 
 const showShiftHover = (e, shift) => {
   clearTimeout(hoverTimer);
   hoveredShift.value = shift;
-  hoverRect.value    = e.currentTarget.getBoundingClientRect();
+  hoverPos.value     = { rect: e.currentTarget.getBoundingClientRect(), mouseX: e.clientX };
 };
 const hideShiftHover = () => {
   hoverTimer = setTimeout(() => { hoveredShift.value = null; }, 150);
@@ -587,25 +594,29 @@ const getDuration = (shift) => {
 };
 
 const hoverCardStyle = computed(() => {
-  if (!hoverRect.value) return {};
-  const r     = hoverRect.value;
+  if (!hoveredShift.value || !hoverPos.value.rect) return {};
+  const { rect, mouseX } = hoverPos.value;
   const vW    = window.innerWidth;
   const vH    = window.innerHeight;
   const cardW = 270;
-  const cardH = 290; // generous estimate — covers all content variants
+  const cardH = 300;
+  const gap   = 10;
 
-  // Horizontal: prefer right of shift, flip left when not enough room
-  const left = r.right + 14 + cardW <= vW ? r.right + 14 : r.left - cardW - 14;
+  // Anchor horizontally to the cursor position (which is on the shift);
+  // flip left when there isn't enough room on the right.
+  let left = mouseX + gap + cardW <= vW
+    ? mouseX + gap
+    : mouseX - gap - cardW;
+  left = Math.max(8, Math.min(left, vW - cardW - 8));
 
-  // Vertical: center card on the shift's midpoint, then clamp to viewport
-  const shiftMid   = r.top + r.height / 2;
-  const idealTop   = shiftMid - cardH / 2;
-  const clampedTop = Math.max(8, Math.min(idealTop, vH - cardH - 8));
+  // Align card top with shift top; push up if it would overflow bottom
+  let top = rect.top;
+  top = Math.max(8, Math.min(top, vH - cardH - 8));
 
   return {
     position: 'fixed',
-    top:  clampedTop + 'px',
-    left: Math.max(8, left) + 'px',
+    top:  top  + 'px',
+    left: left + 'px',
     zIndex: 3000,
     width: cardW + 'px',
   };

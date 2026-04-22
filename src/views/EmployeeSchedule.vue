@@ -8,6 +8,13 @@ import EmployeeLayout from '../components/EmployeeLayout.vue';
 const router = useRouter();
 const user   = ref(null);
 
+const toLocalDateStr = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 const shifts        = ref([]);
 const allShifts     = ref([]); // all team shifts for the week
 const swapRequests  = ref([]); // to show who took a swap
@@ -29,7 +36,7 @@ const weekDays = computed(() => {
   return Array.from({ length: 7 }, (_, i) => {
     const day = new Date(sunday);
     day.setDate(sunday.getDate() + i);
-    const ds = day.toISOString().split('T')[0];
+    const ds = toLocalDateStr(day);
 
     // Determine which shift list to display
     const sourceShifts = myShiftsOnly.value ? shifts.value : allShifts.value;
@@ -37,7 +44,7 @@ const weekDays = computed(() => {
     const dayShifts = sourceShifts
       .filter(s => {
         const st = new Date(Number(s.shiftTime || s.shift_time));
-        return st.toISOString().split('T')[0] === ds;
+        return toLocalDateStr(st) === ds;
       })
       .sort((a, b) => (a.start_time || a.startTime || 0) - (b.start_time || b.startTime || 0));
 
@@ -47,14 +54,14 @@ const weekDays = computed(() => {
       dayShort:   ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][i],
       dayOfMonth: day.getDate(),
       month:      day.toLocaleDateString('en-US', { month: 'short' }),
-      isToday:    ds === new Date().toISOString().split('T')[0],
+      isToday:    ds === toLocalDateStr(new Date()),
       shifts:     dayShifts,
     };
   });
 });
 
 const todayOnly = computed(() => {
-  const today = new Date().toISOString().split('T')[0];
+  const today = toLocalDateStr(new Date());
   return weekDays.value.filter(d => d.dateString === today);
 });
 
