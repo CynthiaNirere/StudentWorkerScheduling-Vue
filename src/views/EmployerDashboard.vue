@@ -9,12 +9,12 @@ const router  = useRouter();
 const user    = ref(null);
 const loading = ref(true);
 
-const weeklySchedule   = ref([]);
+const weeklySchedule    = ref([]);
 const schedulePublished = ref(false);
-const pendingSwaps     = ref([]);
-const pendingTimeOff   = ref([]);
-const employees        = ref([]);
-const clockedInCount   = ref(0);
+const pendingSwaps      = ref([]);
+const pendingTimeOff    = ref([]);
+const employees         = ref([]);
+const clockedInCount    = ref(0);
 
 // ── WEEK DAYS ─────────────────────────────────────────────────────────────
 const weekDays = computed(() => {
@@ -44,36 +44,36 @@ const weekDays = computed(() => {
 // ── STAT CARDS ────────────────────────────────────────────────────────────
 const statCards = computed(() => [
   {
-    label:    'Employees',
-    value:    employees.value.length,
-    icon:     'mdi-account-group',
-    color:    '#12086F',
-    bg:       '#eef2ff',
-    route:    'employerEmployees',
+    label: 'Employees',
+    value: employees.value.length,
+    icon:  'mdi-account-group',
+    color: '#12086F',
+    bg:    '#eef2ff',
+    route: 'employerEmployees',
   },
   {
-    label:    'Shifts This Week',
-    value:    weeklySchedule.value.length,
-    icon:     'mdi-calendar-check',
-    color:    '#4361EE',
-    bg:       '#e8eeff',
-    route:    'employerSchedule',
+    label: 'Shifts This Week',
+    value: weeklySchedule.value.length,
+    icon:  'mdi-calendar-check',
+    color: '#4361EE',
+    bg:    '#e8eeff',
+    route: 'employerSchedule',
   },
   {
-    label:    'Pending Time Off',
-    value:    pendingTimeOff.value.length,
-    icon:     'mdi-calendar-remove',
-    color:    pendingTimeOff.value.length > 0 ? '#f57c00' : '#2e7d32',
-    bg:       pendingTimeOff.value.length > 0 ? '#fff3e0' : '#e8f5e9',
-    route:    'employerTimeOff',
+    label: 'Pending Time Off',
+    value: pendingTimeOff.value.length,
+    icon:  'mdi-calendar-remove',
+    color: pendingTimeOff.value.length > 0 ? '#f57c00' : '#2e7d32',
+    bg:    pendingTimeOff.value.length > 0 ? '#fff3e0' : '#e8f5e9',
+    route: 'employerTimeOff',
   },
   {
-    label:    'Swap Requests',
-    value:    pendingSwaps.value.length,
-    icon:     'mdi-swap-horizontal',
-    color:    pendingSwaps.value.length > 0 ? '#9C27B0' : '#2e7d32',
-    bg:       pendingSwaps.value.length > 0 ? '#f3e5f5' : '#e8f5e9',
-    route:    'employerSwaps',
+    label: 'Swap Requests',
+    value: pendingSwaps.value.length,
+    icon:  'mdi-swap-horizontal',
+    color: pendingSwaps.value.length > 0 ? '#9C27B0' : '#2e7d32',
+    bg:    pendingSwaps.value.length > 0 ? '#f3e5f5' : '#e8f5e9',
+    route: 'employerSwaps',
   },
 ]);
 
@@ -96,10 +96,9 @@ const loadSchedule = async () => {
   try {
     const res = await EmployerService.getAllShifts();
     const allShifts = Array.isArray(res.data) ? res.data : [];
-    // Only this week's shifts
     const sunday   = getSunday(new Date()).getTime();
     const saturday = sunday + 7 * 24 * 60 * 60 * 1000;
-    weeklySchedule.value   = allShifts.filter(s => {
+    weeklySchedule.value    = allShifts.filter(s => {
       const t = Number(s.shift_time || s.shiftTime);
       return t >= sunday && t < saturday;
     });
@@ -129,8 +128,21 @@ const loadClockedIn = async () => {
   try {
     const res = await EmployerService.getAllClockRecords();
     const records = Array.isArray(res.data) ? res.data : [];
-    clockedInCount.value = records.filter(r => r.status === 'clocked_in').length;
-  } catch { clockedInCount.value = 0; }
+    // ✅ FIX: match all possible active clock-in status strings the backend may return
+    clockedInCount.value = records.filter(r => {
+      const status = (r.status || '').toLowerCase();
+      return (
+        status === 'clocked_in' ||
+        status === 'active'     ||
+        status === 'open'       ||
+        status === 'in'         ||
+        // Fallback: no clock-out time recorded = still clocked in
+        (!r.clockOut && !r.clock_out && !r.endTime && !r.end_time && !!r.clockIn || !!r.clock_in)
+      );
+    }).length;
+  } catch {
+    clockedInCount.value = 0;
+  }
 };
 
 // ── HELPERS ───────────────────────────────────────────────────────────────
@@ -149,6 +161,16 @@ const formatTime = (minutes) => {
   const hour = h % 12 || 12;
   return `${hour}:${String(m).padStart(2, '0')}${ampm}`;
 };
+
+// ── KIOSK NAVIGATION ──────────────────────────────────────────────────────
+const goToKiosk = () => {
+  // Kiosk requires work device flag — if not set, go to settings to enable it
+  if (localStorage.getItem('isWorkDevice') === 'true') {
+    router.push({ name: 'clockKiosk' });
+  } else {
+    router.push({ name: 'employerSettings' });
+  }
+};
 </script>
 
 <template>
@@ -161,16 +183,28 @@ const formatTime = (minutes) => {
           <h1 class="text-h4 font-weight-bold navy-text">Dashboard</h1>
           <p class="text-body-2 text-grey">
             Welcome back, {{ user?.fName || user?.first_name }}!
-            <v-chip v-if="clockedInCount > 0" size="x-small" color="#2e7d32" variant="tonal" class="ml-2">
-              <v-icon start size="14">mdi-circle</v-icon>
-              {{ clockedInCount }} clocked in now
-            </v-chip>
           </p>
         </div>
-        <v-chip :color="schedulePublished ? '#2e7d32' : '#f57c00'" variant="tonal" size="small">
-          <v-icon start size="18">{{ schedulePublished ? 'mdi-check-circle' : 'mdi-alert-circle' }}</v-icon>
-          Schedule {{ schedulePublished ? 'Published' : 'Draft' }}
-        </v-chip>
+        <div class="d-flex align-center ga-3">
+          <!-- ✅ NEW: clocked-in chip is now a clickable link to the kiosk -->
+          <v-chip
+            v-if="clockedInCount > 0"
+            color="#2e7d32"
+            variant="tonal"
+            size="small"
+            style="cursor:pointer;"
+            @click="goToKiosk"
+          >
+            <v-icon start size="14">mdi-circle</v-icon>
+            {{ clockedInCount }} clocked in now
+            <v-icon end size="14">mdi-arrow-right</v-icon>
+          </v-chip>
+
+          <v-chip :color="schedulePublished ? '#2e7d32' : '#f57c00'" variant="tonal" size="small">
+            <v-icon start size="18">{{ schedulePublished ? 'mdi-check-circle' : 'mdi-alert-circle' }}</v-icon>
+            Schedule {{ schedulePublished ? 'Published' : 'Draft' }}
+          </v-chip>
+        </div>
       </div>
 
       <div v-if="loading" class="text-center py-12">
@@ -181,23 +215,63 @@ const formatTime = (minutes) => {
 
         <!-- ── Quick Actions ─────────────────────────────────────────────── -->
         <v-row class="mb-6">
-          <v-col cols="12" sm="4">
+          <v-col cols="12" sm="3">
             <v-btn block color="#12086F" variant="flat" size="large"
               @click="router.push({ name: 'employerSchedule' })">
               <v-icon start>mdi-calendar-edit</v-icon>Manage Schedule
             </v-btn>
           </v-col>
-          <v-col cols="12" sm="4">
+          <v-col cols="12" sm="3">
             <v-btn block color="#4361EE" variant="outlined" size="large"
               @click="router.push({ name: 'employerEmployees' })">
               <v-icon start>mdi-account-plus</v-icon>Manage Employees
             </v-btn>
           </v-col>
-          <v-col cols="12" sm="4">
+          <v-col cols="12" sm="3">
             <v-btn block color="#9C27B0" variant="outlined" size="large"
               @click="router.push({ name: 'employerTimeCards' })">
               <v-icon start>mdi-credit-card-clock-outline</v-icon>Review Time Cards
             </v-btn>
+          </v-col>
+          <!-- ✅ NEW: Clock Kiosk quick action -->
+          <v-col cols="12" sm="3">
+            <v-btn block color="#2e7d32" variant="outlined" size="large" @click="goToKiosk">
+              <v-icon start>mdi-clock-check-outline</v-icon>Clock Kiosk
+            </v-btn>
+          </v-col>
+        </v-row>
+
+        <!-- ── Alerts row — only show if there's something pending ────────── -->
+        <v-row v-if="pendingSwaps.length > 0 || pendingTimeOff.length > 0" class="mb-5">
+          <v-col v-if="pendingTimeOff.length > 0" cols="12" sm="6">
+            <v-alert
+              type="warning" variant="tonal" density="compact" rounded="lg"
+              :title="`${pendingTimeOff.length} Pending Time Off Request${pendingTimeOff.length > 1 ? 's' : ''}`"
+              text="Employees are waiting for approval."
+              style="cursor:pointer;"
+              @click="router.push({ name: 'employerTimeOff' })"
+            >
+              <template #append>
+                <v-btn size="small" color="warning" variant="tonal" @click.stop="router.push({ name: 'employerTimeOff' })">
+                  Review
+                </v-btn>
+              </template>
+            </v-alert>
+          </v-col>
+          <v-col v-if="pendingSwaps.length > 0" cols="12" sm="6">
+            <v-alert
+              type="info" variant="tonal" density="compact" rounded="lg"
+              :title="`${pendingSwaps.length} Shift Swap Request${pendingSwaps.length > 1 ? 's' : ''}`"
+              text="Employees have requested shift swaps."
+              style="cursor:pointer;"
+              @click="router.push({ name: 'employerSwaps' })"
+            >
+              <template #append>
+                <v-btn size="small" color="info" variant="tonal" @click.stop="router.push({ name: 'employerSwaps' })">
+                  Review
+                </v-btn>
+              </template>
+            </v-alert>
           </v-col>
         </v-row>
 
@@ -218,14 +292,12 @@ const formatTime = (minutes) => {
               <div v-for="day in weekDays" :key="day.short"
                 class="week-col" :class="{ 'week-col--today': day.isToday }">
 
-                <!-- Day header -->
                 <div class="week-header">
                   <div class="text-overline font-weight-bold text-white" style="font-size:13px;">{{ day.short }}</div>
                   <div class="text-h6 font-weight-black text-white">{{ day.dateNum }}</div>
                   <div class="text-caption text-white" style="opacity:0.7; font-size:12px;">{{ day.monthShort }}</div>
                 </div>
 
-                <!-- Shifts in this day -->
                 <div class="week-body">
                   <div v-if="day.shifts.length === 0" class="empty-day">
                     <v-icon size="26" color="grey-lighten-2">mdi-calendar-blank-outline</v-icon>
@@ -254,14 +326,21 @@ const formatTime = (minutes) => {
 .navy-text { color: #12086F !important; }
 .navy-card { border-color: #e0e0e0; box-shadow: 0 1px 3px rgba(18,8,111,0.05); }
 
-/* Stat cards */
-.stat-card { transition: all 0.2s; }
-.stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(18,8,111,0.12) !important; }
-.stat-icon-wrap { width: 52px; height: 52px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
-
-/* Week grid */
-.week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; background: #f5f5f5; padding: 8px; border-radius: 12px; }
-.week-col { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: box-shadow 0.2s; }
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  background: #f5f5f5;
+  padding: 8px;
+  border-radius: 12px;
+}
+.week-col {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  transition: box-shadow 0.2s;
+}
 .week-col:hover { box-shadow: 0 3px 8px rgba(18,8,111,0.12); }
 .week-col--today { outline: 2px solid #4361EE; }
 
@@ -275,7 +354,11 @@ const formatTime = (minutes) => {
 
 .week-body { padding: 8px; min-height: 140px; max-height: 280px; overflow-y: auto; }
 
-.empty-day { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 16px 4px; }
+.empty-day {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 4px; padding: 16px 4px;
+}
 
 .mini-shift {
   background: #f0f4ff;
