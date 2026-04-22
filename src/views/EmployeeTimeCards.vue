@@ -179,33 +179,6 @@ const orderedPendingWeeks = computed(() => {
     : [{ days: pendingWeek1.value, key: 'w1' }, { days: pendingWeek2.value, key: 'w2' }];
 });
 
-// ── CLOCK IN / OUT ─────────────────────────────────────────────────────────
-const clockingIn  = ref(false);
-const clockingOut = ref(false);
-
-const handleClockIn = async () => {
-  clockingIn.value = true;
-  try {
-    await EmployeeService.clockIn({ clockInTime: Date.now() });
-    showSnackbar('Clocked in!', 'success');
-    await loadData();
-  } catch {
-    showSnackbar('Error clocking in', 'error');
-  } finally { clockingIn.value = false; }
-};
-
-const handleClockOut = async () => {
-  if (!activeClockIn.value) return;
-  clockingOut.value = true;
-  try {
-    const id = activeClockIn.value.id || activeClockIn.value.clock_id;
-    await EmployeeService.clockOut(id);
-    showSnackbar('Clocked out!', 'success');
-    await loadData();
-  } catch {
-    showSnackbar('Error clocking out', 'error');
-  } finally { clockingOut.value = false; }
-};
 
 // ── LIFECYCLE ──────────────────────────────────────────────────────────────
 let pollInterval = null;
@@ -516,16 +489,11 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
           <p class="text-body-2 text-grey mt-1">Track your hours and submit your timecard at the end of the week</p>
         </div>
         <div class="d-flex align-center ga-2 flex-wrap">
-          <!-- Live clock-in badge + clock out -->
+          <!-- Live indicator (read-only — clock in/out is managed by employer) -->
           <div v-if="activeClockIn" class="live-badge d-flex align-center ga-2 px-3 py-1">
             <span class="live-dot"></span>
             <span class="text-caption font-weight-bold" style="color:#2e7d32">Clocked in {{ formatTime(activeClockIn.inDate) }}</span>
-            <v-btn size="x-small" color="error" variant="flat" :loading="clockingOut" @click="handleClockOut">Clock Out</v-btn>
           </div>
-          <!-- Clock In button (only when not already clocked in) -->
-          <v-btn v-if="!activeClockIn && activeTab === 'current'" color="#2e7d32" variant="tonal" size="small" :loading="clockingIn" @click="handleClockIn">
-            <v-icon start size="16">mdi-clock-in</v-icon>Clock In
-          </v-btn>
           <!-- Log Hours -->
           <v-btn v-if="activeTab === 'current'" color="#12086F" variant="tonal" size="small" @click="openLogDialog">
             <v-icon start size="16">mdi-plus</v-icon>Log Hours
