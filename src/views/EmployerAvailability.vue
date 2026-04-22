@@ -294,8 +294,8 @@ const handleDelete = async () => {
             </div>
             <div v-for="(day, dayIndex) in daysOfWeek" :key="day" class="day-column">
               <div v-if="row.schedule[day].length === 0" class="in-class">
-                <v-icon size="12" class="mr-1">{{ dayIndex < 5 ? 'mdi-school' : 'mdi-close-circle-outline' }}</v-icon>
-                {{ dayIndex < 5 ? 'In Class' : 'Unavailable' }}
+                <v-icon size="12" class="mr-1">{{ (dayIndex >= 1 && dayIndex <= 5) ? 'mdi-school' : 'mdi-close-circle-outline' }}</v-icon>
+                {{ (dayIndex >= 1 && dayIndex <= 5) ? 'In Class' : 'Unavailable' }}
               </div>
               <div
                 v-else
