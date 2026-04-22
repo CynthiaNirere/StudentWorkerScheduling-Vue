@@ -209,8 +209,9 @@ export default {
   getAllTaskItems() {
     return apiClient.get("/task-list-items");
   },
+  // ✅ Fixed: uses the /tasklist/:tasklistId route that exists on the backend
   getTaskItemsByList(tasklistId) {
-    return apiClient.get(`/task-list-items?tasklistId=${tasklistId}`);
+    return apiClient.get(`/task-list-items/tasklist/${tasklistId}`);
   },
   createTaskItem(item) {
     return apiClient.post("/task-list-items", item);
@@ -226,6 +227,28 @@ export default {
   },
   reorderTaskItems(items) {
     return apiClient.put("/task-list-items/reorder", { items });
+  },
+
+  // ── TASK ASSIGNMENTS ─────────────────────────────────────────────────────
+  // ✅ NEW: Assign a task list to one or more employees for a specific date
+  bulkAssignTask(data) {
+    return apiClient.post("/task-assignments/bulk", data);
+  },
+  assignTask(data) {
+    return apiClient.post("/task-assignments", data);
+  },
+  removeTaskAssignment(id) {
+    return apiClient.delete(`/task-assignments/${id}`);
+  },
+  // ✅ NEW: Yesterday's audit — who was assigned what, who completed each item
+  getYesterdayTaskAudit() {
+    return apiClient.get("/task-assignments/yesterday");
+  },
+  getTodayAssignments() {
+    return apiClient.get("/task-assignments/today");
+  },
+  getAssignmentsByDate(timestamp) {
+    return apiClient.get(`/task-assignments/date/${timestamp}`);
   },
 
   // ── SHIFT TASKS ──────────────────────────────────────────────────────────
@@ -335,5 +358,4 @@ export default {
   getTaskCompletionHistory() {
     return apiClient.get("/tasklists/history/all");
   },
-
 };
