@@ -130,14 +130,14 @@ export default {
   },
 
   // Submit timecard for the current pay period
-  // Backend should mark all pending records for this user/period as submitted
   submitTimecard(data) {
     return apiClient.post('/clock-records/submit-timecard', data);
   },
 
   // ─── TASKS ────────────────────────────────────────────────────────────────
+  // Fetch task lists assigned to this employee via TaskAssignment table
   getMyTaskLists() {
-    return apiClient.get('/task-lists');
+    return apiClient.get('/task-lists/my-assignments');
   },
 
   // Get task lists linked to a specific shift (for today's tasks filter)
