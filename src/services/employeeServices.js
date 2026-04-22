@@ -48,20 +48,54 @@ export default {
   cancelSwapRequest(id) { return apiClient.put(`/shift-swap-requests/${id}/cancel`); },
 
   // ─── CLOCK / TIME CARDS ───────────────────────────────────────────────────
-  clockIn(data) { return apiClient.post('/clock-records/clock-in', data); },
-  clockOut(id) { return apiClient.put(`/clock-records/clock-out/${id}`, {}); },
-  getMyClockRecords() { return apiClient.get('/clock-records'); },
-  getClockRecordsByUser(userId) { return apiClient.get(`/clock-records?userId=${userId}`); },
-  updateClockRecord(id, data) { return apiClient.put(`/clock-records/${id}/modify`, data); },
-  submitTimecard(data) { return apiClient.post('/clock-records/submit-timecard', data); },
+  clockIn(data) {
+    return apiClient.post('/clock-records/clock-in', data);
+  },
+
+  clockOut(id) {
+    return apiClient.put(`/clock-records/clock-out/${id}`, {});
+  },
+
+  getMyClockRecords() {
+    return apiClient.get('/clock-records');
+  },
+
+  getClockRecordsByUser(userId) {
+    return apiClient.get(`/clock-records?userId=${userId}`);
+  },
+
+  updateClockRecord(id, data) {
+    return apiClient.put(`/clock-records/${id}/modify`, data);
+  },
+
+  // Submit timecard for the current pay period
+  submitTimecard(data) {
+    return apiClient.post('/clock-records/submit-timecard', data);
+  },
 
   // ─── TASKS ────────────────────────────────────────────────────────────────
-  getMyTodayTasks() { return apiClient.get('/task-assignments/my-today'); },
-  getMyTaskLists() { return apiClient.get('/task-assignments/my-today'); },
-  getTaskListsByShift(shiftId) { return apiClient.get(`/shift-tasks/shift/${shiftId}`); },
-  getTaskItems(tasklistId) { return apiClient.get(`/task-list-items/tasklist/${tasklistId}`); },
-  completeTaskItem(id) { return apiClient.put(`/task-list-items/${id}/complete`, {}); },
-  updateTaskItem(id, data) { return apiClient.put(`/task-list-items/${id}`, data); },
+  // Fetch task lists assigned to this employee via TaskAssignment table
+  getMyTaskLists() {
+    return apiClient.get('/task-lists/my-assignments');
+  },
+
+  // Get task lists linked to a specific shift (for today's tasks filter)
+  getTaskListsByShift(shiftId) {
+    return apiClient.get(`/shift-tasks/shift/${shiftId}`);
+  },
+
+  getTaskItems(tasklistId) {
+    return apiClient.get(`/task-list-items?tasklistId=${tasklistId}`);
+  },
+
+  // Complete a task item — backend records completedBy from the auth token
+  completeTaskItem(id) {
+    return apiClient.put(`/task-list-items/${id}/complete`, {});
+  },
+
+  updateTaskItem(id, data) {
+    return apiClient.put(`/task-list-items/${id}`, data);
+  },
 
   // ─── MESSAGES ─────────────────────────────────────────────────────────────
   sendMessage(data) { return apiClient.post('/messages', data); },
