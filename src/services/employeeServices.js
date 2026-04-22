@@ -24,22 +24,19 @@ export default {
   },
 
   // ─── SHIFTS ─────────────────────────────────────────────────────────────
-  // My shifts only (filtered by userId on backend)
   getMyShifts(userId) {
     if (userId) return apiClient.get(`/shifts?userId=${userId}`);
     return apiClient.get('/shifts');
   },
 
-  // All shifts (for team schedule view)
   getAllShifts() {
     return apiClient.get('/shifts');
   },
 
-  // Today's shifts for this employee
   getMyShiftsToday(userId) {
     const today = new Date();
-    const start = new Date(today); start.setHours(0,0,0,0);
-    const end   = new Date(today); end.setHours(23,59,59,999);
+    const start = new Date(today); start.setHours(0, 0, 0, 0);
+    const end   = new Date(today); end.setHours(23, 59, 59, 999);
     return apiClient.get(`/shifts?userId=${userId}&startDate=${start.getTime()}&endDate=${end.getTime()}`);
   },
 
@@ -129,27 +126,30 @@ export default {
     return apiClient.put(`/clock-records/${id}/modify`, data);
   },
 
-  // Submit timecard for the current pay period
-  // Backend should mark all pending records for this user/period as submitted
   submitTimecard(data) {
     return apiClient.post('/clock-records/submit-timecard', data);
   },
 
   // ─── TASKS ────────────────────────────────────────────────────────────────
-  getMyTaskLists() {
-    return apiClient.get('/task-lists');
+  // ✅ PRIMARY: Only fetches tasks explicitly assigned to this employee today
+  getMyTodayTasks() {
+    return apiClient.get('/task-assignments/my-today');
   },
 
-  // Get task lists linked to a specific shift (for today's tasks filter)
+  // Kept for any legacy references — prefer getMyTodayTasks()
+  getMyTaskLists() {
+    return apiClient.get('/task-assignments/my-today');
+  },
+
   getTaskListsByShift(shiftId) {
     return apiClient.get(`/shift-tasks/shift/${shiftId}`);
   },
 
+  // ✅ Fixed: uses the /tasklist/:tasklistId route that exists on the backend
   getTaskItems(tasklistId) {
-    return apiClient.get(`/task-list-items?tasklistId=${tasklistId}`);
+    return apiClient.get(`/task-list-items/tasklist/${tasklistId}`);
   },
 
-  // Complete a task item — backend records completedBy from the auth token
   completeTaskItem(id) {
     return apiClient.put(`/task-list-items/${id}/complete`, {});
   },
