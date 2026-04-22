@@ -11,8 +11,6 @@ const availability    = ref([]);
 const employees       = ref([]);
 const loading         = ref(false);
 const selectedEmployee = ref(null);
-
-// Class Schedule Modal
 const showScheduleModal = ref(false);
 const selectedUserId = ref('');
 const selectedUserName = ref('');
