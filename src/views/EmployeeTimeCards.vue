@@ -338,15 +338,26 @@ const saveEdit = () => {
   showEditDialog.value = false;
 };
 
-const deleting = ref(false);
+const deleting          = ref(false);
+const showDeleteDialog  = ref(false);
+const deleteComment     = ref('');
+const recordToDelete    = ref(null);
 
-const deleteEntry = async (record) => {
-  const id = record.id || record.clock_id;
+const openDeleteDialog = (record) => {
+  recordToDelete.value = record;
+  deleteComment.value  = '';
+  showDeleteDialog.value = true;
+};
+
+const confirmDelete = async () => {
+  if (!deleteComment.value.trim()) return;
+  const id = recordToDelete.value.id || recordToDelete.value.clock_id;
   deleting.value = true;
   try {
     await EmployeeService.deleteClockRecord(id);
     delete localEdits.value[id];
     showSnackbar('Entry deleted.', 'success');
+    showDeleteDialog.value = false;
     await loadData();
   } catch {
     showSnackbar('Could not delete entry.', 'error');
@@ -586,7 +597,7 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
                     </div>
                     <div class="d-flex align-end ga-1">
                       <v-btn size="x-small" variant="tonal" color="#12086F" @click="openEdit(r)">Edit</v-btn>
-                      <v-btn size="x-small" variant="tonal" color="error" :loading="deleting" @click="deleteEntry(r)">Delete</v-btn>
+                      <v-btn size="x-small" variant="tonal" color="error" @click="openDeleteDialog(r)">Delete</v-btn>
                     </div>
                   </div>
                 </template>
@@ -849,6 +860,32 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
         <v-card-actions class="pa-4 d-flex justify-end ga-2">
           <v-btn variant="text" @click="showEditDialog = false">Cancel</v-btn>
           <v-btn color="#12086F" variant="flat" :loading="saving" @click="saveEdit">Save</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Delete Entry dialog -->
+    <v-dialog v-model="showDeleteDialog" max-width="400" persistent>
+      <v-card rounded="lg">
+        <v-card-title class="pa-5 pb-3 font-weight-bold text-body-1" style="color:#d32f2f">Delete Time Entry</v-card-title>
+        <v-divider />
+        <v-card-text class="pa-5">
+          <p class="text-body-2 text-grey mb-4">Please provide a reason for deleting this entry.</p>
+          <v-textarea
+            v-model="deleteComment"
+            label="Reason (required)"
+            variant="outlined"
+            density="compact"
+            color="error"
+            rows="3"
+            :rules="[v => !!v.trim() || 'Reason is required']"
+            hide-details="auto"
+          />
+        </v-card-text>
+        <v-divider />
+        <v-card-actions class="pa-4 d-flex justify-end ga-2">
+          <v-btn variant="text" @click="showDeleteDialog = false" :disabled="deleting">Cancel</v-btn>
+          <v-btn color="error" variant="flat" :loading="deleting" :disabled="!deleteComment.trim()" @click="confirmDelete">Delete</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
