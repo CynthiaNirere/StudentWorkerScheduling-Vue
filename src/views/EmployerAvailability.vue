@@ -81,10 +81,14 @@ const availabilityGrid = computed(() => {
       }));
     });
 
+    // Check if this is an OC student (has @eagles.oc.edu email)
+    const isOCStudent = (employee.email || '').endsWith('@eagles.oc.edu');
+
     return {
       employeeName: `${employee.fName || employee.first_name || ''} ${employee.lName || employee.last_name || ''}`.trim(),
       employeeId: empId,
       schedule: weekSchedule,
+      isOCStudent,
     };
   });
 });
@@ -279,8 +283,9 @@ const handleDelete = async () => {
             <div class="employee-column">
               <div class="d-flex align-center justify-space-between w-100">
                 <div class="font-weight-medium">{{ row.employeeName }}</div>
-                <!-- 📚 Class Schedule Button -->
+                <!-- 📚 Class Schedule Button - Only for OC students -->
                 <v-btn 
+                  v-if="row.isOCStudent"
                   size="x-small" 
                   color="primary" 
                   variant="outlined"
