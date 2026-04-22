@@ -595,7 +595,7 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
                         <v-icon size="11" class="mr-1">mdi-comment-text-outline</v-icon>{{ r.notes }}
                       </div>
                     </div>
-                    <div class="d-flex align-end ga-1">
+                    <div v-if="r.status !== 'clocked_in'" class="d-flex align-end ga-1">
                       <v-btn size="x-small" variant="tonal" color="#12086F" @click="openEdit(r)">Edit</v-btn>
                       <v-btn size="x-small" variant="tonal" color="error" @click="openDeleteDialog(r)">Delete</v-btn>
                     </div>
