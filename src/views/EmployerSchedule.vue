@@ -573,13 +573,13 @@ const dragTimeLabel = computed(() => {
 
 // ── HOVER DETAIL CARD ────────────────────────────────────────────────────
 const hoveredShift = ref(null);
-const hoverRect    = ref(null);
+const hoverPos     = ref({ x: 0, y: 0 });
 let   hoverTimer   = null;
 
 const showShiftHover = (e, shift) => {
   clearTimeout(hoverTimer);
   hoveredShift.value = shift;
-  hoverRect.value    = e.currentTarget.getBoundingClientRect();
+  hoverPos.value     = { x: e.clientX, y: e.clientY };
 };
 const hideShiftHover = () => {
   hoverTimer = setTimeout(() => { hoveredShift.value = null; }, 150);
@@ -594,25 +594,23 @@ const getDuration = (shift) => {
 };
 
 const hoverCardStyle = computed(() => {
-  if (!hoverRect.value) return {};
-  const r     = hoverRect.value;
+  if (!hoveredShift.value) return {};
+  const { x, y } = hoverPos.value;
   const vW    = window.innerWidth;
   const vH    = window.innerHeight;
   const cardW = 270;
-  const cardH = 290; // generous estimate — covers all content variants
+  const cardH = 290;
+  const offset = 14;
 
-  // Horizontal: prefer right of shift, flip left when not enough room
-  const left = r.right + 14 + cardW <= vW ? r.right + 14 : r.left - cardW - 14;
-
-  // Vertical: center card on the shift's midpoint, then clamp to viewport
-  const shiftMid   = r.top + r.height / 2;
-  const idealTop   = shiftMid - cardH / 2;
-  const clampedTop = Math.max(8, Math.min(idealTop, vH - cardH - 8));
+  // Prefer right of cursor, flip left when not enough room
+  const rawLeft = x + offset + cardW <= vW ? x + offset : x - cardW - offset;
+  // Prefer below cursor, flip up when not enough room
+  const rawTop  = y + offset + cardH <= vH ? y + offset : y - cardH - offset;
 
   return {
     position: 'fixed',
-    top:  clampedTop + 'px',
-    left: Math.max(8, left) + 'px',
+    top:  Math.max(8, Math.min(rawTop,  vH - cardH - 8)) + 'px',
+    left: Math.max(8, Math.min(rawLeft, vW - cardW - 8)) + 'px',
     zIndex: 3000,
     width: cardW + 'px',
   };
