@@ -44,10 +44,15 @@ function periodLabel(start) {
 }
 
 // ── RECORDS ───────────────────────────────────────────────────────────────
+// Local edits for draft entries — not sent to backend until Submit is clicked
+const localEdits = ref({});
+
 const recordsWithDetails = computed(() =>
   clockRecords.value.map(r => {
-    const clockIn  = r.clockInTime  || r.clock_in_time;
-    const clockOut = r.clockOutTime || r.clock_out_time;
+    const rid    = r.id || r.clock_id;
+    const edit   = localEdits.value[rid];
+    const clockIn  = edit?.clockInTime  ?? r.clockInTime  ?? r.clock_in_time;
+    const clockOut = edit?.clockOutTime ?? r.clockOutTime ?? r.clock_out_time;
     const inDate   = clockIn  ? new Date(Number(clockIn))  : null;
     const outDate  = clockOut ? new Date(Number(clockOut)) : null;
     let totalHours = null;
@@ -57,7 +62,14 @@ const recordsWithDetails = computed(() =>
       totalHours = parseFloat(r.totalHoursWorked || r.total_hours_worked).toFixed(2);
     }
     const rejectionComment = r.rejectionReason || r.rejection_reason || r.rejectReason || r.reason || null;
-    return { ...r, inDate, outDate, totalHours, status: r.status || 'pending', rejectionComment };
+    return {
+      ...r,
+      ...(edit ? { clockInTime: edit.clockInTime, clockOutTime: edit.clockOutTime, notes: edit.notes } : {}),
+      inDate, outDate, totalHours,
+      status: r.status || 'pending',
+      rejectionComment,
+      _pendingEdit: !!edit,
+    };
   })
 );
 
@@ -151,6 +163,17 @@ const expandedPeriods  = ref({});
 const togglePeriod     = (key) => { expandedPeriods.value[key] = !expandedPeriods.value[key]; };
 const pendingWeeksOpen = ref({ w1: true, w2: false });
 
+// Today's week always comes first in the Current tab
+const orderedPendingWeeks = computed(() => {
+  const today  = new Date(); today.setHours(0,0,0,0);
+  const w2Start = new Date(pendingWeek2.value[0].date); w2Start.setHours(0,0,0,0);
+  const w2End   = new Date(pendingWeek2.value[6].date); w2End.setHours(23,59,59,999);
+  const todayInW2 = today >= w2Start && today <= w2End;
+  return todayInW2
+    ? [{ days: pendingWeek2.value, key: 'w2' }, { days: pendingWeek1.value, key: 'w1' }]
+    : [{ days: pendingWeek1.value, key: 'w1' }, { days: pendingWeek2.value, key: 'w2' }];
+});
+
 // ── LIFECYCLE ──────────────────────────────────────────────────────────────
 onMounted(async () => {
   user.value = Utils.getStore('user');
@@ -211,6 +234,12 @@ const submitTimecard = async () => {
       return;
     }
 
+    // Flush any locally-edited drafts to the backend first
+    for (const [id, edit] of Object.entries(localEdits.value)) {
+      await EmployeeService.updateClockRecord(id, edit).catch(() => {});
+    }
+    localEdits.value = {};
+
     // Use the submitTimecard service call if available, otherwise update each record
     try {
       const userId = user.value?.user_id || user.value?.userId;
@@ -240,6 +269,39 @@ const submitTimecard = async () => {
   }
 };
 
+// ── SUBMIT WEEK ────────────────────────────────────────────────────────────
+const submittingWeek = ref(false);
+
+const submitWeek = async (weekDays) => {
+  const unsubmitted = weekDays.flatMap(d => d.records)
+    .filter(r => r.status === 'pending' || r.status === 'clocked_out');
+  if (!unsubmitted.length) { showSnackbar('No entries to submit this week', 'warning'); return; }
+  submittingWeek.value = true;
+  try {
+    // Flush any local edits for this week's records first
+    for (const r of unsubmitted) {
+      const rid = r.id || r.clock_id;
+      if (localEdits.value[rid]) {
+        await EmployeeService.updateClockRecord(rid, localEdits.value[rid]).catch(() => {});
+        delete localEdits.value[rid];
+      }
+    }
+    const userId = user.value?.user_id || user.value?.userId;
+    const weekEnd = new Date(weekDays[6].date); weekEnd.setHours(23,59,59,999);
+    await EmployeeService.submitTimecard({
+      userId,
+      periodStart: weekDays[0].date.getTime(),
+      periodEnd:   weekEnd.getTime(),
+    });
+    showSnackbar(`${unsubmitted.length} entr${unsubmitted.length===1?'y':'ies'} submitted for manager review!`, 'success');
+    await loadData();
+  } catch {
+    showSnackbar('Error submitting week', 'error');
+  } finally {
+    submittingWeek.value = false;
+  }
+};
+
 // ── EDIT ──────────────────────────────────────────────────────────────────
 const showEditDialog = ref(false);
 const editForm       = ref({ id: null, clockInTime: '', clockOutTime: '', notes: '' });
@@ -255,20 +317,13 @@ const openEdit = (record) => {
   showEditDialog.value = true;
 };
 
-const saveEdit = async () => {
-  saving.value = true;
-  try {
-    const inTs  = editForm.value.clockInTime  ? new Date(editForm.value.clockInTime).getTime()  : null;
-    const outTs = editForm.value.clockOutTime ? new Date(editForm.value.clockOutTime).getTime() : null;
-    await EmployeeService.updateClockRecord(editForm.value.id, {
-      clockInTime: inTs, clockOutTime: outTs, notes: editForm.value.notes
-    });
-    showSnackbar('Time entry updated', 'success');
-    showEditDialog.value = false;
-    await loadData();
-  } catch (err) {
-    showSnackbar(err.response?.data?.message || 'Error updating', 'error');
-  } finally { saving.value = false; }
+const saveEdit = () => {
+  const inTs  = editForm.value.clockInTime  ? new Date(editForm.value.clockInTime).getTime()  : null;
+  const outTs = editForm.value.clockOutTime ? new Date(editForm.value.clockOutTime).getTime() : null;
+  // Store locally — backend is only updated on Submit to avoid auto-approval
+  localEdits.value[editForm.value.id] = { clockInTime: inTs, clockOutTime: outTs, notes: editForm.value.notes };
+  showSnackbar('Entry updated — submit your timecard to save permanently.', 'success');
+  showEditDialog.value = false;
 };
 
 // ── LOG HOURS ──────────────────────────────────────────────────────────────
@@ -421,54 +476,10 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
           <h1 class="text-h5 font-weight-bold navy-text">My Time Card</h1>
           <p class="text-body-2 text-grey mt-1">Track your hours and submit your timecard at the end of the week</p>
         </div>
-        <div class="d-flex ga-2 flex-wrap">
-          <v-btn color="#12086F" variant="tonal" size="small" @click="openLogDialog">
-            <v-icon start size="16">mdi-plus</v-icon>Log Hours
-          </v-btn>
-          <!-- Submit Timecard button -->
-          <v-btn
-            color="#2e7d32"
-            variant="flat"
-            size="small"
-            :disabled="pendingRecords.length === 0 || currentPeriodSubmitted"
-            @click="showSubmitDialog = true"
-          >
-            <v-icon start size="16">mdi-send-check</v-icon>
-            {{ currentPeriodSubmitted ? 'Submitted' : 'Submit Timecard' }}
-          </v-btn>
-        </div>
+        <v-btn v-if="activeTab === 'current'" color="#12086F" variant="tonal" size="small" @click="openLogDialog">
+          <v-icon start size="16">mdi-plus</v-icon>Log Hours
+        </v-btn>
       </div>
-
-      <!-- End of week reminder -->
-      <v-alert
-        v-if="isEndOfWeek && pendingRecords.length > 0 && !currentPeriodSubmitted"
-        type="warning"
-        variant="tonal"
-        density="compact"
-        color="#f57c00"
-        class="mb-4"
-        icon="mdi-calendar-clock"
-      >
-        <div class="d-flex align-center justify-space-between flex-wrap gap-2">
-          <div class="text-caption">
-            It's end of week — you have <strong>{{ currentPeriodHours }} hours</strong> ready to submit for this pay period.
-          </div>
-          <v-btn size="x-small" color="#f57c00" variant="flat" @click="showSubmitDialog = true">Submit Now</v-btn>
-        </div>
-      </v-alert>
-
-      <!-- Already submitted notice -->
-      <v-alert
-        v-if="currentPeriodSubmitted"
-        type="success"
-        variant="tonal"
-        density="compact"
-        color="#2e7d32"
-        class="mb-4"
-        icon="mdi-check-circle"
-      >
-        <div class="text-caption">Timecard submitted for this period. Awaiting manager review.</div>
-      </v-alert>
 
       <!-- Tabs -->
       <v-card variant="outlined" rounded="lg" class="navy-card mb-5">
@@ -493,30 +504,31 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
 
         <!-- CURRENT PERIOD TAB (unsubmitted) -->
         <template v-if="activeTab === 'current'">
-          <div class="d-flex align-center justify-space-between mb-4">
-            <div class="text-body-2 font-weight-bold navy-text">{{ periodLabel(currentPeriodStart) }}</div>
-            <div class="d-flex align-center ga-2">
-              <span class="text-caption text-grey">Total: <strong class="navy-text">{{ currentPeriodHours }} hrs</strong></span>
-            </div>
-          </div>
 
-          <!-- Week 1 -->
-          <v-card variant="outlined" rounded="lg" class="navy-card overflow-hidden mb-3" :class="weekEntryCount(pendingWeek1) > 0 ? 'week-card--active' : ''">
-            <div class="week-toggle d-flex align-center px-5 py-4 cursor-pointer" @click="pendingWeeksOpen.w1 = !pendingWeeksOpen.w1">
-              <v-icon size="18" class="mr-3" color="#12086F" style="transition:transform .2s" :style="pendingWeeksOpen.w1 ? 'transform:rotate(90deg)' : ''">mdi-chevron-right</v-icon>
-              <span class="text-body-2 font-weight-bold navy-text mr-2">{{ getWeekLabel(pendingWeek1, 'Week 1') }}</span>
-              <v-chip v-if="weekEntryCount(pendingWeek1) > 0" size="x-small" color="#12086F" variant="tonal" class="mr-2">{{ weekEntryCount(pendingWeek1) }} entr{{ weekEntryCount(pendingWeek1) === 1 ? 'y' : 'ies' }}</v-chip>
+          <v-card
+            v-for="week in orderedPendingWeeks"
+            :key="week.key"
+            variant="outlined"
+            rounded="lg"
+            class="navy-card overflow-hidden mb-3"
+            :class="weekEntryCount(week.days) > 0 ? 'week-card--active' : ''"
+          >
+            <!-- Week header -->
+            <div class="week-toggle d-flex align-center px-5 py-4 cursor-pointer" @click="pendingWeeksOpen[week.key] = !pendingWeeksOpen[week.key]">
+              <v-icon size="18" class="mr-3" color="#12086F" style="transition:transform .2s" :style="pendingWeeksOpen[week.key] ? 'transform:rotate(90deg)' : ''">mdi-chevron-right</v-icon>
+              <span class="text-body-2 font-weight-bold navy-text mr-2">{{ getWeekLabel(week.days, week.key === 'w1' ? 'Week 1' : 'Week 2') }}</span>
+              <v-chip v-if="weekEntryCount(week.days) > 0" size="x-small" color="#12086F" variant="tonal" class="mr-2">{{ weekEntryCount(week.days) }} entr{{ weekEntryCount(week.days) === 1 ? 'y' : 'ies' }}</v-chip>
               <span class="text-caption text-grey">
-                {{ pendingWeek1[0].date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }} –
-                {{ pendingWeek1[6].date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }}
+                {{ week.days[0].date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }} –
+                {{ week.days[6].date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }}
               </span>
-              <v-spacer />
-              <span class="text-body-2 font-weight-bold" :style="weekEntryCount(pendingWeek1) > 0 ? 'color:#12086F' : ''">{{ weekHours(pendingWeek1) }} hrs</span>
             </div>
-            <template v-if="pendingWeeksOpen.w1">
+
+            <!-- Expanded entries -->
+            <template v-if="pendingWeeksOpen[week.key]">
               <v-divider />
               <div class="pa-4 d-flex flex-column ga-3">
-                <template v-for="day in pendingWeek1" :key="day.date.getTime()">
+                <template v-for="day in week.days" :key="day.date.getTime()">
                   <div v-for="r in day.records" :key="r.id || r.clock_id" class="shift-card d-flex align-center pa-4" :class="cardClass(r.status)">
                     <div class="shift-icon-circle mr-4" :class="isToday(day.date) ? 'shift-icon-circle--today' : ''">
                       <v-icon color="white" size="20">mdi-clock-outline</v-icon>
@@ -525,9 +537,7 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
                       <div class="d-flex align-center ga-2 mb-1">
                         <span class="entry-badge">Clock Entry</span>
                         <span v-if="isToday(day.date)" class="today-pill">Today</span>
-                        <span v-if="r.status === 'submitted'" class="status-pill status-pill--submitted">Needs Review</span>
-                        <span v-if="r.status === 'approved'"  class="status-pill status-pill--approved">Approved</span>
-                        <span v-if="r.status === 'rejected'"  class="status-pill status-pill--rejected">Rejected</span>
+                        <span v-if="r._pendingEdit" class="status-pill status-pill--edited">Edited</span>
                       </div>
                       <div class="text-body-2 font-weight-bold navy-text mb-1">{{ day.date.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'}) }}</div>
                       <div class="text-caption text-grey">
@@ -537,79 +547,38 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
                       <div v-if="r.notes" class="text-caption text-grey mt-1">
                         <v-icon size="11" class="mr-1">mdi-comment-text-outline</v-icon>{{ r.notes }}
                       </div>
-                      <div v-if="r.status === 'rejected' && r.rejectionComment" class="rejection-note mt-2 d-flex align-start ga-2">
-                        <v-icon size="13" color="#d32f2f" style="margin-top:2px">mdi-message-alert-outline</v-icon>
-                        <span class="text-caption" style="color:#b71c1c"><strong>Manager:</strong> {{ r.rejectionComment }}</span>
-                      </div>
                     </div>
                     <div class="d-flex flex-column align-end ga-2">
-                      <v-chip size="x-small" :color="statusColor(r.status)" variant="tonal">{{ statusLabel(r.status) }}</v-chip>
-                      <v-btn v-if="r.status==='pending'||r.status==='rejected'||r.status==='clocked_out'" size="x-small" variant="tonal" color="#12086F" @click="openEdit(r)">Edit</v-btn>
+                      <v-btn size="x-small" variant="tonal" color="#12086F" @click="openEdit(r)">Edit</v-btn>
                     </div>
                   </div>
                 </template>
-                <div v-if="pendingWeek1.every(d => d.records.length === 0)" class="text-center py-4 text-caption text-grey">No shifts logged this week</div>
+                <div v-if="week.days.every(d => d.records.length === 0)" class="text-center py-4 text-caption text-grey">No hours logged this week</div>
               </div>
-            </template>
-          </v-card>
 
-          <!-- Week 2 -->
-          <v-card variant="outlined" rounded="lg" class="navy-card overflow-hidden mb-4" :class="weekEntryCount(pendingWeek2) > 0 ? 'week-card--active' : ''">
-            <div class="week-toggle d-flex align-center px-5 py-4 cursor-pointer" @click="pendingWeeksOpen.w2 = !pendingWeeksOpen.w2">
-              <v-icon size="18" class="mr-3" color="#12086F" style="transition:transform .2s" :style="pendingWeeksOpen.w2 ? 'transform:rotate(90deg)' : ''">mdi-chevron-right</v-icon>
-              <span class="text-body-2 font-weight-bold navy-text mr-2">{{ getWeekLabel(pendingWeek2, 'Week 2') }}</span>
-              <v-chip v-if="weekEntryCount(pendingWeek2) > 0" size="x-small" color="#12086F" variant="tonal" class="mr-2">{{ weekEntryCount(pendingWeek2) }} entr{{ weekEntryCount(pendingWeek2) === 1 ? 'y' : 'ies' }}</v-chip>
-              <span class="text-caption text-grey">
-                {{ pendingWeek2[0].date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }} –
-                {{ pendingWeek2[6].date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) }}
-              </span>
-              <v-spacer />
-              <span class="text-body-2 font-weight-bold" :style="weekEntryCount(pendingWeek2) > 0 ? 'color:#12086F' : ''">{{ weekHours(pendingWeek2) }} hrs</span>
-            </div>
-            <template v-if="pendingWeeksOpen.w2">
+              <!-- Submit button at bottom of expanded week -->
               <v-divider />
-              <div class="pa-4 d-flex flex-column ga-3">
-                <template v-for="day in pendingWeek2" :key="day.date.getTime()">
-                  <div v-for="r in day.records" :key="r.id || r.clock_id" class="shift-card d-flex align-center pa-4" :class="cardClass(r.status)">
-                    <div class="shift-icon-circle mr-4" :class="isToday(day.date) ? 'shift-icon-circle--today' : ''">
-                      <v-icon color="white" size="20">mdi-clock-outline</v-icon>
-                    </div>
-                    <div style="flex:1">
-                      <div class="d-flex align-center ga-2 mb-1">
-                        <span class="entry-badge">Clock Entry</span>
-                        <span v-if="isToday(day.date)" class="today-pill">Today</span>
-                        <span v-if="r.status === 'submitted'" class="status-pill status-pill--submitted">Needs Review</span>
-                        <span v-if="r.status === 'approved'"  class="status-pill status-pill--approved">Approved</span>
-                        <span v-if="r.status === 'rejected'"  class="status-pill status-pill--rejected">Rejected</span>
-                      </div>
-                      <div class="text-body-2 font-weight-bold navy-text mb-1">{{ day.date.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'}) }}</div>
-                      <div class="text-caption text-grey">
-                        In: <strong>{{ formatTime(r.inDate) }}</strong> → Out: <strong>{{ r.outDate ? formatTime(r.outDate) : 'Not clocked out' }}</strong>
-                        <span v-if="r.totalHours"> · <span class="navy-text font-weight-bold">{{ r.totalHours }} hrs</span></span>
-                      </div>
-                      <div v-if="r.notes" class="text-caption text-grey mt-1">
-                        <v-icon size="11" class="mr-1">mdi-comment-text-outline</v-icon>{{ r.notes }}
-                      </div>
-                      <div v-if="r.status === 'rejected' && r.rejectionComment" class="rejection-note mt-2 d-flex align-start ga-2">
-                        <v-icon size="13" color="#d32f2f" style="margin-top:2px">mdi-message-alert-outline</v-icon>
-                        <span class="text-caption" style="color:#b71c1c"><strong>Manager:</strong> {{ r.rejectionComment }}</span>
-                      </div>
-                    </div>
-                    <div class="d-flex flex-column align-end ga-2">
-                      <v-chip size="x-small" :color="statusColor(r.status)" variant="tonal">{{ statusLabel(r.status) }}</v-chip>
-                      <v-btn v-if="r.status==='pending'||r.status==='rejected'||r.status==='clocked_out'" size="x-small" variant="tonal" color="#12086F" @click="openEdit(r)">Edit</v-btn>
-                    </div>
-                  </div>
-                </template>
-                <div v-if="pendingWeek2.every(d => d.records.length === 0)" class="text-center py-4 text-caption text-grey">No shifts logged this week</div>
+              <div class="pa-3 d-flex justify-end align-center ga-3">
+                <span class="text-caption text-grey">{{ weekEntryCount(week.days) }} entr{{ weekEntryCount(week.days) === 1 ? 'y' : 'ies' }} · {{ weekHours(week.days) }} hrs</span>
+                <v-btn
+                  color="#2e7d32"
+                  variant="flat"
+                  size="small"
+                  :loading="submittingWeek"
+                  :disabled="weekEntryCount(week.days) === 0"
+                  @click="submitWeek(week.days)"
+                >
+                  <v-icon start size="14">mdi-send-check</v-icon>
+                  Submit Timecard
+                </v-btn>
               </div>
             </template>
           </v-card>
 
           <div v-if="pendingRecords.length === 0" class="text-center py-10">
             <v-icon size="52" color="grey-lighten-2" class="mb-3">mdi-calendar-check-outline</v-icon>
-            <div class="text-body-2 text-grey">No unsubmitted entries for this period</div>
-            <div class="text-caption text-grey mt-1">Check the "Submitted" tab to see entries awaiting review</div>
+            <div class="text-body-2 text-grey">No draft entries — log your hours to get started</div>
+            <div class="text-caption text-grey mt-1">Check the Submitted tab for entries sent to your manager</div>
           </div>
         </template>
 
@@ -989,6 +958,7 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
 .entry-badge { background: #ede9ff; color: #12086F; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
 .today-pill  { background: #12086F; color: white; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; }
 .status-pill { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; letter-spacing: .02em; }
+.status-pill--edited { background: #fff3e0; color: #e65100; }
 .status-pill--submitted { background: #1565C0; color: white; }
 .status-pill--approved  { background: #2e7d32; color: white; }
 .status-pill--rejected  { background: #d32f2f; color: white; }
