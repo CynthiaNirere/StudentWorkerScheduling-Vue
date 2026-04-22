@@ -338,6 +338,21 @@ const saveEdit = () => {
   showEditDialog.value = false;
 };
 
+const deleting = ref(false);
+
+const deleteEntry = async (record) => {
+  const id = record.id || record.clock_id;
+  deleting.value = true;
+  try {
+    await EmployeeService.deleteClockRecord(id);
+    delete localEdits.value[id];
+    showSnackbar('Entry deleted.', 'success');
+    await loadData();
+  } catch {
+    showSnackbar('Could not delete entry.', 'error');
+  } finally { deleting.value = false; }
+};
+
 // ── LOG HOURS ──────────────────────────────────────────────────────────────
 const showLogDialog   = ref(false);
 const logSelectedWeek = ref(null);
@@ -569,8 +584,9 @@ const cardClass   = (s) => ({ rejected: 'status-card--rejected', submitted: 'sta
                         <v-icon size="11" class="mr-1">mdi-comment-text-outline</v-icon>{{ r.notes }}
                       </div>
                     </div>
-                    <div class="d-flex flex-column align-end ga-2">
+                    <div class="d-flex align-end ga-1">
                       <v-btn size="x-small" variant="tonal" color="#12086F" @click="openEdit(r)">Edit</v-btn>
+                      <v-btn size="x-small" variant="tonal" color="error" :loading="deleting" @click="deleteEntry(r)">Delete</v-btn>
                     </div>
                   </div>
                 </template>
