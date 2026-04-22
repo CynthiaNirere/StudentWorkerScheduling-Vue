@@ -154,10 +154,18 @@ const handleNameSearch = async () => {
 
 const selectExistingEmployee = (emp) => {
   selectedExisting.value = emp;
-  addStep.value          = 'preview';
+  newEmployee.value = {
+    first_name:   emp.fName        || emp.first_name   || '',
+    last_name:    emp.lName        || emp.last_name    || '',
+    email:        emp.email        || '',
+    phone_number: emp.phone_number || '',
+    selectedRoles: [],
+  };
+  addStep.value = 'manual';
 };
 
 const goManual = () => {
+  selectedExisting.value = null;
   const parts = nameQuery.value.trim().split(/\s+/);
   newEmployee.value = {
     first_name: parts[0] || '', last_name: parts.slice(1).join(' ') || '',
@@ -214,9 +222,34 @@ const handleAddEmployee = async () => {
     const newUserId   = createdUser?.user_id || createdUser?.userId;
 
     if (res.data?.alreadyExisted) {
-      showSnackbar(`${createdUser?.fName || newEmployee.value.first_name} already has an account — added to your workplace!`, "success");
+      const existingUserId = createdUser?.user_id || createdUser?.userId;
+      const locationId = user.value?.work_location || user.value?.impersonatedLocation;
+      if (existingUserId && locationId) {
+        try {
+          const rolesRes = await EmployerService.getUserRoles(existingUserId, locationId);
+          const existingRoles = Array.isArray(rolesRes.data) ? rolesRes.data : [];
+          for (const role of existingRoles) {
+            try { await EmployerService.removeRoleFromUser(existingUserId, role.job_role_id); } catch {}
+          }
+        } catch {}
+        for (let i = 0; i < newEmployee.value.selectedRoles.length; i++) {
+          const role      = newEmployee.value.selectedRoles[i];
+          const isPrimary = i === 0;
+          try {
+            if (typeof role === 'string') {
+              const created = await EmployerService.createJobRole({ title: role.trim(), location_id: locationId });
+              await EmployerService.addRoleToUser(existingUserId, { jobRoleId: created.data.job_role_id, isPrimary });
+            } else {
+              await EmployerService.addRoleToUser(existingUserId, { jobRoleId: role.job_role_id, isPrimary });
+            }
+          } catch {}
+        }
+        await loadJobRoles();
+      }
+      showSnackbar(`${createdUser?.fName || newEmployee.value.first_name} added to your workplace!`, "success");
       showAddDialog.value = false;
       newEmployee.value   = { first_name: '', last_name: '', email: '', phone_number: '', selectedRoles: [] };
+      selectedExisting.value = null;
       await loadEmployees();
       return;
     }
@@ -549,7 +582,7 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
             </v-row>
             <v-text-field v-model="newEmployee.email" label="Email *" type="email" variant="outlined" density="compact" color="#12086F"
               :loading="emailCheckLoading" @blur="handleEmailCheck" @keyup.enter="handleEmailCheck" />
-            <v-alert v-if="foundByEmail" type="info" variant="tonal" density="compact" class="mb-3 mt-1 text-body-2" rounded="lg">
+            <v-alert v-if="foundByEmail || selectedExisting" type="info" variant="tonal" density="compact" class="mb-3 mt-1 text-body-2" rounded="lg">
               <v-icon start size="small">mdi-account-check</v-icon>
               Details pre-filled from an existing account. They'll be a fresh member here — no roles carried over.
             </v-alert>
@@ -590,7 +623,7 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
           <v-card-actions class="pa-4">
             <v-btn variant="text" @click="showAddDialog = false">Cancel</v-btn>
             <v-spacer />
-            <v-btn color="#12086F" variant="flat" :loading="saving" @click="handleAddEmployee">Create Employee</v-btn>
+            <v-btn color="#12086F" variant="flat" :loading="saving" @click="handleAddEmployee">{{ selectedExisting ? 'Add to My Workplace' : 'Create Employee' }}</v-btn>
           </v-card-actions>
         </template>
       </v-card>
