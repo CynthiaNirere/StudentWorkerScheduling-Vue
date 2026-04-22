@@ -6,15 +6,15 @@ import EmployerService from "../services/employerServices.js";
 import EmployerLayout from '../components/EmployerLayout.vue';
 
 const router = useRouter();
-const user = ref(null);
+const user    = ref(null);
 const loading = ref(false);
-const saving = ref(false);
+const saving  = ref(false);
 
 const profileForm = ref({ first_name: "", last_name: "", email: "", phone_number: "", workplace: "" });
 
-const snackbar = ref(false);
-const snackbarMessage = ref("");
-const snackbarColor = ref("success");
+const snackbar        = ref(false);
+const snackbarMessage = ref('');
+const snackbarColor   = ref('success');
 
 onMounted(async () => {
   user.value = Utils.getStore("user");
@@ -25,10 +25,9 @@ const loadUserProfile = async () => {
   loading.value = true;
   try {
     const userId = user.value.user_id || user.value.userId;
-    const res = await EmployerService.getEmployeeById(userId);
+    const res    = await EmployerService.getEmployeeById(userId);
     if (res.data) {
       const u = res.data;
-      // Load workplace name if available
       let workplaceName = '';
       if (u.work_location) {
         try {
@@ -37,21 +36,21 @@ const loadUserProfile = async () => {
         } catch {}
       }
       profileForm.value = {
-        first_name: u.fName || u.first_name || "",
-        last_name: u.lName || u.last_name || "",
-        email: u.email || "",
+        first_name:   u.fName || u.first_name || "",
+        last_name:    u.lName || u.last_name  || "",
+        email:        u.email || "",
         phone_number: u.phone_number || "",
-        workplace: workplaceName,
+        workplace:    workplaceName,
       };
       Utils.setStore("user", { ...user.value, fName: u.fName || u.first_name, lName: u.lName || u.last_name, email: u.email, phone_number: u.phone_number });
     }
-  } catch (err) {
+  } catch {
     profileForm.value = {
-      first_name: user.value.fName || user.value.first_name || "",
-      last_name: user.value.lName || user.value.last_name || "",
-      email: user.value.email || "",
+      first_name:   user.value.fName || user.value.first_name || "",
+      last_name:    user.value.lName || user.value.last_name  || "",
+      email:        user.value.email || "",
       phone_number: user.value.phone_number || "",
-      workplace: "",
+      workplace:    "",
     };
   } finally {
     loading.value = false;
@@ -66,22 +65,22 @@ const handleSaveProfile = async () => {
   try {
     const userId = user.value.user_id || user.value.userId;
     await EmployerService.updateEmployee(userId, {
-      first_name: profileForm.value.first_name,
-      last_name: profileForm.value.last_name,
-      email: profileForm.value.email,
+      first_name:   profileForm.value.first_name,
+      last_name:    profileForm.value.last_name,
+      email:        profileForm.value.email,
       phone_number: profileForm.value.phone_number || null,
     });
     Utils.setStore("user", {
       ...user.value,
-      fName: profileForm.value.first_name,
-      lName: profileForm.value.last_name,
-      first_name: profileForm.value.first_name,
-      last_name: profileForm.value.last_name,
-      email: profileForm.value.email,
+      fName:        profileForm.value.first_name,
+      lName:        profileForm.value.last_name,
+      first_name:   profileForm.value.first_name,
+      last_name:    profileForm.value.last_name,
+      email:        profileForm.value.email,
       phone_number: profileForm.value.phone_number,
     });
     showSnackbar("Profile updated successfully!", "success");
-  } catch (err) {
+  } catch {
     showSnackbar("Error updating profile", "error");
   } finally {
     saving.value = false;
@@ -93,7 +92,7 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
 
 <template>
   <EmployerLayout>
-    <v-container fluid class="pa-6" style="max-width: 700px;">
+    <v-container fluid class="pa-6" style="max-width:700px;">
       <div class="mb-6">
         <h1 class="text-h4 font-weight-bold navy-text">My Profile</h1>
         <p class="text-body-2 text-grey">Your personal information</p>
@@ -104,7 +103,7 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
       </div>
 
       <template v-else>
-        <!-- Avatar + Name Banner -->
+        <!-- Avatar banner -->
         <v-card variant="outlined" rounded="lg" class="mb-4 navy-card">
           <v-card-text class="pa-6 d-flex align-center ga-5">
             <v-avatar size="72" color="#12086F">
@@ -120,7 +119,7 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
           </v-card-text>
         </v-card>
 
-        <!-- Profile Form -->
+        <!-- Profile form -->
         <v-card variant="outlined" rounded="lg" class="navy-card">
           <v-card-title class="text-body-1 font-weight-bold pa-5 pb-4 navy-text">Profile Information</v-card-title>
           <v-divider />
@@ -161,5 +160,5 @@ const showSnackbar = (msg, color = "success") => { snackbarMessage.value = msg; 
 
 <style scoped>
 .navy-text { color: #12086F !important; }
-.navy-card { border-color: #e0e0e0; box-shadow: 0 1px 3px rgba(18, 8, 111, 0.05); }
+.navy-card { border-color: #e0e0e0; box-shadow: 0 1px 3px rgba(18,8,111,0.05); }
 </style>

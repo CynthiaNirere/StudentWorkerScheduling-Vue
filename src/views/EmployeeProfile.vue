@@ -10,15 +10,20 @@ const user   = ref(null);
 const loading = ref(false);
 const saving  = ref(false);
 
-const phone  = ref('');
+const phone   = ref('');
 const jobRole = ref('');
 
-// Certifications (local file store)
-const certifications  = ref([]);
-const certError       = ref('');
-const ALLOWED_TYPES   = ['application/pdf','image/jpeg','image/png','image/gif','image/webp'];
-const viewingCert     = ref(null);
-const showCertViewer  = ref(false);
+// Kiosk PIN (read-only for employee — employer sets it)
+const myKioskPin  = ref('0000');
+const showPin     = ref(false);
+const loadingPin  = ref(false);
+
+// Certifications
+const certifications = ref([]);
+const certError      = ref('');
+const ALLOWED_TYPES  = ['application/pdf','image/jpeg','image/png','image/gif','image/webp'];
+const viewingCert    = ref(null);
+const showCertViewer = ref(false);
 
 const snackbar   = ref(false);
 const snackMsg   = ref('');
@@ -35,25 +40,41 @@ const fullName = computed(() => {
   return `${user.value.fName || user.value.first_name || ''} ${user.value.lName || user.value.last_name || ''}`.trim();
 });
 
+// Masked PIN for display: shows dots except when revealed
+const maskedPin = computed(() => showPin.value ? myKioskPin.value : '••••');
+
 onMounted(async () => {
   user.value = Utils.getStore('user');
   if (!user.value) return;
 
-  phone.value = user.value.phone_number || user.value.phone || '';
+  phone.value          = user.value.phone_number || user.value.phone || '';
   certifications.value = [...(user.value.certifications || [])];
 
-  // Load job role
   loading.value = true;
+  loadingPin.value = true;
   try {
     const userId = user.value.user_id || user.value.userId;
-    const rolesRes = await EmployeeService.getUserRoles(userId);
-    const roles = Array.isArray(rolesRes.data) ? rolesRes.data : [];
-    const primary = roles.find(r => r.is_primary) || roles[0];
-    jobRole.value = primary?.role_title || '';
+
+    // Load role and PIN in parallel
+    const [rolesRes, pinRes] = await Promise.allSettled([
+      EmployeeService.getUserRoles(userId),
+      EmployeeService.getMyKioskPin(userId),
+    ]);
+
+    if (rolesRes.status === 'fulfilled') {
+      const roles   = Array.isArray(rolesRes.value.data) ? rolesRes.value.data : [];
+      const primary = roles.find(r => r.is_primary) || roles[0];
+      jobRole.value = primary?.role_title || '';
+    }
+
+    if (pinRes.status === 'fulfilled') {
+      myKioskPin.value = pinRes.value.data?.kioskPin || '0000';
+    }
   } catch (err) {
-    console.error('Error loading roles:', err);
+    console.error('Error loading profile:', err);
   } finally {
-    loading.value = false;
+    loading.value    = false;
+    loadingPin.value = false;
   }
 });
 
@@ -66,7 +87,7 @@ const savePhone = async () => {
     Utils.setStore('user', updated);
     user.value = updated;
     showSnackbar('Phone number saved!', 'success');
-  } catch (err) {
+  } catch {
     showSnackbar('Error saving phone number', 'error');
   } finally {
     saving.value = false;
@@ -108,17 +129,13 @@ const removeCert = async (idx) => {
   await saveCertsToBackend([...certifications.value]);
 };
 
-const openCertViewer = (cert) => {
-  viewingCert.value = cert;
-  showCertViewer.value = true;
-};
-
+const openCertViewer = (cert) => { viewingCert.value = cert; showCertViewer.value = true; };
 const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackColor.value = color; snackbar.value = true; };
 </script>
 
 <template>
   <EmployeeLayout>
-    <v-container fluid class="pa-6" style="max-width: 800px;">
+    <v-container fluid class="pa-6" style="max-width:800px;">
 
       <div class="mb-6">
         <h1 class="text-h4 font-weight-bold navy-text">My Profile</h1>
@@ -142,7 +159,7 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
         </v-card-text>
       </v-card>
 
-      <!-- Read-only info -->
+      <!-- Personal info -->
       <v-card variant="outlined" rounded="lg" class="navy-card mb-4">
         <v-card-title class="text-body-1 font-weight-bold pa-4 navy-text">
           <v-icon start size="18">mdi-account-outline</v-icon>Personal Information
@@ -164,8 +181,6 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
           <v-text-field :model-value="user?.email" label="Email" variant="outlined" density="compact" readonly color="#12086F" class="mb-3">
             <template #append-inner><v-icon size="small" color="grey">mdi-lock</v-icon></template>
           </v-text-field>
-
-          <!-- ✅ Phone number — editable -->
           <v-text-field
             v-model="phone"
             label="Phone Number"
@@ -187,6 +202,49 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
         </v-card-actions>
       </v-card>
 
+      <!-- ✅ Kiosk PIN card — read-only, employee just needs to see it -->
+      <v-card variant="outlined" rounded="lg" class="navy-card mb-4">
+        <v-card-title class="text-body-1 font-weight-bold pa-4 navy-text">
+          <v-icon start size="18">mdi-lock-outline</v-icon>My Kiosk PIN
+        </v-card-title>
+        <v-divider />
+        <v-card-text class="pa-5">
+          <v-alert type="info" variant="tonal" density="compact" color="#12086F" class="mb-4">
+            <div class="text-caption">
+              Use this 4-digit PIN when clocking in or out at the shared kiosk. Keep it private.
+              If you need it changed, ask your manager.
+            </div>
+          </v-alert>
+
+          <div v-if="loadingPin" class="d-flex align-center ga-2">
+            <v-progress-circular indeterminate size="20" width="2" color="#12086F" />
+            <span class="text-caption text-grey">Loading PIN...</span>
+          </div>
+
+          <div v-else class="d-flex align-center ga-4">
+            <div>
+              <div class="text-caption text-grey mb-1">Your kiosk PIN</div>
+              <div class="pin-display font-weight-bold navy-text">{{ maskedPin }}</div>
+            </div>
+            <v-btn
+              :icon="showPin ? 'mdi-eye-off' : 'mdi-eye'"
+              size="small"
+              variant="tonal"
+              color="#12086F"
+              @click="showPin = !showPin"
+            >
+              <v-tooltip activator="parent" location="top">
+                {{ showPin ? 'Hide PIN' : 'Show PIN' }}
+              </v-tooltip>
+            </v-btn>
+          </div>
+
+          <p class="text-caption text-grey mt-3">
+            Default PIN is <strong>0000</strong>. Your manager can set a personal PIN for you in Employee Management.
+          </p>
+        </v-card-text>
+      </v-card>
+
       <!-- Certifications -->
       <v-card variant="outlined" rounded="lg" class="navy-card">
         <v-card-title class="text-body-1 font-weight-bold pa-4 navy-text">
@@ -195,28 +253,17 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
         <v-divider />
         <v-card-text class="pa-5">
           <div class="mb-4">
-            <v-btn color="#12086F" variant="tonal" prepend-icon="mdi-upload" @click="$refs.certInput.click()">
-              Upload File
-            </v-btn>
+            <v-btn color="#12086F" variant="tonal" prepend-icon="mdi-upload" @click="$refs.certInput.click()">Upload File</v-btn>
             <input ref="certInput" type="file" accept=".pdf,image/*" style="display:none" @change="onCertFileChange" />
             <p class="text-caption text-grey mt-1">Accepted: PDF, JPEG, PNG, GIF, WEBP</p>
             <v-alert v-if="certError" type="error" density="compact" variant="tonal" class="mt-2">{{ certError }}</v-alert>
           </div>
-
           <div v-if="certifications.length === 0" class="text-center pa-6">
             <v-icon size="48" color="grey-lighten-2" class="mb-2">mdi-file-outline</v-icon>
             <p class="text-caption text-grey">No files uploaded yet</p>
           </div>
-
           <v-list v-else density="compact" class="pa-0">
-            <v-list-item
-              v-for="(cert, i) in certifications"
-              :key="i"
-              :prepend-icon="cert.mimeType === 'application/pdf' ? 'mdi-file-pdf-box' : 'mdi-file-image'"
-              rounded="lg"
-              class="mb-2"
-              style="border: 1px solid #e0e0e0;"
-            >
+            <v-list-item v-for="(cert, i) in certifications" :key="i" :prepend-icon="cert.mimeType === 'application/pdf' ? 'mdi-file-pdf-box' : 'mdi-file-image'" rounded="lg" class="mb-2" style="border:1px solid #e0e0e0;">
               <v-list-item-title class="text-body-2 font-weight-medium">{{ cert.name }}</v-list-item-title>
               <v-list-item-subtitle class="text-caption text-grey">Uploaded {{ cert.date }}</v-list-item-subtitle>
               <template #append>
@@ -229,7 +276,7 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
       </v-card>
     </v-container>
 
-    <!-- File Viewer Dialog -->
+    <!-- File viewer -->
     <v-dialog v-model="showCertViewer" max-width="800">
       <v-card rounded="lg" v-if="viewingCert">
         <v-card-title class="pa-4 d-flex align-center justify-space-between navy-text">
@@ -238,8 +285,8 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
         </v-card-title>
         <v-divider />
         <v-card-text class="pa-4">
-          <img v-if="viewingCert.mimeType !== 'application/pdf'" :src="viewingCert.dataUrl" style="max-width:100%; border-radius:8px;" />
-          <iframe v-else :src="viewingCert.dataUrl" style="width:100%; height:500px; border:none; border-radius:8px;" />
+          <img v-if="viewingCert.mimeType !== 'application/pdf'" :src="viewingCert.dataUrl" style="max-width:100%;border-radius:8px;" />
+          <iframe v-else :src="viewingCert.dataUrl" style="width:100%;height:500px;border:none;border-radius:8px;" />
         </v-card-text>
       </v-card>
     </v-dialog>
@@ -251,4 +298,10 @@ const showSnackbar = (msg, color = 'success') => { snackMsg.value = msg; snackCo
 <style scoped>
 .navy-text { color: #12086F !important; }
 .navy-card { border-color: #e0e0e0; box-shadow: 0 1px 3px rgba(18,8,111,0.05); }
+.pin-display {
+  font-size: 2rem;
+  letter-spacing: 12px;
+  font-family: monospace;
+  color: #12086F;
+}
 </style>
