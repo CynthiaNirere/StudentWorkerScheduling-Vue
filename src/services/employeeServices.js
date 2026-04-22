@@ -126,6 +126,12 @@ export default {
     return apiClient.put(`/clock-records/${id}/modify`, data);
   },
 
+  deleteClockRecord(id) {
+    return apiClient.delete(`/clock-records/${id}`);
+  },
+
+  // Submit timecard for the current pay period
+  // Backend should mark all pending records for this user/period as submitted
   submitTimecard(data) {
     return apiClient.post('/clock-records/submit-timecard', data);
   },
